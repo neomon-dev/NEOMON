@@ -1,0 +1,1 @@
+"""NEOMON backend package."""

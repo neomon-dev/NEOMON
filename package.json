@@ -1,0 +1,29 @@
+{
+  "name": "neomon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Neural Evidence Orchestration & Multi-Agent Observation Network",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "node --test tests/workspace-ui.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "backend:test": "python -m pytest backend/tests -q",
+    "backend:dev": "python -m uvicorn app.main:app --app-dir backend --reload --port 8000"
+  },
+  "dependencies": {
+    "next": "^16.4.6",
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.4.6",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,481 @@
+"use client";
+
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { requestJson } from "@/lib/api";
+import {
+  agentStatusBadgeClass,
+  formatAgentStatus,
+  formatDurationSeconds,
+  type AgentExecutionObservatoryItem,
+  type AgentObservatoryResponse,
+  type InvestigationSummary,
+} from "@/lib/workspace";
+
+const PAGE_SIZE = 25;
+
+export function AgentObservatory() {
+  const searchParams = useSearchParams();
+  const initialInvId = searchParams.get("investigation_id") ?? "";
+  const initialRole = searchParams.get("agent_identifier") ?? "all";
+
+  const [investigations, setInvestigations] = useState<InvestigationSummary[]>([]);
+  const [data, setData] = useState<AgentObservatoryResponse | null>(null);
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string>("");
+
+  const [investigationId, setInvestigationId] = useState(initialInvId);
+  const [roleFilter, setRoleFilter] = useState(initialRole);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [offset, setOffset] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
+  const [autoPoll, setAutoPoll] = useState(true);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    requestJson<InvestigationSummary[]>("/research/investigations")
+      .then((rows) => {
+        if (active) setInvestigations(rows);
+      })
+      .catch(() => {
+        // Investigation list is optional filter metadata.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function loadObservatory() {
+      setLoading(true);
+      const params = new URLSearchParams();
+      params.set("limit", String(PAGE_SIZE));
+      params.set("offset", String(offset));
+      if (investigationId) params.set("investigation_id", investigationId);
+      if (roleFilter !== "all") params.set("agent_identifier", roleFilter);
+      if (statusFilter !== "all") params.set("status", statusFilter);
+
+      try {
+        const result = await requestJson<AgentObservatoryResponse>(`/agents/observatory?${params.toString()}`);
+        if (!active) return;
+        setData(result);
+        setError("");
+        setSelectedExecutionId((prev) => {
+          if (prev && result.executions.some((item) => item.id === prev)) return prev;
+          return result.executions[0]?.id ?? "";
+        });
+      } catch (reason) {
+        if (active) {
+          setError(reason instanceof Error ? reason.message : "Could not load Agent Observatory telemetry.");
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    void loadObservatory();
+    return () => {
+      active = false;
+    };
+  }, [investigationId, roleFilter, statusFilter, offset, refreshTick]);
+
+  const hasActiveActivity = Boolean(
+    data &&
+      (data.summary.active_jobs > 0 ||
+        data.summary.waiting_in_queue > 0 ||
+        data.summary.generating > 0),
+  );
+
+  useEffect(() => {
+    if (!autoPoll || !hasActiveActivity) return;
+    const timer = window.setInterval(() => {
+      setRefreshTick((prev) => prev + 1);
+    }, 4000);
+    return () => window.clearInterval(timer);
+  }, [autoPoll, hasActiveActivity]);
+
+  const selectedExecution: AgentExecutionObservatoryItem | undefined =
+    data?.executions.find((item) => item.id === selectedExecutionId) ?? data?.executions[0];
+  const showingFrom = !data || data.executions_total === 0 ? 0 : data.offset + 1;
+  const showingTo = !data ? 0 : Math.min(data.executions_total, data.offset + data.executions.length);
+
+  return (
+    <>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Evidence Intelligence Workspace</p>
+          <h1>Agent Observatory</h1>
+        </div>
+        <div className="analysis-actions">
+          <label className="mode-toggle">
+            <input
+              type="checkbox"
+              checked={autoPoll}
+              onChange={(event) => setAutoPoll(event.target.checked)}
+            />
+            Auto-refresh active runs
+          </label>
+          <button
+            className="outline-button compact-button"
+            type="button"
+            onClick={() => setRefreshTick((prev) => prev + 1)}
+          >
+            Refresh telemetry
+          </button>
+          <Link className="primary-button" href="/investigations/new">
+            + New investigation
+          </Link>
+        </div>
+      </header>
+
+      <div className="content">
+        <div className="metric-grid">
+          <article className="metric-card">
+            <span className="metric-label">Generating / Queued</span>
+            <strong>
+              {data?.summary.generating ?? 0} / {data?.summary.waiting_in_queue ?? 0}
+            </strong>
+            <span className="metric-detail">
+              Active jobs: {data?.summary.active_jobs ?? 0} of {data?.summary.total_jobs ?? 0}
+            </span>
+          </article>
+          <article className="metric-card">
+            <span className="metric-label">Completed executions</span>
+            <strong>{data?.summary.completed ?? 0}</strong>
+            <span className="metric-detail">Validated outputs out of {data?.summary.total_executions ?? 0} total runs</span>
+          </article>
+          <article className="metric-card">
+            <span className="metric-label">Failed / Cancelled</span>
+            <strong>
+              {data?.summary.failed ?? 0} / {data?.summary.cancelled ?? 0}
+            </strong>
+            <span className="metric-detail">Queue timeouts, validation rejections, and user cancellations</span>
+          </article>
+          <article className="metric-card">
+            <span className="metric-label">Local runtime policy</span>
+            <strong>1 concurrent</strong>
+            <span className="metric-detail">
+              Queue limit: {formatDurationSeconds(data?.summary.provider_queue_wait_timeout_seconds)} · Read:{" "}
+              {formatDurationSeconds(data?.summary.local_inference_timeout_seconds)}
+            </span>
+          </article>
+        </div>
+
+        <section className="panel" style={{ marginTop: 18 }}>
+          <div className="panel-heading">
+            <div>
+              <h3>Registered agent roster ({data?.agents.length ?? 12})</h3>
+              <span className="muted">
+                Every stage stays independent; failures never convert silently into completed runs.
+              </span>
+            </div>
+            <Link className="outline-button compact-button" href="/settings">
+              Provider settings
+            </Link>
+          </div>
+          <div className="execution-grid" style={{ paddingTop: 16 }}>
+            {(data?.agents ?? []).map((agent) => (
+              <button
+                key={agent.identifier}
+                type="button"
+                className={`workspace-card${roleFilter === agent.identifier ? " selected" : ""}`}
+                onClick={() => {
+                  setRoleFilter((prev) => (prev === agent.identifier ? "all" : agent.identifier));
+                  setOffset(0);
+                }}
+              >
+                <div className="row-header">
+                  <strong style={{ fontSize: 12 }}>{agent.name}</strong>
+                  <span className={agentStatusBadgeClass(agent.latest_status)}>
+                    {formatAgentStatus(agent.latest_status)}
+                  </span>
+                </div>
+                <small className="muted">{agent.description}</small>
+                <div className="workspace-card-meta">
+                  <span>{agent.total_executions} runs</span>
+                  <span>·</span>
+                  <span>{agent.completed_count} ok</span>
+                  {agent.failed_count > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="connection-result error">{agent.failed_count} failed</span>
+                    </>
+                  )}
+                </div>
+                {agent.latest_model && (
+                  <small className="muted">
+                    Latest: {agent.latest_model}
+                    {agent.latest_queue_wait_seconds != null
+                      ? ` · wait ${formatDurationSeconds(agent.latest_queue_wait_seconds)}`
+                      : ""}
+                    {agent.latest_inference_duration_seconds != null
+                      ? ` · gen ${formatDurationSeconds(agent.latest_inference_duration_seconds)}`
+                      : ""}
+                  </small>
+                )}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="panel" style={{ marginTop: 18 }}>
+          <div className="workspace-toolbar">
+            <select
+              aria-label="Filter executions by investigation"
+              className="filter-select"
+              value={investigationId}
+              onChange={(event) => {
+                setInvestigationId(event.target.value);
+                setOffset(0);
+              }}
+            >
+              <option value="">All investigations</option>
+              {investigations.map((inv) => (
+                <option key={inv.id} value={inv.id}>
+                  {inv.question.slice(0, 60)}
+                  {inv.question.length > 60 ? "…" : ""}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter executions by agent role"
+              className="filter-select"
+              value={roleFilter}
+              onChange={(event) => {
+                setRoleFilter(event.target.value);
+                setOffset(0);
+              }}
+            >
+              <option value="all">All agent roles</option>
+              {(data?.agents ?? []).map((agent) => (
+                <option key={agent.identifier} value={agent.identifier}>
+                  {agent.name}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Filter executions by status"
+              className="filter-select"
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setOffset(0);
+              }}
+            >
+              <option value="all">All statuses</option>
+              <option value="waiting_in_queue">Waiting in queue</option>
+              <option value="generating">Generating</option>
+              <option value="completed">Completed</option>
+              <option value="failed">Failed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button
+              className="outline-button compact-button"
+              type="button"
+              onClick={() => {
+                setInvestigationId("");
+                setRoleFilter("all");
+                setStatusFilter("all");
+                setOffset(0);
+              }}
+            >
+              Reset filters
+            </button>
+          </div>
+
+          {error && <p className="connection-result error dashboard-error">{error}</p>}
+
+          {loading && !data ? (
+            <div className="empty-state">
+              <p className="muted">Loading persisted agent execution telemetry...</p>
+            </div>
+          ) : !data || data.executions.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-icon">◎</div>
+              <h4>No agent execution records match these filters</h4>
+              <p>Start multi-agent analysis inside an investigation to inspect live queue states and outputs.</p>
+            </div>
+          ) : (
+            <div className="workspace-split">
+              <div className="source-list" style={{ paddingTop: 0 }}>
+                {data.executions.map((item) => {
+                  const isSelected = selectedExecution?.id === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`workspace-card${isSelected ? " selected" : ""}`}
+                      onClick={() => setSelectedExecutionId(item.id)}
+                    >
+                      <div className="row-header">
+                        <strong style={{ fontSize: 13 }}>{item.agent_name}</strong>
+                        <span className={agentStatusBadgeClass(item.status)}>
+                          {formatAgentStatus(item.status)}
+                        </span>
+                      </div>
+                      <small className="muted">{item.investigation_question}</small>
+                      <div className="workspace-card-meta">
+                        <span>{item.model || "rule-based / default"}</span>
+                        {item.provider_kind && (
+                          <>
+                            <span>·</span>
+                            <span>{item.provider_kind}</span>
+                          </>
+                        )}
+                        <span>·</span>
+                        <span>Wait: {formatDurationSeconds(item.queue_wait_seconds)}</span>
+                        <span>·</span>
+                        <span>Inference: {formatDurationSeconds(item.inference_duration_seconds)}</span>
+                        <span>·</span>
+                        <span>Total: {formatDurationSeconds(item.total_duration_seconds)}</span>
+                      </div>
+                      <div className="workspace-card-meta">
+                        <span>Claims: {item.claims_processed_count}</span>
+                        <span>·</span>
+                        <span>Arguments: {item.argument_count}</span>
+                        <span>·</span>
+                        <span>Cited evidence: {item.cited_evidence_count}</span>
+                      </div>
+                      {item.error_message && (
+                        <small className="connection-result error">{item.error_message}</small>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedExecution && (
+                <aside className="workspace-detail panel" style={{ minHeight: "auto" }}>
+                  <div className="panel-heading">
+                    <div>
+                      <p className="eyebrow blue">Execution Telemetry</p>
+                      <h3>{selectedExecution.agent_name}</h3>
+                    </div>
+                    <span className={agentStatusBadgeClass(selectedExecution.status)}>
+                      {formatAgentStatus(selectedExecution.status)}
+                    </span>
+                  </div>
+
+                  <div className="workspace-chain">
+                    <div>
+                      <strong>Investigation:</strong>{" "}
+                      <Link className="inline-link" href={`/investigations/${selectedExecution.investigation_id}`}>
+                        {selectedExecution.investigation_question}
+                      </Link>
+                    </div>
+                    <div>
+                      <strong>Model & Provider:</strong>{" "}
+                      <span>
+                        {selectedExecution.model || "Rule-based"} · {selectedExecution.provider_kind || "none"}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>Timing breakdown:</strong>{" "}
+                      <span>
+                        Queue wait {formatDurationSeconds(selectedExecution.queue_wait_seconds)} · Inference{" "}
+                        {formatDurationSeconds(selectedExecution.inference_duration_seconds)} · Total elapsed{" "}
+                        {formatDurationSeconds(selectedExecution.total_duration_seconds)}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>Timestamps:</strong>{" "}
+                      <span className="muted">
+                        Started {selectedExecution.started_at ? new Date(selectedExecution.started_at).toLocaleString() : "—"}
+                        {" · "}
+                        Completed{" "}
+                        {selectedExecution.completed_at ? new Date(selectedExecution.completed_at).toLocaleString() : "Active / incomplete"}
+                      </span>
+                    </div>
+                    <div>
+                      <strong>Outputs recorded:</strong>{" "}
+                      <span>
+                        {selectedExecution.claims_processed_count} claims · {selectedExecution.argument_count} arguments ·{" "}
+                        {selectedExecution.cited_evidence_count} cited evidence passages
+                      </span>
+                    </div>
+                    {selectedExecution.error_message && (
+                      <div>
+                        <strong>Error / Timeout / Cancellation:</strong>
+                        <p className="connection-result error" style={{ marginTop: 4 }}>
+                          {selectedExecution.error_message}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <p className="eyebrow">Token & Queue Telemetry</p>
+                    <pre className="workspace-pre">
+                      {JSON.stringify(selectedExecution.token_usage ?? {}, null, 2)}
+                    </pre>
+                  </div>
+
+                  {selectedExecution.output && (
+                    <details>
+                      <summary className="inline-link" style={{ cursor: "pointer", fontSize: 12 }}>
+                        Inspect structured output JSON
+                      </summary>
+                      <pre className="workspace-pre">
+                        {JSON.stringify(selectedExecution.output, null, 2)}
+                      </pre>
+                    </details>
+                  )}
+
+                  <div className="workspace-quick-links">
+                    <Link
+                      className="outline-button compact-button"
+                      href={`/investigations/${selectedExecution.investigation_id}`}
+                    >
+                      Open investigation
+                    </Link>
+                    <Link
+                      className="outline-button compact-button"
+                      href={`/evidence?investigation_id=${selectedExecution.investigation_id}`}
+                    >
+                      Explore evidence
+                    </Link>
+                    <Link
+                      className="outline-button compact-button"
+                      href={`/sources?investigation_id=${selectedExecution.investigation_id}`}
+                    >
+                      Inspect sources
+                    </Link>
+                  </div>
+                </aside>
+              )}
+            </div>
+          )}
+
+          {data && data.executions_total > 0 && (
+            <div className="workspace-pagination">
+              <span>
+                Showing {showingFrom}–{showingTo} of {data.executions_total} executions
+              </span>
+              <div className="analysis-actions">
+                <button
+                  className="outline-button compact-button"
+                  disabled={offset === 0 || loading}
+                  type="button"
+                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                >
+                  Previous
+                </button>
+                <button
+                  className="outline-button compact-button"
+                  disabled={offset + PAGE_SIZE >= data.executions_total || loading}
+                  type="button"
+                  onClick={() => setOffset(offset + PAGE_SIZE)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
