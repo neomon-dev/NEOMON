@@ -24,6 +24,12 @@ from app.analysis.protocol import (
     PlannerPayload,
     ReportSectionPayload,
 )
+from app.analysis.report_service import (
+    build_18_report_sections,
+    compute_evidence_strength,
+    save_report_version,
+)
+from app.config import get_settings
 from app.events import EventBroker
 from app.models import (
     AdjudicationDecision,
@@ -43,12 +49,13 @@ from app.providers import create_provider
 from app.providers.base import AIProvider, ProviderRequestError
 from app.providers.limiter import (
     InferenceStateCallback,
+    ProviderQueueFullError,
     ProviderQueueTimeoutError,
     inference_state_listener,
 )
 from app.providers.openai_compatible import OpenAICompatibleProvider
 from app.research.relevance import assess_text
-from app.schemas import EventType, ProviderConfigRequest
+from app.schemas import AnalysisCoverageSummary, EventType, ProviderConfigRequest, ProviderKind
 
 
 ROLE_ORDER = (
@@ -70,6 +77,15 @@ async def _publish(
 
 def _dump(value: object) -> str:
     return json.dumps(value, default=str)
+
+
+def _safe_json_loads(raw: str | None, fallback: Any) -> Any:
+    if not raw:
+        return fallback
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError):
+        return fallback
 
 
 def _normalized(value: str) -> str:
@@ -169,6 +185,7 @@ async def _optional_llm_json(
     stage_name: str = "analysis",
     on_state_change: InferenceStateCallback | None = None,
     validator: Callable[[dict[str, Any]], None] | None = None,
+    last_validated_ref: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any], str | None]:
     if provider is None:
         return None, {}, None
@@ -213,7 +230,7 @@ async def _optional_llm_json(
                 await _tracked_state("generating", {})
             async with inference_state_listener(_tracked_state):
                 result = await provider.complete(messages, model=model, **complete_kwargs)
-        except (ProviderRequestError, ProviderQueueTimeoutError) as exc:
+        except (ProviderRequestError, ProviderQueueTimeoutError, ProviderQueueFullError) as exc:
             if generating_started_monotonic is not None:
                 total_inference_seconds += time.monotonic() - generating_started_monotonic
             elif queued_started_monotonic is not None and attempt_queue_wait == 0.0:
@@ -253,6 +270,9 @@ async def _optional_llm_json(
                 dumped = validated.model_dump(mode="json")
             else:
                 dumped = parsed
+            if last_validated_ref is not None:
+                last_validated_ref.clear()
+                last_validated_ref.append(dumped)
             if validator is not None:
                 validator(dumped)
             return dumped, usage, None
@@ -311,6 +331,19 @@ def _make_state_callback(
     async def on_state(state: str, meta: dict[str, Any]) -> None:
         async with db_lock:
             execution.status = state
+            try:
+                usage_dict = json.loads(execution.token_usage_json) if execution.token_usage_json else {}
+                if not isinstance(usage_dict, dict):
+                    usage_dict = {}
+            except (ValueError, TypeError):
+                usage_dict = {}
+            if "queue_position" in meta:
+                usage_dict["queue_position"] = meta["queue_position"]
+            if "queue_depth" in meta:
+                usage_dict["queue_depth"] = meta["queue_depth"]
+            if "queue_wait_seconds" in meta:
+                usage_dict["queue_wait_seconds"] = meta["queue_wait_seconds"]
+            execution.token_usage_json = _dump(usage_dict)
             await session.commit()
         event_type = EventType.analysis_agent_started if state == "generating" else EventType.analysis_agent_queued
         await _publish(
@@ -563,6 +596,109 @@ async def _add_argument(
     session.add(row)
     await session.flush()
     return row
+
+
+def _build_fallback_report_sections(
+    question: str,
+    claims: list[Claim],
+    decisions: list[DecisionPayload],
+    evidence: list[Evidence],
+    sources: dict[uuid.UUID, Source],
+    documents: dict[uuid.UUID, Document],
+    warnings: list[str],
+    provenance_for_fn: Callable[[list[uuid.UUID]], list[EvidenceProvenance]],
+    arguments: list[Any] | None = None,
+) -> list[ReportSectionPayload]:
+    return build_18_report_sections(
+        question=question,
+        claims=claims,
+        decisions=decisions,
+        evidence=evidence,
+        sources=sources,
+        documents=documents,
+        arguments=arguments or [],
+        warnings=warnings,
+        provenance_for_fn=provenance_for_fn,
+    )
+
+
+def compute_analysis_coverage(
+    claims: list[Claim],
+    executions: list[AnalysisAgentExecution],
+    arguments: list[AgentArgument],
+    decisions: list[AdjudicationDecision],
+    evidence: list[Evidence],
+) -> AnalysisCoverageSummary:
+    required_agents = [
+        "intelligence_planner",
+        "advocate",
+        "skeptic",
+        "methodology_auditor",
+        "source_intelligence",
+        "citation_genealogy",
+        "temporal_intelligence",
+        "debate_moderator",
+        "conflict_adjudicator",
+        "report_intelligence",
+    ]
+    completed_agents = list(dict.fromkeys([e.agent_identifier for e in executions if e.status == "completed"]))
+    failed_agents = list(dict.fromkeys([e.agent_identifier for e in executions if e.status == "failed"]))
+    active_agent_ids = {
+        e.agent_identifier for e in executions if e.status in {"waiting_in_queue", "generating", "running", "queued"}
+    }
+    pending_agents = [r for r in required_agents if r in active_agent_ids]
+    skipped_agents = [
+        r for r in required_agents if r not in completed_agents and r not in failed_agents and r not in pending_agents
+    ]
+
+    claims_total = len(claims)
+    claims_evaluated = len(decisions)
+    claims_without_arguments = sum(1 for c in claims if not any(a.claim_id == c.id for a in arguments))
+    claims_without_evidence = sum(
+        1
+        for c in claims
+        if not any(a.claim_id == c.id and _safe_json_loads(a.evidence_ids_json, []) for a in arguments)
+    )
+    claims_with_supporting = sum(
+        1
+        for c in claims
+        if any(
+            a.claim_id == c.id and a.argument_type == "supporting" and _safe_json_loads(a.evidence_ids_json, [])
+            for a in arguments
+        )
+    )
+    claims_with_conflicting = sum(
+        1
+        for c in claims
+        if any(
+            a.claim_id == c.id
+            and a.argument_type in {"contradicting", "methodological_criticism"}
+            and _safe_json_loads(a.evidence_ids_json, [])
+            for a in arguments
+        )
+    )
+    coverage_pct = round((len(completed_agents) / max(1, len(required_agents))) * 100.0, 1)
+    is_partial = (
+        len(failed_agents) > 0
+        or claims_without_arguments > 0
+        or claims_evaluated < claims_total
+        or len(skipped_agents) > 0
+    )
+    return AnalysisCoverageSummary(
+        required_agents=required_agents,
+        completed_agents=completed_agents,
+        failed_agents=failed_agents,
+        skipped_agents=skipped_agents,
+        pending_agents=pending_agents,
+        claims_total=claims_total,
+        claims_evaluated=claims_evaluated,
+        claims_without_arguments=claims_without_arguments,
+        claims_without_evidence=claims_without_evidence,
+        claims_with_supporting_evidence=claims_with_supporting,
+        claims_with_conflicting_evidence=claims_with_conflicting,
+        coverage_percentage=coverage_pct,
+        is_partially_completed=is_partial,
+    )
 
 
 _EXACT_CLAIM_RULE = (
@@ -921,7 +1057,21 @@ async def run_analysis(
                 except ValueError as exc:
                     return role, None, usage, str(exc)
 
-        prepared_roles = await asyncio.gather(*(prepare_role(role) for role in ROLE_ORDER[1:]))
+        is_local_provider = (
+            provider_config is not None
+            and (
+                provider_config.kind in {ProviderKind.lm_studio, ProviderKind.ollama}
+                or provider_config.allow_local_runtime
+            )
+        )
+        if is_local_provider:
+            prepared_roles = []
+            for role in ROLE_ORDER[1:]:
+                prepared_roles.append(await prepare_role(role))
+        else:
+            prepared_roles = await asyncio.gather(*(prepare_role(role) for role in ROLE_ORDER[1:]))
+
+        evidence_source_map = {item.id: item.source_id for item in evidence}
         for role, prepared_arguments, usage, role_error in prepared_roles:
             if await _cancelled(session, job.id):
                 raise asyncio.CancelledError()
@@ -940,6 +1090,27 @@ async def run_analysis(
                 )
                 continue
             try:
+                seen_arg_claims = {item.claim_id for item in prepared_arguments}
+                for claim in claims:
+                    if claim.id not in seen_arg_claims:
+                        fallback_arg = _role_argument(role, claim, associated_evidence.get(claim.id, []), sources)
+                        prepared_arguments.append(fallback_arg)
+                        warnings.append(f"{role}: omitted claim {claim.id}; generated grounded fallback argument.")
+
+                for payload in prepared_arguments:
+                    unknown_ev = set(payload.evidence_ids) - evidence_ids
+                    if unknown_ev:
+                        valid_ev = [eid for eid in payload.evidence_ids if eid in evidence_ids]
+                        payload.evidence_ids = valid_ev
+                        payload.source_ids = [evidence_source_map[eid] for eid in valid_ev]
+                        if not valid_ev:
+                            payload.evidence_basis = "none"
+                            payload.confidence = ConfidenceAssessment(
+                                level="insufficient",
+                                explanation="Filtered non-existent evidence IDs; no verified passages remained.",
+                            )
+                        warnings.append(f"{role}: filtered non-existent evidence IDs {unknown_ev} for claim {payload.claim_id}.")
+
                 for claim in claims:
                     payload = next((item for item in prepared_arguments if item.claim_id == claim.id), None)
                     if payload is None:
@@ -953,7 +1124,7 @@ async def run_analysis(
                         payload,
                         evidence_ids,
                         source_ids,
-                        {item.id: item.source_id for item in evidence},
+                        evidence_source_map,
                     )
                 await _finish_execution(
                     session,
@@ -1332,7 +1503,60 @@ async def run_analysis(
         )
         await session.commit()
         if adjudicator_error:
-            raise ValueError(f"conflict adjudicator failed: {adjudicator_error}")
+            warnings.append(
+                f"conflict_adjudicator: LLM adjudication encountered an error ({adjudicator_error}); applying evidence-grounded adjudication fallback."
+            )
+            existing_decision_claim_ids = {d.claim_id for d in decisions}
+            for claim in claims:
+                if claim.id not in existing_decision_claim_ids:
+                    claim_arguments = arguments_by_claim.get(claim.id, [])
+                    support = [item for item in claim_arguments if item.argument_type == ArgumentType.supporting.value]
+                    challenges = [
+                        item
+                        for item in claim_arguments
+                        if item.argument_type
+                        in {ArgumentType.contradicting.value, ArgumentType.methodological_criticism.value}
+                    ]
+                    support_evidence = [
+                        item
+                        for argument in support
+                        for item in evidence
+                        if item.id in set(_safe_json_loads(argument.evidence_ids_json, []))
+                    ]
+                    has_contradicting_evidence = any(
+                        item.evidence_type == "contradicting"
+                        for argument in challenges
+                        for item in evidence
+                        if item.id in set(_safe_json_loads(argument.evidence_ids_json, []))
+                    )
+                    source_diversity = len({item.source_id for item in support_evidence})
+                    has_full_text = any(
+                        documents[item.document_id].access_level == "full_text"
+                        for item in support_evidence
+                        if item.document_id in documents
+                    )
+                    if not support_evidence and not has_contradicting_evidence:
+                        decision_label = "insufficient_evidence"
+                    elif has_contradicting_evidence:
+                        decision_label = "contradictory"
+                    elif source_diversity >= 2 and has_full_text:
+                        decision_label = "moderately_supported"
+                    else:
+                        decision_label = "weakly_supported"
+                    decisions.append(
+                        DecisionPayload(
+                            claim_id=claim.id,
+                            decision=decision_label,
+                            explanation=(
+                                "Evidence-grounded adjudication fallback evaluated traceability, relevance, source diversity, "
+                                "and access level; contradictory classification required documented opposing evidence."
+                            ),
+                            supporting_argument_ids=[item.id for item in support + challenges],
+                            evidence_ids=[item.id for item in support_evidence],
+                            unresolved_disagreements=[item for item in unresolved if str(claim.id) in item],
+                        )
+                    )
+            adjudicator_error = None
         claims_by_id = {item.id: item for item in claims}
         for payload in decisions:
             session.add(
@@ -1390,39 +1614,16 @@ async def run_analysis(
                 execution_id=str(report_agent.id),
                 status="generating",
             )
-            report_sections = [
-                ReportSectionPayload(
-                    section_type="research_question",
-                    title="Research question",
-                    content=question,
-                    claim_ids=[claims[0].id] if claims else [],
-                )
-            ]
-            for decision in decisions:
-                claim = next(item for item in claims if item.id == decision.claim_id)
-                report_sections.append(
-                    ReportSectionPayload(
-                        section_type="claim_finding",
-                        title=claim.text,
-                        content=(
-                            f"Rule-based report finding: {decision.decision}. "
-                            f"{decision.explanation}"
-                        ),
-                        claim_ids=[claim.id],
-                        evidence_ids=decision.evidence_ids,
-                        provenance=provenance_for(decision.evidence_ids),
-                    )
-                )
-            report_sections.append(
-                ReportSectionPayload(
-                    section_type="limitations",
-                    title="Limitations and evidence gaps",
-                    content=(
-                        "Rule-based report generation uses only persisted traceable evidence. "
-                        + ("; ".join(warnings) if warnings else "No agent execution warnings were recorded.")
-                    ),
-                    claim_ids=[item.id for item in claims],
-                )
+            report_sections = build_18_report_sections(
+                question=question,
+                claims=claims,
+                decisions=decisions,
+                evidence=evidence,
+                sources=sources,
+                documents=documents,
+                arguments=arguments,
+                warnings=warnings,
+                provenance_for_fn=provenance_for,
             )
             report_payload: object = {
                 "sections": [item.model_dump(mode="json") for item in report_sections],
@@ -1499,13 +1700,26 @@ async def run_analysis(
         ):
             report_error = "report references claims or evidence outside the investigation"
         if report_error is not None:
-            await _finish_execution(session, report_agent, None, report_usage, report_error)
+            warnings.append(
+                f"report_intelligence: LLM generation failed ({report_error}); synthesized transparent report from persisted findings."
+            )
+            report_sections = _build_fallback_report_sections(
+                question, claims, decisions, evidence, sources, documents, warnings, provenance_for
+            )
+            report_payload = {
+                "sections": [item.model_dump(mode="json") for item in report_sections],
+                "mode": "rule_based_fallback",
+                "llm_error": report_error,
+            }
+            await _finish_execution(session, report_agent, report_payload, report_usage, report_error)
             await session.commit()
-            raise ValueError(f"report intelligence failed: {report_error}")
-        for section in report_sections:
-            section.provenance = provenance_for(section.evidence_ids)
-        await _finish_execution(session, report_agent, report_payload, report_usage)
-        await session.commit()
+            report_error = None
+        else:
+            for section in report_sections:
+                section.provenance = provenance_for(section.evidence_ids)
+            await _finish_execution(session, report_agent, report_payload, report_usage)
+            await session.commit()
+
         assessment = "insufficient_evidence" if all(item.decision == "insufficient_evidence" for item in decisions) else "qualified"
         report = ResearchReport(
             job_id=job.id,
@@ -1531,7 +1745,30 @@ async def run_analysis(
                     position=position,
                 )
             )
-        job.status = "completed_with_warnings" if warnings else "completed"
+
+        evidence_strength_summary = compute_evidence_strength(claims, sources, documents, evidence, decisions)
+        await save_report_version(
+            session=session,
+            investigation_id=job.investigation_id,
+            job_id=job.id,
+            executive_summary=report.executive_summary,
+            overall_assessment=report.overall_assessment,
+            evidence_gap=report.evidence_gap,
+            sections=report_sections,
+            evidence_strength=evidence_strength_summary,
+        )
+
+        all_executions = list(
+            (
+                await session.scalars(
+                    select(AnalysisAgentExecution).where(AnalysisAgentExecution.job_id == job.id)
+                )
+            ).all()
+        )
+        coverage_summary = compute_analysis_coverage(claims, all_executions, arguments, decisions, evidence)
+        job.status = (
+            "completed_with_warnings" if (warnings or coverage_summary.is_partially_completed) else "completed"
+        )
         job.error_message = " ".join(warnings) or None
         job.completed_at = datetime.now(UTC)
         await session.commit()
@@ -1542,6 +1779,7 @@ async def run_analysis(
             job_id=str(job.id),
             status=job.status,
             warnings=warnings,
+            coverage=coverage_summary.model_dump(mode="json"),
         )
     except asyncio.CancelledError:
         await session.rollback()

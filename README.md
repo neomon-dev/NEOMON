@@ -86,4 +86,41 @@ See [MILESTONE_3_1_PLAN.md](./MILESTONE_3_1_PLAN.md), [MILESTONE_2_PLAN.md](./MI
   - `/` — Live dashboard with backend health, active provider status, and quick navigation.
   - `/history` — Persisted investigations list with status, mode, source counts, and links.
   - `/investigations/[id]` — Claims, visually separated Advocate/Skeptic/specialist assessments, clickable evidence references that scroll to and highlight exact persisted passages with source/document/access/page provenance, cancellation controls, and `Last-Event-ID` SSE replay with fallback polling.
-- **Durable SSE replay & restart recovery**: `EventBroker` persists research and analysis events to `research_events` for `Last-Event-ID` / `last_event_id` replay with investigation isolation, and `AnalysisManager.recover()` reconciles interrupted jobs on backend startup.
+- **Durable SSE replay & restart recovery**: `EventBroker` persists research and events to `research_events` for `Last-Event-ID` / `last_event_id` replay with investigation isolation, and `AnalysisManager.recover()` reconciles interrupted jobs on backend startup.
+
+## Milestone 6 Intelligence Workspaces & Knowledge Graph
+
+- **Evidence Intelligence Workspace**:
+  - `/evidence` — Filterable passage explorer with relevance badges, source links, and claim tags.
+  - `/sources` — Literature catalog with open access acquisition levels and document version counts.
+  - `/agents` — Observatory displaying registered agents and real-time execution telemetry.
+- **Interactive Knowledge Graph (`/graph`)**:
+  - Full relational graph connecting Claims, Evidence, Sources, and Decisions with React Flow.
+  - Interactive pan, zoom, node dragging, search query highlighting, and branch collapsing.
+  - Side inspection drawer displaying passage provenance, relevance scores, and missing link warnings.
+
+## Milestone 7 Reliability, Report Intelligence & Knowledge Export
+
+- **Milestone 7A: Research Reliability & Concurrency Queue**:
+  - Global `ProviderConcurrencyRegistry` with bounded queues and FIFO position tracking.
+  - Enforced concurrency 1 and sequential scheduling for local providers (LM Studio & Ollama) to eliminate GPU/VRAM overload on consumer hardware.
+  - Granular dual timeouts (`queue_timeout_seconds` vs `inference_timeout_seconds`) and 1800s overall analysis timeout.
+  - Multi-tier argument grounding repair, adjudicator repair, and deterministic fallback report synthesis.
+  - Automated analysis coverage tracking (`AnalysisCoverageSummary`).
+- **Milestone 7B: 18-Section Report Intelligence**:
+  - Standardized 18-section academic intelligence report schema.
+  - Deterministic 5-dimension evidence strength scoring (`0.0` - `100.0`) categorized into 5 tiers (Very Strong, Strong, Moderate, Weak, Inconclusive).
+  - Immutable report version snapshotting (`ReportVersion` table) with version switcher and regeneration endpoints (`/research/investigations/{id}/reports/*`).
+  - Document-style report interface with Table of Contents jump navigation, score breakdown drawer, and print stylesheet (`@media print`).
+- **Milestone 7C: Knowledge Export & Reproducibility**:
+  - Dedicated export router (`GET /api/v1/research/investigations/{id}/export/*`) supporting 8 standard formats:
+    1. **Markdown (`.md`)**: Full 18-section report with YAML frontmatter and citation anchors.
+    2. **Paginated PDF (`.pdf`)**: Pure Python PDF 1.4 document generator with running headers, footers, page numbering, and line-wrapping without paid APIs or headless browsers.
+    3. **Research Snapshot JSON (`.json`)**: Machine-readable full investigation graph (`schema_version: 1.0.0`).
+    4. **Standalone Interactive HTML Graph (`.html`)**: Zero-CDN interactive vector graph with pan, zoom, node drag, search, filtering, and side panel for offline air-gapped environments.
+    5. **Vector Knowledge Graph (`.svg`)**: High-resolution vector graphic with color-coded nodes and relationship markers.
+    6. **Semantic Linked Data (`.jsonld`)**: Schema.org `ScholarlyArticle` and `ClaimReview` metadata.
+    7. **Evidence Dataset (`.csv`)**: RFC 4180 tabular evidence dataset with source provenance.
+    8. **Sources Catalog (`.csv`)**: RFC 4180 tabular catalog of all discovered literature.
+  - Integrated Knowledge Export panel in the web interface with direct download triggers.
+  - Complete secret/credential sanitization and strict provenance tracking.

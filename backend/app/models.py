@@ -319,6 +319,29 @@ class ReportSection(Base):
     report: Mapped[ResearchReport] = relationship(back_populates="sections")
 
 
+class ReportVersion(Base):
+    __tablename__ = "report_versions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    job_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("analysis_jobs.id", ondelete="CASCADE"), index=True
+    )
+    version_number: Mapped[int] = mapped_column(default=1)
+    executive_summary: Mapped[str] = mapped_column(Text)
+    overall_assessment: Mapped[str] = mapped_column(String(32))
+    evidence_gap: Mapped[str | None] = mapped_column(Text, nullable=True)
+    evidence_strength_score: Mapped[float] = mapped_column(Float, default=0.0)
+    evidence_strength_tier: Mapped[str] = mapped_column(String(32), default="moderate")
+    evidence_strength_json: Mapped[str] = mapped_column(Text, default="{}")
+    sections_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class Evidence(Base):
     __tablename__ = "evidence"
 

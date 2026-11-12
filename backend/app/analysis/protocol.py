@@ -108,6 +108,7 @@ class AgentExecutionView(BaseModel):
     completed_at: datetime | None
     queue_wait_seconds: float | None = None
     inference_duration_seconds: float | None = None
+    queue_position: int | None = None
 
 
 class ClaimAnalysisView(BaseModel):

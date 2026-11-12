@@ -24,7 +24,11 @@ from app.schemas import ProviderConfigRequest, ProviderKind
 
 @pytest_asyncio.fixture
 async def async_session():
-    from app.db import engine
+    from app.db import Base, engine
+    import app.models  # noqa: F401
+
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     async with SessionFactory() as session:
         yield session

@@ -178,6 +178,8 @@ async def validate_provider_endpoint(
 
 
 def effective_inference_timeout(config: ProviderConfigRequest) -> float:
+    if config.inference_timeout_seconds is not None:
+        return config.inference_timeout_seconds
     if config.timeout_seconds is not None:
         return config.timeout_seconds
     settings = get_settings()
@@ -207,10 +209,15 @@ class AIProvider(ABC):
     async def _inference_slot(self, model: str | None = None) -> AsyncIterator[QueueLease]:
         settings = get_settings()
         key = build_limiter_key(self.config, model=model)
+        queue_timeout = (
+            self.config.queue_timeout_seconds
+            if self.config.queue_timeout_seconds is not None
+            else settings.provider_queue_wait_timeout_seconds
+        )
         async with provider_concurrency_registry.acquire(
             key,
             max_concurrency=default_concurrency_for(self.config),
-            queue_wait_timeout=settings.provider_queue_wait_timeout_seconds,
+            queue_wait_timeout=queue_timeout,
         ) as lease:
             yield lease
 

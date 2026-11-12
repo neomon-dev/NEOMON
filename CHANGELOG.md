@@ -22,3 +22,31 @@
   - Live dashboard (`/`), investigation history (`/history`), and complete investigation detail (`/investigations/[id]`) with claims, separate Advocate/Skeptic/specialist panels, clickable evidence provenance highlighting, and duplicate-submission prevention.
   - Session-only in-memory provider configuration (API keys are never persisted to `localStorage`, `sessionStorage`, URLs, logs, or database records) wired into initial analysis and re-run requests.
   - Persisted SSE event replay (`Last-Event-ID` / `last_event_id`) with cross-investigation isolation, gapless replay-to-live transition, `AnalysisManager.recover()` restart handling, and frontend `EventSource` + terminal-state polling recovery.
+- Added Milestone 6A (Evidence Intelligence Workspace):
+  - Replaced placeholder routes with persisted workspaces: Evidence Explorer (`/evidence`), Source Intelligence (`/sources`), and Agent Observatory (`/agents`).
+  - Added full-text passage inspection, claim association badges, document version tracking, open access status indicators, and execution queue telemetry.
+- Added Milestone 6B (Interactive Evidence Knowledge Graph):
+  - Interactive knowledge graph workspace (`/graph`) generated strictly from persisted database relationships with React Flow canvas.
+  - Real-time zoom, pan, node drag, search highlighting, entity/relationship filtering, branch collapse, fit-to-screen, and layout reset.
+  - Detailed node and edge inspection side drawer with missing provenance warnings.
+- Added Milestone 7A (Research Reliability & Local LLM Orchestration):
+  - Provider concurrency limiter registry with bounded queue management (`provider_queue_max_size: 50`) and queue position tracking.
+  - Strict serialization for local providers (LM Studio & Ollama concurrency = 1) preventing GPU/RAM exhaustion.
+  - Granular dual timeouts (`queue_timeout_seconds` vs `inference_timeout_seconds`) and overall analysis timeout protection (1800s).
+  - Multi-tier agent argument grounding repair and conflict adjudicator repair.
+  - Rule-based fallback report synthesis ensuring reports are always generated even during provider failure.
+  - Automated analysis coverage tracking (`AnalysisCoverageSummary`).
+- Added Milestone 7B (Advanced Report Intelligence & Synthesis):
+  - Standardized 18-section academic intelligence report schema.
+  - Deterministic 5-dimension evidence strength scoring (`0.0` - `100.0`) with 5-tier categorization.
+  - Immutable report version snapshotting (`ReportVersion` table) with version switcher and regeneration endpoints.
+  - Document-style report UI with Table of Contents jump navigation and print stylesheet (`@media print`).
+- Added Milestone 7C (Knowledge Export & Reproducibility):
+  - Pure Python PDF 1.4 multi-page document generator with running headers, footers, and text wrapping without external paid APIs or headless browser dependencies.
+  - Standalone interactive HTML knowledge graph with zero external CDN dependencies for air-gapped environments.
+  - High-resolution SVG vector knowledge graph with color-coded nodes and relationship markers.
+  - Schema.org `ScholarlyArticle` and `ClaimReview` semantic Linked Data (`.jsonld`).
+  - Standard Markdown report (`.md`) with YAML frontmatter, 18 sections, and references catalog.
+  - Machine-readable research snapshot JSON (`.json`) with full database graph serialization.
+  - RFC 4180 compliant tabular CSV exports for Evidence passages and Sources catalog.
+  - Responsive Knowledge Export panel in the investigation interface with direct download endpoints.

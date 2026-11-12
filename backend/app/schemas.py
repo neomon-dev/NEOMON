@@ -34,6 +34,8 @@ class ProviderConfigRequest(BaseModel):
     api_key: SecretStr | None = None
     allow_local_runtime: bool = False
     timeout_seconds: float | None = Field(default=None, gt=0, le=1800)
+    queue_timeout_seconds: float | None = Field(default=None, gt=0, le=3600)
+    inference_timeout_seconds: float | None = Field(default=None, gt=0, le=1800)
     retry_count: int = Field(default=2, ge=0, le=5)
 
     @field_validator("endpoint")
@@ -212,6 +214,22 @@ class AnalysisStartRequest(BaseModel):
     role_models: dict[str, str] = Field(default_factory=dict, max_length=12)
 
 
+class AnalysisCoverageSummary(BaseModel):
+    required_agents: list[str] = Field(default_factory=list)
+    completed_agents: list[str] = Field(default_factory=list)
+    failed_agents: list[str] = Field(default_factory=list)
+    skipped_agents: list[str] = Field(default_factory=list)
+    pending_agents: list[str] = Field(default_factory=list)
+    claims_total: int = 0
+    claims_evaluated: int = 0
+    claims_without_arguments: int = 0
+    claims_without_evidence: int = 0
+    claims_with_supporting_evidence: int = 0
+    claims_with_conflicting_evidence: int = 0
+    coverage_percentage: float = 0.0
+    is_partially_completed: bool = False
+
+
 class AnalysisJobResponse(BaseModel):
     id: uuid.UUID
     investigation_id: uuid.UUID
@@ -225,6 +243,33 @@ class AnalysisJobResponse(BaseModel):
     created_at: datetime | None
     started_at: datetime | None
     completed_at: datetime | None
+    coverage: AnalysisCoverageSummary | None = None
+
+
+class EvidenceStrengthBreakdown(BaseModel):
+    source_independence: float = 0.0
+    source_quality: float = 0.0
+    full_text_coverage: float = 0.0
+    methodological_rigor: float = 0.0
+    conflict_resolution: float = 0.0
+
+
+class EvidenceStrengthSummary(BaseModel):
+    score: float = 0.0
+    tier: str = "moderate"
+    breakdown: EvidenceStrengthBreakdown = Field(default_factory=EvidenceStrengthBreakdown)
+
+
+class ReportVersionView(BaseModel):
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    job_id: uuid.UUID
+    version_number: int
+    executive_summary: str
+    overall_assessment: str
+    evidence_gap: str | None = None
+    evidence_strength: EvidenceStrengthSummary
+    created_at: datetime | None = None
 
 
 class AnalysisReportResponse(BaseModel):
@@ -234,6 +279,9 @@ class AnalysisReportResponse(BaseModel):
     overall_assessment: str
     evidence_gap: str | None
     sections: list["ReportSectionView"]
+    version_number: int = 1
+    evidence_strength: EvidenceStrengthSummary | None = None
+    versions: list[ReportVersionView] = Field(default_factory=list)
 
 
 class EvidenceClaimLink(BaseModel):

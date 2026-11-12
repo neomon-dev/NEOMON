@@ -52,6 +52,22 @@ type Evidence = {
   traceable: boolean;
 };
 
+type AnalysisCoverageSummary = {
+  required_agents: string[];
+  completed_agents: string[];
+  failed_agents: string[];
+  skipped_agents: string[];
+  pending_agents: string[];
+  claims_total: number;
+  claims_evaluated: number;
+  claims_without_arguments: number;
+  claims_without_evidence: number;
+  claims_with_supporting_evidence: number;
+  claims_with_conflicting_evidence: number;
+  coverage_percentage: number;
+  is_partially_completed: boolean;
+};
+
 type AnalysisJob = {
   id: string;
   investigation_id: string;
@@ -62,6 +78,7 @@ type AnalysisJob = {
   default_model?: string | null;
   cancel_requested: boolean;
   error_message?: string | null;
+  coverage?: AnalysisCoverageSummary | null;
 };
 
 type AgentExecution = {
@@ -70,6 +87,9 @@ type AgentExecution = {
   status: string;
   model?: string | null;
   error_message?: string | null;
+  queue_wait_seconds?: number | null;
+  inference_duration_seconds?: number | null;
+  queue_position?: number | null;
 };
 
 type ClaimAnalysis = {
@@ -126,10 +146,36 @@ type EvidenceProvenance = {
   section_name?: string | null;
 };
 
+type EvidenceStrength = {
+  score: number;
+  tier: string;
+  breakdown: {
+    source_independence: number;
+    source_quality: number;
+    full_text_coverage: number;
+    methodological_rigor: number;
+    conflict_resolution: number;
+  };
+};
+
+type ReportVersionSummary = {
+  id: string;
+  version_number: number;
+  executive_summary: string;
+  overall_assessment: string;
+  evidence_strength: EvidenceStrength;
+  created_at?: string | null;
+};
+
 type Report = {
+  id?: string;
+  job_id?: string;
   executive_summary: string;
   overall_assessment: string;
   evidence_gap?: string | null;
+  version_number?: number;
+  evidence_strength?: EvidenceStrength | null;
+  versions?: ReportVersionSummary[];
   sections: Array<{
     id: string;
     section_type: string;
@@ -157,11 +203,13 @@ const TERMINAL_JOB_STATUSES = new Set([
   "cancelled",
 ]);
 
-function formatExecutionStatus(status: string): string {
+function formatExecutionStatus(status: string, queuePosition?: number | null): string {
   switch (status) {
     case "waiting_in_queue":
     case "queued":
-      return "Waiting in queue";
+      return queuePosition && queuePosition > 0
+        ? `Waiting in queue (#${queuePosition})`
+        : "Waiting in queue";
     case "generating":
     case "running":
       return "Generating";
@@ -197,6 +245,10 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
   const [debates, setDebates] = useState<DebateRound[]>([]);
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [report, setReport] = useState<Report | null>(null);
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
+  const [regeneratingReport, setRegeneratingReport] = useState(false);
+  const [showStrengthBreakdown, setShowStrengthBreakdown] = useState(false);
+  const [showExportPanel, setShowExportPanel] = useState(false);
   const [analysisRefresh, setAnalysisRefresh] = useState(0);
   const [error, setError] = useState("");
   const [analysisError, setAnalysisError] = useState("");
@@ -354,6 +406,35 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
       const element = document.getElementById(`evidence-${evidenceId}`);
       element?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 50);
+  }
+
+  async function loadReportVersion(versionNumber: number) {
+    try {
+      const { id } = await params;
+      const loaded = await requestJson<Report>(`/research/investigations/${id}/reports/${versionNumber}`);
+      setReport(loaded);
+      setSelectedVersion(versionNumber);
+    } catch (err) {
+      console.error("Failed to load report version", err);
+    }
+  }
+
+  async function regenerateReportVersion() {
+    if (regeneratingReport) return;
+    setRegeneratingReport(true);
+    try {
+      const { id } = await params;
+      const regenerated = await requestJson<Report>(`/research/investigations/${id}/reports/generate`, {
+        method: "POST",
+      });
+      setReport(regenerated);
+      setSelectedVersion(regenerated.version_number ?? null);
+      setAnalysisRefresh((v) => v + 1);
+    } catch (err) {
+      console.error("Failed to regenerate report", err);
+    } finally {
+      setRegeneratingReport(false);
+    }
   }
 
   async function triggerAnalysis() {
@@ -520,7 +601,95 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         <Link className="outline-button compact-button" href={`/graph?investigation_id=${investigation.id}`}>
           Open in Knowledge Graph →
         </Link>
+        <button
+          type="button"
+          className="outline-button compact-button"
+          onClick={() => setShowExportPanel((v) => !v)}
+          style={{ background: showExportPanel ? "#17283e" : undefined, color: showExportPanel ? "#fff" : undefined }}
+        >
+          {showExportPanel ? "Hide Export Options ▲" : "Export Knowledge (8 Formats) ⤓"}
+        </button>
       </div>
+
+      {showExportPanel && (
+        <section className="export-panel" id="export-panel">
+          <div className="panel-heading" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h3>Knowledge Export & Reproducibility</h3>
+            <span className="mode-pill">8 Standard Formats</span>
+          </div>
+          <p className="muted" style={{ fontSize: "12px", margin: "4px 0 14px" }}>
+            Export the complete research investigation, interactive knowledge graph, and evidence datasets for peer review, archival, and offline analysis.
+          </p>
+          <div className="export-grid">
+            {[
+              {
+                endpoint: "markdown",
+                ext: ".MD",
+                label: "Research Report (Markdown)",
+                desc: "Complete 18-section research report with frontmatter and bibliography.",
+              },
+              {
+                endpoint: "pdf",
+                ext: ".PDF",
+                label: "Intelligence Report (PDF)",
+                desc: "Paginated PDF document with title header and evidence strength scores.",
+              },
+              {
+                endpoint: "json",
+                ext: ".JSON",
+                label: "Research Snapshot (JSON)",
+                desc: "Machine-readable research snapshot containing all claims, evidence, and arguments.",
+              },
+              {
+                endpoint: "html-graph",
+                ext: ".HTML",
+                label: "Interactive Graph (Standalone)",
+                desc: "Single-file interactive graph with pan, zoom, search, and zero CDN dependencies.",
+              },
+              {
+                endpoint: "svg",
+                ext: ".SVG",
+                label: "Vector Knowledge Graph",
+                desc: "High-resolution vector graphic for publications or vector illustration tools.",
+              },
+              {
+                endpoint: "json-ld",
+                ext: ".JSONLD",
+                label: "Linked Data (JSON-LD)",
+                desc: "Schema.org ScholarlyArticle & ClaimReview structured metadata.",
+              },
+              {
+                endpoint: "evidence-csv",
+                ext: ".CSV",
+                label: "Evidence Dataset",
+                desc: "Tabular dataset of all extracted evidence passages with provenance.",
+              },
+              {
+                endpoint: "sources-csv",
+                ext: ".CSV",
+                label: "Source Catalog",
+                desc: "Tabular catalog of all discovered academic & institutional sources.",
+              },
+            ].map((f) => (
+              <a
+                key={f.endpoint}
+                className="export-card"
+                href={`${apiBaseUrl}/research/investigations/${investigation.id}/export/${f.endpoint}`}
+                download
+              >
+                <div className="export-card-header">
+                  <strong>{f.label}</strong>
+                  <span className="export-ext">{f.ext}</span>
+                </div>
+                <p className="export-card-desc">{f.desc}</p>
+                <div className="export-card-footer">
+                  <span className="export-download-pill">Download {f.ext} ↓</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="panel quality-panel">
         <div className="panel-heading">
@@ -700,6 +869,11 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
                     }`
                   : "Rule-based execution (no LLM provider)"}
               </span>
+              {analysis.coverage && (
+                <span className={`mode-pill ${analysis.coverage.is_partially_completed ? "status-queued" : "status-completed"}`}>
+                  Coverage: {analysis.coverage.coverage_percentage.toFixed(0)}% ({analysis.coverage.completed_agents.length}/{analysis.coverage.required_agents.length} agents)
+                </span>
+              )}
               {executions.length > 0 && (
                 <span className="muted">
                   {executions.filter((item) => item.status === "generating" || item.status === "running").length}{" "}
@@ -710,6 +884,11 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
                 </span>
               )}
               {analysis.cancel_requested && <span className="muted">Cancellation requested</span>}
+              {analysis.status === "completed_with_warnings" && (
+                <span className="connection-result warning">
+                  Investigation completed with warnings. Fallback synthesis preserved grounded evidence and decisions.
+                </span>
+              )}
               {analysis.error_message && (
                 <span className="connection-result error">{analysis.error_message}</span>
               )}
@@ -722,11 +901,13 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
                     <div className="row-header">
                       <strong>{execution.agent_identifier}</strong>
                       <span className={`exec-status-badge ${executionStatusClass(execution.status)}`}>
-                        {formatExecutionStatus(execution.status)}
+                        {formatExecutionStatus(execution.status, execution.queue_position)}
                       </span>
                     </div>
                     <small>
                       {execution.model ?? "default model"}
+                      {execution.queue_wait_seconds ? ` · wait ${execution.queue_wait_seconds.toFixed(1)}s` : ""}
+                      {execution.inference_duration_seconds ? ` · gen ${execution.inference_duration_seconds.toFixed(1)}s` : ""}
                       {execution.error_message ? ` · ${execution.error_message}` : ""}
                     </small>
                   </div>
@@ -879,17 +1060,141 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             )}
 
             {report && (
-              <div className="analysis-subsection">
-                <h4>Report: {report.overall_assessment}</h4>
-                <p>{report.executive_summary}</p>
+              <div className="report-container">
+                <div className="report-header-bar">
+                  <div className="report-title-group">
+                    <h4>Research Report: {report.overall_assessment.replace("_", " ").toUpperCase()}</h4>
+                    {report.evidence_strength && (
+                      <button
+                        type="button"
+                        className={`report-strength-pill tier-${report.evidence_strength.tier}`}
+                        onClick={() => setShowStrengthBreakdown((prev) => !prev)}
+                        title="Click to toggle component breakdown"
+                      >
+                        Evidence Strength: {report.evidence_strength.score.toFixed(1)}/100 · {report.evidence_strength.tier.replace("_", " ").toUpperCase()}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="report-version-bar">
+                    {report.versions && report.versions.length > 0 && (
+                      <span>Versions:</span>
+                    )}
+                    {report.versions?.map((v) => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        className={`report-version-chip ${(selectedVersion ?? report.version_number) === v.version_number ? "active" : ""}`}
+                        onClick={() => void loadReportVersion(v.version_number)}
+                      >
+                        v{v.version_number}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => void regenerateReportVersion()}
+                      disabled={regeneratingReport}
+                      style={{ padding: "4px 10px", fontSize: "11px" }}
+                    >
+                      {regeneratingReport ? "Regenerating..." : "+ New Version"}
+                    </button>
+                  </div>
+                </div>
+
+                {showStrengthBreakdown && report.evidence_strength && (
+                  <div className="report-breakdown-card">
+                    <div className="report-breakdown-item">
+                      <span className="report-breakdown-label">Source Independence</span>
+                      <span className="report-breakdown-score">
+                        {report.evidence_strength.breakdown.source_independence}/25
+                      </span>
+                    </div>
+                    <div className="report-breakdown-item">
+                      <span className="report-breakdown-label">Source Quality</span>
+                      <span className="report-breakdown-score">
+                        {report.evidence_strength.breakdown.source_quality}/25
+                      </span>
+                    </div>
+                    <div className="report-breakdown-item">
+                      <span className="report-breakdown-label">Full-Text Coverage</span>
+                      <span className="report-breakdown-score">
+                        {report.evidence_strength.breakdown.full_text_coverage}/20
+                      </span>
+                    </div>
+                    <div className="report-breakdown-item">
+                      <span className="report-breakdown-label">Methodological Rigor</span>
+                      <span className="report-breakdown-score">
+                        {report.evidence_strength.breakdown.methodological_rigor}/15
+                      </span>
+                    </div>
+                    <div className="report-breakdown-item">
+                      <span className="report-breakdown-label">Conflict Resolution</span>
+                      <span className="report-breakdown-score">
+                        {report.evidence_strength.breakdown.conflict_resolution}/15
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 {report.evidence_gap && (
                   <p className="connection-result error">Evidence gap: {report.evidence_gap}</p>
                 )}
-                <div className="source-list">
-                  {report.sections.map((section) => (
-                    <div className="source-row" key={section.id}>
-                      <strong>{section.title}</strong>
-                      <p>{section.content}</p>
+
+                {/* Table of Contents Navigation Bar */}
+                {report.sections.length > 0 && (
+                  <div className="report-toc-bar">
+                    <span className="muted" style={{ fontSize: "11px", alignSelf: "center", marginRight: "4px" }}>
+                      Sections ({report.sections.length}):
+                    </span>
+                    {report.sections.map((section) => (
+                      <button
+                        key={section.id}
+                        type="button"
+                        className="report-toc-item"
+                        onClick={() => {
+                          const el = document.getElementById(`report-sec-${section.section_type}`);
+                          el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}
+                      >
+                        {section.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Structured 18 Section Cards */}
+                <div className="source-list" style={{ gap: "16px" }}>
+                  {report.sections.map((section, idx) => (
+                    <div
+                      className="report-section-card"
+                      id={`report-sec-${section.section_type}`}
+                      key={section.id}
+                    >
+                      <h4>
+                        <span>{idx + 1}. {section.title}</span>
+                        <span className="report-section-type">{section.section_type}</span>
+                      </h4>
+                      <div className="report-content">{section.content}</div>
+
+                      {section.provenance && section.provenance.length > 0 && (
+                        <div className="report-provenance-list">
+                          {section.provenance.map((p) => (
+                            <button
+                              key={p.evidence_id}
+                              type="button"
+                              className="report-provenance-chip"
+                              onClick={() => focusEvidence(p.evidence_id)}
+                              title={`View passage in Source: ${p.source_title || p.source_url}`}
+                            >
+                              Cite: {p.source_title ? p.source_title.slice(0, 30) + "..." : "Source"}
+                              {p.page_number ? ` · p.${p.page_number}` : ""}
+                              {p.section_name ? ` · §${p.section_name}` : ""}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {renderEvidenceButtons(section.evidence_ids)}
                     </div>
                   ))}

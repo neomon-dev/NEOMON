@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.analysis.manager import AnalysisManager, stop_analysis_manager
-from app.db import SessionFactory, close_database
+from app.db import Base, SessionFactory, close_database, engine
 from app.errors import (
     BackendError,
     backend_error_handler,
@@ -15,11 +15,13 @@ from app.errors import (
     validation_error_handler,
 )
 from app.events import EventBroker
-from app.routers import agents, analysis, events, graph, health, providers, research, workspace
+from app.routers import agents, analysis, events, export, graph, health, providers, research, workspace
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     app.state.event_broker = EventBroker(session_factory=SessionFactory)
     app.state.analysis_manager = AnalysisManager(app.state.event_broker)
     await app.state.analysis_manager.recover()
@@ -58,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(analysis.router, prefix=prefix)
     app.include_router(workspace.router, prefix=prefix)
     app.include_router(graph.router, prefix=prefix)
+    app.include_router(export.router, prefix=prefix)
     return app
 
 

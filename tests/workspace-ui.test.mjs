@@ -427,3 +427,32 @@ test("KnowledgeGraphWorkspace renders interactive controls shell without placeho
   assert.match(html, /Loading persisted evidence knowledge graph/);
   assert.doesNotMatch(html, /reserved for the next NEOMON milestone/i);
 });
+
+test("Investigation Detail UI includes Milestone 7B Report Intelligence and 7C Knowledge Export controls", () => {
+  const filePath = path.join(rootDir, "app", "investigations", "[id]", "page.tsx");
+  assert.equal(fs.existsSync(filePath), true, `Expected investigation page file ${filePath}`);
+  const content = fs.readFileSync(filePath, "utf8");
+
+  // Milestone 7B: 18 structured report sections, evidence strength score, and version switcher
+  assert.match(content, /evidence_strength/);
+  assert.match(content, /report-version-bar/);
+  assert.match(content, /Versions:/);
+  assert.match(content, /New Version/);
+  assert.match(content, /report-toc-bar/);
+  assert.match(content, /report-section-card/);
+  assert.match(content, /executive_summary/);
+  assert.match(content, /overall_assessment/);
+
+  // Milestone 7C: Knowledge Export panel with 8 reproducible formats
+  assert.match(content, /Knowledge Export & Reproducibility/);
+  assert.match(content, /export\/\$\{f\.endpoint\}/);
+  assert.match(content, /endpoint: "markdown"/);
+  assert.match(content, /endpoint: "pdf"/);
+  assert.match(content, /endpoint: "json"/);
+  assert.match(content, /endpoint: "html-graph"/);
+  assert.match(content, /endpoint: "svg"/);
+  assert.match(content, /endpoint: "json-ld"/);
+  assert.match(content, /endpoint: "evidence-csv"/);
+  assert.match(content, /endpoint: "sources-csv"/);
+});
+

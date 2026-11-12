@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
     local_inference_timeout_seconds: float = Field(default=300.0, gt=0, le=1800)
     provider_queue_wait_timeout_seconds: float = Field(default=600.0, gt=0, le=3600)
+    provider_queue_max_size: int = Field(default=50, ge=1, le=500)
+    analysis_overall_timeout_seconds: float = Field(default=1800.0, gt=0, le=7200)
     local_provider_max_concurrency: int = Field(default=1, ge=1, le=10)
     remote_provider_max_concurrency: int = Field(default=4, ge=1, le=20)
     provider_retry_count: int = Field(default=2, ge=0, le=5)
