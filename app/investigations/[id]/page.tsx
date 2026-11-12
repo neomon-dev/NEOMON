@@ -517,6 +517,9 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         <Link className="outline-button compact-button" href={`/agents?investigation_id=${investigation.id}`}>
           Open in Agent Observatory →
         </Link>
+        <Link className="outline-button compact-button" href={`/graph?investigation_id=${investigation.id}`}>
+          Open in Knowledge Graph →
+        </Link>
       </div>
 
       <section className="panel quality-panel">

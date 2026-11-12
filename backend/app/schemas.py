@@ -400,3 +400,59 @@ class AgentObservatoryResponse(BaseModel):
     executions_total: int
     limit: int
     offset: int
+
+
+class GraphNodeType(StrEnum):
+    investigation = "investigation"
+    research_question = "research_question"
+    claim = "claim"
+    evidence = "evidence"
+    document = "document"
+    source = "source"
+    agent_argument = "agent_argument"
+    adjudication_decision = "adjudication_decision"
+
+
+class GraphNodeView(BaseModel):
+    id: str
+    entity_id: uuid.UUID
+    type: GraphNodeType
+    label: str
+    description: str
+    investigation_id: uuid.UUID
+    status: str
+    missing_provenance: list[str] = Field(default_factory=list)
+    has_hidden_neighbors: bool = False
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class GraphEdgeView(BaseModel):
+    id: str
+    source: str
+    target: str
+    relationship_type: str
+    label: str
+    classification: str | None = None
+    explanation: str | None = None
+
+
+class GraphTotalCounts(BaseModel):
+    claims: int = 0
+    evidence: int = 0
+    documents: int = 0
+    sources: int = 0
+    arguments: int = 0
+    decisions: int = 0
+
+
+class InvestigationGraphResponse(BaseModel):
+    investigation_id: uuid.UUID | None = None
+    investigation_question: str | None = None
+    investigation_status: str | None = None
+    nodes: list[GraphNodeView]
+    edges: list[GraphEdgeView]
+    truncated: bool = False
+    total_counts: GraphTotalCounts
+    node_type_counts: dict[str, int] = Field(default_factory=dict)
+    relationship_type_counts: dict[str, int] = Field(default_factory=dict)
+    empty_reason: str | None = None

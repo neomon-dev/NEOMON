@@ -127,11 +127,303 @@ test("EvidenceExplorer, SourceIntelligence, and AgentObservatory render loading 
   assert.doesNotMatch(agentHtml, /reserved for the next NEOMON milestone/i);
 });
 
-test("Route entrypoints replace placeholder routes for /evidence, /sources, and /agents", () => {
-  for (const route of ["evidence", "sources", "agents"]) {
+test("Route entrypoints replace placeholder routes for /evidence, /sources, /agents, and /graph", () => {
+  for (const route of ["evidence", "sources", "agents", "graph"]) {
     const filePath = path.join(rootDir, "app", route, "page.tsx");
     assert.equal(fs.existsSync(filePath), true, `Expected route file ${filePath}`);
     const content = fs.readFileSync(filePath, "utf8");
     assert.match(content, /Suspense/);
   }
+});
+
+test("Graph helpers support filtering, search highlighting, branch collapse, merging, and layout determinism", () => {
+  const graphHelpers = loadTsModule("lib/graph.ts", {
+    "@xyflow/react": {},
+  });
+
+  const invId = "11111111-1111-1111-1111-111111111111";
+  const claimNode = {
+    id: "claim:c1",
+    entity_id: "c1",
+    type: "claim",
+    label: "Async review prevents escapes",
+    description: "Asynchronous code review reduces escaped bugs.",
+    investigation_id: invId,
+    status: "moderately_supported",
+    missing_provenance: [],
+    has_hidden_neighbors: false,
+    metadata: {},
+  };
+  const evSupp = {
+    id: "evidence:e1",
+    entity_id: "e1",
+    type: "evidence",
+    label: "34% defect reduction",
+    description: "34% defect reduction in controlled teams.",
+    investigation_id: invId,
+    status: "supporting",
+    missing_provenance: [],
+    has_hidden_neighbors: false,
+    metadata: {},
+  };
+  const evContra = {
+    id: "evidence:e2",
+    entity_id: "e2",
+    type: "evidence",
+    label: "No effect on 1-line diffs",
+    description: "Null result on trivial edits.",
+    investigation_id: invId,
+    status: "contradicting",
+    missing_provenance: ["missing_document"],
+    has_hidden_neighbors: false,
+    metadata: {},
+  };
+  const srcNode = {
+    id: "source:s1",
+    entity_id: "s1",
+    type: "source",
+    label: "PR Review Study",
+    description: "ACM 2024",
+    investigation_id: invId,
+    status: "included",
+    missing_provenance: [],
+    has_hidden_neighbors: false,
+    metadata: {},
+  };
+  const edges = [
+    { id: "c1->e1", source: "claim:c1", target: "evidence:e1", relationship_type: "supports", label: "supports" },
+    { id: "c1->e2", source: "claim:c1", target: "evidence:e2", relationship_type: "contradicts", label: "contradicts" },
+    { id: "e1->s1", source: "evidence:e1", target: "source:s1", relationship_type: "extracted_from_source", label: "source" },
+  ];
+
+  // Collapse claim branch hides descendants without infinite loop
+  const collapsed = graphHelpers.computeVisibleSubgraph([claimNode, evSupp, evContra, srcNode], edges, {
+    activeNodeTypes: new Set(graphHelpers.NODE_TYPE_ORDER),
+    relationshipFilter: "all",
+    collapsedBranchIds: new Set(["claim:c1"]),
+  });
+  assert.deepEqual(
+    collapsed.visibleNodes.map((n) => n.id),
+    ["claim:c1"],
+  );
+  assert.equal(collapsed.hiddenDescendantCounts.get("claim:c1"), 3);
+
+  // Relationship filter isolates contradicting edges cleanly
+  const contraOnly = graphHelpers.computeVisibleSubgraph([claimNode, evSupp, evContra, srcNode], edges, {
+    activeNodeTypes: new Set(graphHelpers.NODE_TYPE_ORDER),
+    relationshipFilter: "contradicts",
+    collapsedBranchIds: new Set(),
+  });
+  assert.deepEqual(
+    contraOnly.visibleEdges.map((e) => e.id),
+    ["c1->e2"],
+  );
+
+  // Search highlighting & deterministic positions
+  const built = graphHelpers.buildFlowElements([claimNode, evSupp, evContra], edges.slice(0, 2), {
+    searchQuery: "34%",
+    collapsedBranchIds: new Set(),
+    hiddenDescendantCounts: new Map(),
+  });
+  assert.deepEqual(built.matchedNodeIds, ["evidence:e1"]);
+  const e1Flow = built.flowNodes.find((n) => n.id === "evidence:e1");
+  const e2Flow = built.flowNodes.find((n) => n.id === "evidence:e2");
+  assert.equal(e1Flow.data.isSearchMatch, true);
+  assert.equal(e2Flow.data.isDimmed, true);
+
+  // Merge graph responses deduplicates cleanly
+  const merged = graphHelpers.mergeGraphResponses(
+    {
+      investigation_id: invId,
+      nodes: [claimNode, evSupp],
+      edges: [edges[0]],
+      truncated: true,
+      total_counts: { claims: 1, evidence: 2, documents: 0, sources: 1, arguments: 0, decisions: 0 },
+      node_type_counts: {},
+      relationship_type_counts: {},
+    },
+    {
+      investigation_id: invId,
+      nodes: [evSupp, evContra, srcNode],
+      edges: [edges[1], edges[2]],
+      truncated: false,
+      total_counts: { claims: 1, evidence: 2, documents: 0, sources: 1, arguments: 0, decisions: 0 },
+      node_type_counts: {},
+      relationship_type_counts: {},
+    },
+  );
+  assert.equal(merged.nodes.length, 4);
+  assert.equal(merged.edges.length, 3);
+});
+
+test("GraphDetailPanel renders Claim, Evidence, Source, and Edge details with missing provenance warnings", () => {
+  const workspaceHelpers = loadTsModule("lib/workspace.ts");
+  const graphHelpers = loadTsModule("lib/graph.ts", { "@xyflow/react": {} });
+  const { GraphDetailPanel } = loadTsModule("components/graph-detail-panel.tsx", {
+    "next/link": { default: mockLink, __esModule: true },
+    "@/lib/graph": graphHelpers,
+    "@/lib/workspace": workspaceHelpers,
+  });
+
+  const invId = "11111111-1111-1111-1111-111111111111";
+  const claimNode = {
+    id: "claim:c1",
+    entity_id: "c1",
+    type: "claim",
+    label: "Claim label",
+    description: "Full claim text",
+    investigation_id: invId,
+    status: "contradictory",
+    missing_provenance: [],
+    has_hidden_neighbors: false,
+    metadata: {
+      full_text: "Automated reviews cut escapes.",
+      supporting_evidence: [{ id: "e1", text: "Supporting passage", relevance_score: 0.9 }],
+      contradicting_evidence: [{ id: "e2", text: "Contradicting passage", relevance_score: 0.8 }],
+      related_arguments: [{ id: "a1", agent_identifier: "advocate", argument_type: "supporting", confidence_level: "moderate", text: "Arg" }],
+      adjudication_decision: { id: "d1", decision: "contradictory", explanation: "Mixed subgroup findings." },
+    },
+  };
+  const claimHtml = renderToStaticMarkup(
+    React.createElement(GraphDetailPanel, {
+      selectedNode: claimNode,
+      selectedEdge: null,
+      nodeMap: new Map([["claim:c1", claimNode]]),
+      isCollapsed: false,
+      expandingNodeId: null,
+      onExpandNode: () => {},
+      onToggleCollapse: () => {},
+      onSelectNodeById: () => {},
+      onClearSelection: () => {},
+    }),
+  );
+  assert.match(claimHtml, /Automated reviews cut escapes/);
+  assert.match(claimHtml, /Supporting evidence \(1\)/);
+  assert.match(claimHtml, /Contradicting evidence \(1\)/);
+  assert.match(claimHtml, /Mixed subgroup findings/);
+  assert.match(claimHtml, /Claim evidence in Explorer/);
+
+  const evNode = {
+    id: "evidence:e2",
+    entity_id: "e2",
+    type: "evidence",
+    label: "Contradicting passage",
+    description: "Exact contradicting text",
+    investigation_id: invId,
+    status: "contradicting",
+    missing_provenance: ["missing_document"],
+    has_hidden_neighbors: false,
+    metadata: {
+      exact_text: "Exact contradicting text",
+      evidence_type: "contradicting",
+      relevance_score: 0.8,
+      page_number: 5,
+      section_name: "Limitations",
+      extraction_method: "pdf",
+      associated_claims: [{ claim_id: "c1", text: "Automated reviews cut escapes.", status: "contradictory", type: "contradicting" }],
+      document_id: null,
+      source_id: "s1",
+      source_title: "PR Study",
+    },
+  };
+  const evHtml = renderToStaticMarkup(
+    React.createElement(GraphDetailPanel, {
+      selectedNode: evNode,
+      selectedEdge: null,
+      nodeMap: new Map([["evidence:e2", evNode]]),
+      isCollapsed: false,
+      expandingNodeId: null,
+      onExpandNode: () => {},
+      onToggleCollapse: () => {},
+      onSelectNodeById: () => {},
+      onClearSelection: () => {},
+    }),
+  );
+  assert.match(evHtml, /Missing persisted provenance/);
+  assert.match(evHtml, /Page 5/);
+  assert.match(evHtml, /Limitations/);
+  assert.match(evHtml, /Document record missing/);
+
+  const srcNode = {
+    id: "source:s1",
+    entity_id: "s1",
+    type: "source",
+    label: "PR Study",
+    description: "ACM 2024",
+    investigation_id: invId,
+    status: "included",
+    missing_provenance: [],
+    has_hidden_neighbors: false,
+    metadata: {
+      title: "PR Study",
+      authors: ["Dr. E. Baker"],
+      doi: "10.1145/review.2024",
+      publication_date: "2024",
+      original_url: "https://example.org/pr",
+      document_versions: [{ document_id: "doc1", version_type: "publishedVersion", access_level: "full_text" }],
+      related_evidence: [{ id: "e2", exact_text: "Exact contradicting text" }],
+      evidence_count: 1,
+    },
+  };
+  const srcHtml = renderToStaticMarkup(
+    React.createElement(GraphDetailPanel, {
+      selectedNode: srcNode,
+      selectedEdge: null,
+      nodeMap: new Map([["source:s1", srcNode]]),
+      isCollapsed: false,
+      expandingNodeId: null,
+      onExpandNode: () => {},
+      onToggleCollapse: () => {},
+      onSelectNodeById: () => {},
+      onClearSelection: () => {},
+    }),
+  );
+  assert.match(srcHtml, /Dr\. E\. Baker/);
+  assert.match(srcHtml, /10\.1145\/review\.2024/);
+  assert.match(srcHtml, /Open in Source Intelligence/);
+});
+
+test("KnowledgeGraphWorkspace renders interactive controls shell without placeholders", () => {
+  const workspaceHelpers = loadTsModule("lib/workspace.ts");
+  const graphHelpers = loadTsModule("lib/graph.ts", { "@xyflow/react": {} });
+  const noop = () => null;
+  const xyflowMock = {
+    Background: noop,
+    Controls: noop,
+    MiniMap: noop,
+    ReactFlow: ({ children }) => React.createElement("div", { "data-testid": "react-flow" }, children),
+    ReactFlowProvider: ({ children }) => React.createElement("div", null, children),
+    applyNodeChanges: (_c, nodes) => nodes,
+    useReactFlow: () => ({ fitView: () => Promise.resolve(), setCenter: () => Promise.resolve() }),
+    Handle: noop,
+    Position: { Left: "left", Right: "right" },
+  };
+  const { KnowledgeGraphNode } = loadTsModule("components/knowledge-graph-node.tsx", {
+    "@xyflow/react": xyflowMock,
+    "@/lib/graph": graphHelpers,
+  });
+  const { GraphDetailPanel } = loadTsModule("components/graph-detail-panel.tsx", {
+    "next/link": { default: mockLink, __esModule: true },
+    "@/lib/graph": graphHelpers,
+    "@/lib/workspace": workspaceHelpers,
+  });
+  const { KnowledgeGraphWorkspace } = loadTsModule("components/knowledge-graph-workspace.tsx", {
+    "@xyflow/react": xyflowMock,
+    "@xyflow/react/dist/style.css": {},
+    "next/link": { default: mockLink, __esModule: true },
+    "next/navigation": { useSearchParams: () => new URLSearchParams("") },
+    "@/lib/api": { requestJson: () => new Promise(() => {}) },
+    "@/lib/graph": graphHelpers,
+    "@/lib/workspace": workspaceHelpers,
+    "@/components/knowledge-graph-node": { KnowledgeGraphNode },
+    "@/components/graph-detail-panel": { GraphDetailPanel },
+  });
+
+  const html = renderToStaticMarkup(React.createElement(KnowledgeGraphWorkspace));
+  assert.match(html, /Knowledge Graph/);
+  assert.match(html, /Search nodes/);
+  assert.match(html, /Fit to screen/);
+  assert.match(html, /Reset layout/);
+  assert.match(html, /Loading persisted evidence knowledge graph/);
+  assert.doesNotMatch(html, /reserved for the next NEOMON milestone/i);
 });
