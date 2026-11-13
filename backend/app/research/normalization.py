@@ -30,6 +30,22 @@ def deduplicate_results(results: list[SearchResult]) -> list[SearchResult]:
         title = normalize_title(result.title)
         doi = result.doi.casefold() if result.doi else None
         if result.url in seen_urls or (doi and doi in seen_dois) or title in seen_titles:
+            # If the duplicate has richer metadata (e.g. DOI or academic classification), enrich the existing item
+            for existing in unique:
+                if (
+                    existing.url == result.url
+                    or (doi and existing.doi and existing.doi.casefold() == doi)
+                    or normalize_title(existing.title) == title
+                ):
+                    if not existing.doi and result.doi:
+                        existing.doi = result.doi
+                    if not existing.open_access_locations and result.open_access_locations:
+                        existing.open_access_locations = result.open_access_locations
+                    if existing.source_type == "web" and result.source_type == "academic":
+                        existing.source_type = "academic"
+                        existing.publisher = existing.publisher or result.publisher
+                        existing.authors = existing.authors or result.authors
+                    break
             continue
         seen_urls.add(result.url)
         seen_titles.add(title)

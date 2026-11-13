@@ -222,8 +222,17 @@ export function SourceIntelligence() {
               }}
             >
               <option value="all">All source types</option>
-              <option value="academic">Academic</option>
-              <option value="institutional">Institutional</option>
+              <option value="peer_reviewed">Peer-Reviewed Journal/Conf</option>
+              <option value="preprint">Preprint (arXiv / bioRxiv)</option>
+              <option value="government_institutional">Government / Institutional</option>
+              <option value="research_organization">Research Organization</option>
+              <option value="industry_analysis">Industry Analysis</option>
+              <option value="reputable_journalism">Reputable Journalism</option>
+              <option value="vendor_commercial">Vendor / Commercial</option>
+              <option value="general_reference">General Reference</option>
+              <option value="community_generated">Community Generated</option>
+              <option value="academic">Academic (general)</option>
+              <option value="institutional">Institutional (general)</option>
               <option value="news">News</option>
               <option value="web">Web</option>
               <option value="other">Other</option>

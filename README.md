@@ -50,8 +50,10 @@ The backend defaults to explicit demo mode. Demo agent responses are labeled as 
 - `POST /api/v1/research/investigations` — run a real quick/deep public-source investigation.
 - `GET /api/v1/research/investigations/{id}/sources` — inspect preserved source metadata and URLs.
 - `GET /api/v1/research/investigations/{id}/evidence` — inspect extracted passages.
+- `POST /api/v1/providers/tavily/test` — verify Tavily connectivity and validate API key.
+- `GET /api/v1/providers/tavily/status` — retrieve Tavily provider status, search depth, and live telemetry metrics.
 
-Crossref, OpenAlex, and arXiv are available without keys. Tavily is optional and requires `NEOMON_TAVILY_API_KEY`. Provider failures are returned as errors; the engine does not invent fallback sources or quotations.
+Crossref, OpenAlex, and arXiv are available without keys. Tavily Search is supported as a first-class, optional general-web research provider (requires `TAVILY_API_KEY` or `NEOMON_TAVILY_API_KEY`). Tavily search executes concurrently with academic providers, producing 4-dimensional domain-isolated queries (causal mechanisms, counter-evidence, empirical data, and critical perspectives), preserving technical acronyms (AI, IT, ML, RAM, DDR5), and preventing semantic drift. Provider failures are recorded in telemetry without halting other providers, and snippet fallbacks are indexed as `abstract_only` documents when paywalled. Provider failures are returned as errors; the engine does not invent fallback sources or quotations.
 
 OpenAlex locations and arXiv PDFs are checked for legitimate open-access copies. Unpaywall discovery is optional:
 set `NEOMON_UNPAYWALL_EMAIL` (and, if supplied by Unpaywall, `NEOMON_UNPAYWALL_API_KEY`).

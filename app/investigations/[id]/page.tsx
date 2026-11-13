@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useProviderSession } from "@/components/provider-context";
+import { ResearchGapWorkspace } from "@/components/research-gap-workspace";
 import { apiBaseUrl, requestJson } from "../../../lib/api";
 
 type Investigation = {
@@ -601,6 +602,48 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         <Link className="outline-button compact-button" href={`/graph?investigation_id=${investigation.id}`}>
           Open in Knowledge Graph →
         </Link>
+        <a
+          className="outline-button compact-button"
+          href="#research-gap-workspace"
+          style={{ borderColor: "#f97316", color: "#f97316" }}
+        >
+          Research Gaps & Horizon ⚡
+        </a>
+        <Link
+          className="outline-button compact-button"
+          href={`/hypotheses?investigation_id=${investigation.id}`}
+          style={{ borderColor: "#a855f7", color: "#c084fc" }}
+        >
+          Hypotheses 🔬
+        </Link>
+        <Link
+          className="outline-button compact-button"
+          href={`/contradictions?investigation_id=${investigation.id}`}
+          style={{ borderColor: "#ef4444", color: "#fca5a5" }}
+        >
+          Contradictions ⚖️
+        </Link>
+        <Link
+          className="outline-button compact-button"
+          href={`/synthesis`}
+          style={{ borderColor: "#06b6d4", color: "#67e8f9" }}
+        >
+          Cross-Synthesis 🔗
+        </Link>
+        <Link
+          className="outline-button compact-button"
+          href={`/trends`}
+          style={{ borderColor: "#eab308", color: "#facc15" }}
+        >
+          Trends 📈
+        </Link>
+        <Link
+          className="outline-button compact-button"
+          href={`/quality-audit?investigation_id=${investigation.id}`}
+          style={{ borderColor: "#06b6d4", color: "#22d3ee" }}
+        >
+          Quality Audit 🛡️
+        </Link>
         <button
           type="button"
           className="outline-button compact-button"
@@ -698,6 +741,11 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         <p>{investigation.quality_summary ?? "Quality assessment is not available."}</p>
         {investigation.evidence_gap && <p className="connection-result error">{investigation.evidence_gap}</p>}
       </section>
+
+      <ResearchGapWorkspace
+        investigationId={investigation.id}
+        investigationQuestion={investigation.question}
+      />
 
       <section className="research-columns">
         <article className="panel">

@@ -62,16 +62,31 @@ Local LLM endpoints (LM Studio, Ollama) running on consumer hardware (e.g. 16 GB
 - **Deterministic 5-Dimension Evidence Strength Scoring (0–100)**: Evaluates Source Independence (25%), Source Quality (25%), Full-Text Coverage (20%), Methodological Rigor (15%), and Conflict Resolution (15%). Classifies into 5 qualitative tiers (Very Strong, Strong, Moderate, Weak, Inconclusive).
 - **Immutable Report Versioning**: `ReportVersion` table captures snapshots of each synthesis, enabling historical audits and regeneration without re-executing data collection.
 
-### 3. Knowledge Export & Reproducibility Pipeline (Milestone 7C)
-A dedicated, dependency-light export engine generates 8 distinct scientific and archival formats from persisted database relationships:
-- **Markdown (`.md`)**: Complete 18-section report with YAML frontmatter and citation anchors.
-- **Paginated PDF (`.pdf`)**: Pure Python PDF 1.4 document generator with running headers, footers, page numbering, and line-wrapping without paid APIs or headless browsers.
-- **Research Snapshot JSON (`.json`)**: Machine-readable full investigation graph (`schema_version: 1.0.0`).
-- **Standalone Interactive HTML Graph (`.html`)**: Zero-CDN interactive vector graph with pan, zoom, node drag, search, filtering, and side panel for offline air-gapped environments.
-- **Vector Knowledge Graph (`.svg`)**: High-resolution vector graphic with color-coded nodes and relationship markers.
-- **Semantic Linked Data (`.jsonld`)**: Schema.org `ScholarlyArticle` and `ClaimReview` metadata.
-- **Evidence Dataset (`.csv`)**: RFC 4180 tabular evidence dataset with source provenance.
-- **Sources Catalog (`.csv`)**: RFC 4180 tabular catalog of all discovered literature.
+### 4. Research Quality Calibration & Scientific Evidence Validation (Milestone 8G)
+
+Milestone 8G establishes scientific truthfulness, lineage tracking, and rigorous quality calibration:
+
+- **Canonical Source Credibility (`source_credibility.py`)**:
+  - Decouples Source Type from Verification Status and Evidence Quality Attributes.
+  - Strictly prohibits equating DOI presence or declared type with peer review. Preprints (arXiv, bioRxiv) and open repositories (Zenodo, Figshare) have registered DOIs but are explicitly marked non-peer-reviewed (`is_peer_reviewed = False`).
+  - Distinguishes authoritative institutional reports (e.g. NIST, WHO, CDC) as primary evidence from peer-reviewed academic literature.
+- **Source Lineage & Explainable Independence (`source_lineage.py`)**:
+  - Replaces naive URL/domain counts with graph-based lineage components.
+  - Collapses syndicated wire stories (Reuters, AP), derivative news commentary, shared primary citations, and overlapping co-authorship into single lineage clusters.
+  - Computes `effective_independent_count` and `independence_ratio` to eliminate domain-diversity illusions.
+- **Evidence-to-Claim Entailment Validation (`entailment_service.py`)**:
+  - Evaluates every evidence passage against specific claims to classify inferential relationship: `direct_support`, `contextual_support`, `direct_contradiction`, `mitigating`, `methodological_limitation`, `insufficient_evidence`.
+  - Flags `correlation_vs_causation_flag` when statistical association or concurrent timeline is presented without counterfactual causality or mechanism.
+  - Records explicit `missing_inferential_steps` bridging evidence to claim.
+- **Calibrated Research Quality Scoring & Coverage Decoupling (`quality_calibration_service.py`)**:
+  - Calibrates 5 dimensions: Empirical Depth (25), Source Credibility (25), Source Independence (20), Methodological Rigor (15), Consensus Stability (15).
+  - Decouples research coverage from raw score: coverage < 70% caps tier at Moderate; coverage < 85% caps tier at Strong.
+  - Enforces strict prerequisites for `Very Strong`: calibrated score >= 85, coverage >= 80%, verified peer-reviewed publications >= 1, zero critical retrieval failures.
+  - Evaluates provider retrieval failures with severity tiers (`harmless_optional`, `partial_coverage`, `significant_coverage`, `critical_loss`) and applies calibrated point deductions.
+- **Scientific Quality Audit Workspace (`/quality-audit`)**:
+  - Full-featured dashboard with 5 KPI summary cards, 5D breakdown, lineage explorer, entailment validation matrix, and provider failure impact log.
+- **Export Integration Across All 9 Formats**:
+  - Updates Markdown, PDF, JSON, HTML graph, SVG, JSON-LD, Evidence CSV, Sources CSV, and Manifest to reflect calibrated tiers, lineage clusters, and entailment classifications.
 
 ## Milestone 2 contracts
 

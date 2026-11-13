@@ -29,6 +29,7 @@ from app.analysis.report_service import (
     compute_evidence_strength,
     save_report_version,
 )
+from app.research.scientific_integrity import classify_evidence_for_claim
 from app.config import get_settings
 from app.events import EventBroker
 from app.models import (
@@ -526,22 +527,29 @@ async def _associate_evidence(
     for claim in claims:
         objectives = json.loads(claim.search_objectives_json)
         for item in evidence:
-            assessment = assess_text(" ".join(objectives), item.exact_text)
             directly_linked = item.claim_id == claim.id
-            if not item.traceable or (not directly_linked and assessment.score < 0.2):
+            if not item.traceable:
+                continue
+            assessment = assess_text(" ".join(objectives), item.exact_text)
+            if not directly_linked and assessment.score < 0.2:
+                continue
+            classification = classify_evidence_for_claim(claim.text, item.exact_text)
+            if not directly_linked and classification.category.value == "insufficient":
                 continue
             associated[claim.id].append(item)
             if (claim.id, item.id) not in existing_keys:
+                rel_type = classification.category.value if classification.category.value != "insufficient" else item.evidence_type
+                explanation = (
+                    f"Directly linked: classified as {rel_type} ({classification.confidence:.2f}) - {classification.reasoning}"
+                    if directly_linked
+                    else f"Claim association: {rel_type} ({classification.confidence:.2f}) - {classification.reasoning}"
+                )
                 session.add(
                     ClaimEvidenceRelationship(
                         claim_id=claim.id,
                         evidence_id=item.id,
-                        relationship_type=item.evidence_type,
-                        explanation=(
-                            "Directly linked during extraction."
-                            if directly_linked
-                            else f"Claim-specific lexical relevance score {assessment.score:.3f}."
-                        ),
+                        relationship_type=rel_type,
+                        explanation=explanation,
                     )
                 )
                 existing_keys.add((claim.id, item.id))
@@ -712,14 +720,16 @@ _EXACT_CLAIM_RULE = (
 ROLE_SYSTEM_INSTRUCTIONS: dict[str, str] = {
     "advocate": (
         "You are the Advocate agent in NEOMON. Construct the strongest evidence-grounded supporting case for each "
-        "claim using ONLY the supplied evidence passages. Highlight positive findings, effect direction, and "
-        "supporting mechanisms while explicitly stating scope conditions. Use argument_type 'supporting' or "
-        f"'qualifying'. {_EXACT_CLAIM_RULE}"
+        "claim using ONLY the supplied supporting evidence passages. Highlight positive findings, effect direction, and "
+        "supporting mechanisms while explicitly stating scope conditions. If no supporting evidence exists for a claim, "
+        "explicitly output 'No supporting evidence found' rather than misusing non-supporting passages or inventing arguments. "
+        f"Use argument_type 'supporting' or 'qualifying'. {_EXACT_CLAIM_RULE}"
     ),
     "skeptic": (
-        "You are the Skeptic agent in NEOMON. Independently challenge each claim by hunting for counter-evidence, "
-        "null findings, confounding variables, unsupported assumptions, and sample or design weaknesses in the "
-        "supplied evidence. Use argument_type 'contradicting' or 'qualifying'. "
+        "You are the Skeptic agent in NEOMON. Independently challenge each claim by examining contradicting evidence, "
+        "mitigating factors (counterbalancing forces or efficiency improvements), and methodological limitations in the "
+        "supplied evidence. If no contradicting or mitigating evidence exists, explicitly note 'No direct contradictions "
+        "found in available evidence' and focus on scope limits. Use argument_type 'contradicting' or 'qualifying'. "
         f"{_EXACT_CLAIM_RULE}"
     ),
     "methodology_auditor": (
@@ -755,28 +765,36 @@ def _role_argument(
     evidence: list[Evidence],
     sources: dict[uuid.UUID, Source],
 ) -> ArgumentPayload:
+    empty_text = f"No traceable persisted evidence was found for this agent's specific review of: {claim.text}"
     if role == "advocate":
-        chosen = _candidate_evidence(evidence, {"supporting", "contextual"})
+        chosen = _candidate_evidence(evidence, {"supporting"})
         argument_type = ArgumentType.supporting
         lead = "Traceable evidence supports"
+        empty_text = f"No supporting evidence found for claim: {claim.text}"
     elif role == "skeptic":
-        chosen = _candidate_evidence(evidence, {"contradicting", "methodological_limitation"})
-        argument_type = ArgumentType.contradicting if any(item.evidence_type == "contradicting" for item in chosen) else ArgumentType.qualifying
-        lead = "Counter-evidence or limitations qualify"
+        chosen = _candidate_evidence(evidence, {"contradicting", "mitigating", "methodological_limitation"})
+        argument_type = (
+            ArgumentType.contradicting
+            if any(item.evidence_type in {"contradicting", "mitigating"} for item in chosen)
+            else ArgumentType.qualifying
+        )
+        lead = "Counter-evidence, mitigating factors, or limitations qualify"
+        empty_text = f"No direct contradictions, mitigating factors, or methodological limitations found in available evidence for: {claim.text}"
     elif role == "methodology_auditor":
         chosen = _candidate_evidence(evidence, {"methodological_limitation"})
         argument_type = ArgumentType.methodological_criticism
         lead = "Methodological review identifies"
+        empty_text = f"No methodological limitations identified in available evidence for: {claim.text}"
     elif role == "source_intelligence":
-        chosen = _candidate_evidence(evidence, {"supporting", "contradicting", "contextual"}, 3)
+        chosen = _candidate_evidence(evidence, {"supporting", "contradicting", "mitigating", "contextual"}, 3)
         argument_type = ArgumentType.source_criticism
         lead = "Source-level inspection finds"
     elif role == "citation_genealogy":
-        chosen = _candidate_evidence(evidence, {"supporting", "contradicting", "contextual"}, 3)
+        chosen = _candidate_evidence(evidence, {"supporting", "contradicting", "mitigating", "contextual"}, 3)
         argument_type = ArgumentType.source_criticism
         lead = "Citation-independence review finds"
     else:
-        chosen = _candidate_evidence(evidence, {"supporting", "contradicting", "contextual"}, 3)
+        chosen = _candidate_evidence(evidence, {"supporting", "contradicting", "mitigating", "contextual"}, 3)
         argument_type = ArgumentType.temporal_qualification
         lead = "Temporal review finds"
     evidence_ids = [item.id for item in chosen]
@@ -797,7 +815,7 @@ def _role_argument(
         )
         limitations = ["The agent did not infer facts absent from the persisted passages."]
     else:
-        text = f"No traceable persisted evidence was found for this agent's specific review of: {claim.text}"
+        text = empty_text
         confidence = ConfidenceAssessment(
             level="insufficient",
             explanation="No qualifying evidence passage was available for this role.",

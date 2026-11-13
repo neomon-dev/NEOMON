@@ -20,6 +20,10 @@ from app.models import (
     Evidence,
     Investigation,
     OpenAccessLocation,
+    ResearchContradiction,
+    ResearchGap,
+    ResearchGapAnalysis,
+    ResearchHypothesis,
     ResearchQuery,
     Source,
 )
@@ -207,6 +211,46 @@ async def _build_investigation_graph(
         ).all()
         decisions = [item for item in raw_decisions if item.claim_id in claim_map]
 
+    latest_gap_analysis = await session.scalar(
+        select(ResearchGapAnalysis)
+        .where(ResearchGapAnalysis.investigation_id == investigation.id)
+        .order_by(desc(ResearchGapAnalysis.version_number), ResearchGapAnalysis.id)
+    )
+    gaps: list[ResearchGap] = []
+    if latest_gap_analysis is not None:
+        gaps = list(
+            (
+                await session.scalars(
+                    select(ResearchGap)
+                    .where(ResearchGap.analysis_id == latest_gap_analysis.id)
+                    .order_by(ResearchGap.research_priority.desc(), ResearchGap.id)
+                )
+            ).all()
+        )
+
+    hypotheses = list(
+        (
+            await session.scalars(
+                select(ResearchHypothesis)
+                .where(ResearchHypothesis.investigation_id == investigation.id)
+                .order_by(desc(ResearchHypothesis.testability_score), ResearchHypothesis.id)
+            )
+        ).all()
+    )
+
+    contradictions = list(
+        (
+            await session.scalars(
+                select(ResearchContradiction)
+                .where(
+                    (ResearchContradiction.primary_investigation_id == investigation.id)
+                    | (ResearchContradiction.secondary_investigation_id == investigation.id)
+                )
+                .order_by(desc(ResearchContradiction.created_at), ResearchContradiction.id)
+            )
+        ).all()
+    )
+
     total_counts = GraphTotalCounts(
         claims=len(claims),
         evidence=len(all_evidence),
@@ -214,6 +258,9 @@ async def _build_investigation_graph(
         sources=len(sources),
         arguments=len(arguments),
         decisions=len(decisions),
+        research_gaps=len(gaps),
+        hypotheses=len(hypotheses),
+        contradictions=len(contradictions),
     )
 
     # Index investigation relationships strictly from persisted FKs & junction tables.
@@ -682,6 +729,84 @@ async def _build_investigation_graph(
             )
         )
 
+    for gap in gaps:
+        add_node(
+            GraphNodeView(
+                id=f"{GraphNodeType.research_gap.value}:{gap.id}",
+                entity_id=gap.id,
+                type=GraphNodeType.research_gap,
+                label=_truncate_label(gap.title, 84),
+                description=f"{gap.category.replace('_', ' ')} · {gap.severity} · priority {gap.research_priority}",
+                investigation_id=investigation.id,
+                status=gap.severity,
+                missing_provenance=[],
+                has_hidden_neighbors=False,
+                metadata={
+                    "gap_id": str(gap.id),
+                    "category": gap.category,
+                    "gap_type": gap.gap_type,
+                    "severity": gap.severity,
+                    "priority": gap.research_priority,
+                    "confidence": gap.confidence,
+                    "missing_information": gap.missing_information,
+                    "explanation": gap.supporting_explanation,
+                    "recommended_action": _safe_json_loads(gap.recommended_action_json, {}),
+                },
+            )
+        )
+
+    for hyp in hypotheses:
+        add_node(
+            GraphNodeView(
+                id=f"{GraphNodeType.hypothesis.value}:{hyp.id}",
+                entity_id=hyp.id,
+                type=GraphNodeType.hypothesis,
+                label=_truncate_label(hyp.title, 84),
+                description=f"{hyp.category} · testability {hyp.testability_score:.1f} · {hyp.status}",
+                investigation_id=investigation.id,
+                status=hyp.status,
+                missing_provenance=[],
+                has_hidden_neighbors=False,
+                metadata={
+                    "hypothesis_id": str(hyp.id),
+                    "statement": hyp.statement,
+                    "category": hyp.category,
+                    "status": hyp.status,
+                    "falsification_criteria": hyp.falsification_criteria,
+                    "testability_score": hyp.testability_score,
+                    "falsifiability_score": hyp.falsifiability_score,
+                    "novelty_score": hyp.novelty_score,
+                    "evidence_grounding_score": hyp.evidence_grounding_score,
+                    "generation_method": hyp.generation_method,
+                },
+            )
+        )
+
+    for contra in contradictions:
+        add_node(
+            GraphNodeView(
+                id=f"{GraphNodeType.contradiction.value}:{contra.id}",
+                entity_id=contra.id,
+                type=GraphNodeType.contradiction,
+                label=_truncate_label(contra.title, 84),
+                description=f"{contra.category} · {contra.severity} severity · {contra.status}",
+                investigation_id=investigation.id,
+                status=contra.status,
+                missing_provenance=[],
+                has_hidden_neighbors=False,
+                metadata={
+                    "contradiction_id": str(contra.id),
+                    "category": contra.category,
+                    "severity": contra.severity,
+                    "status": contra.status,
+                    "description": contra.description,
+                    "scope_differences": contra.scope_differences,
+                    "methodological_differences": contra.methodological_differences,
+                    "resolution_explanation": contra.resolution_explanation,
+                },
+            )
+        )
+
     # Emit only persisted relationships whose source & target both exist in nodes_by_id; deduplicate safely.
     edges_by_key: dict[tuple[str, str, str], GraphEdgeView] = {}
 
@@ -807,6 +932,82 @@ async def _build_investigation_graph(
                     "weighs_argument",
                     "weighs argument",
                 )
+
+    for gap in gaps:
+        gap_node = f"{GraphNodeType.research_gap.value}:{gap.id}"
+        claim_ids = _safe_json_loads(gap.claim_ids_json, [])
+        for cid in claim_ids:
+            try:
+                c_uuid = uuid.UUID(str(cid))
+            except ValueError:
+                continue
+            if c_uuid in claim_map:
+                add_edge(
+                    f"{GraphNodeType.claim.value}:{c_uuid}",
+                    gap_node,
+                    "has_gap",
+                    f"gap: {gap.gap_type.replace('_', ' ')}",
+                    classification=gap.severity,
+                    explanation=gap.description,
+                )
+        add_edge(
+            gap_node,
+            inv_node_id,
+            "affects",
+            "affects investigation",
+            classification=gap.severity,
+            explanation=gap.description,
+        )
+
+    for hyp in hypotheses:
+        hyp_node = f"{GraphNodeType.hypothesis.value}:{hyp.id}"
+        # Edge to investigation
+        add_edge(hyp_node, inv_node_id, "hypothesizes_for", "hypothesizes for", classification=hyp.status)
+        # Edge to claims
+        claim_ids = _safe_json_loads(hyp.claim_ids_json, [])
+        for cid in claim_ids:
+            try:
+                c_uuid = uuid.UUID(str(cid))
+                if c_uuid in claim_map:
+                    add_edge(hyp_node, f"{GraphNodeType.claim.value}:{c_uuid}", "hypothesizes", "hypothesizes", classification=hyp.category)
+            except ValueError:
+                pass
+        # Supporting evidence edges
+        for eid in _safe_json_loads(hyp.supporting_evidence_ids_json, []):
+            try:
+                e_uuid = uuid.UUID(str(eid))
+                if e_uuid in evidence_map:
+                    add_edge(f"{GraphNodeType.evidence.value}:{e_uuid}", hyp_node, "supports_hypothesis", "supports hypothesis", classification="supporting")
+            except ValueError:
+                pass
+        # Challenging evidence edges
+        for eid in _safe_json_loads(hyp.challenging_evidence_ids_json, []):
+            try:
+                e_uuid = uuid.UUID(str(eid))
+                if e_uuid in evidence_map:
+                    add_edge(f"{GraphNodeType.evidence.value}:{e_uuid}", hyp_node, "challenges", "challenges hypothesis", classification="contradicting")
+            except ValueError:
+                pass
+
+    for contra in contradictions:
+        contra_node = f"{GraphNodeType.contradiction.value}:{contra.id}"
+        add_edge(contra_node, inv_node_id, "observed_in", "observed in", classification=contra.severity)
+        # Claims
+        for cid in _safe_json_loads(contra.claim_ids_json, []):
+            try:
+                c_uuid = uuid.UUID(str(cid))
+                if c_uuid in claim_map:
+                    add_edge(contra_node, f"{GraphNodeType.claim.value}:{c_uuid}", "contradicts", "contradicts claim", classification=contra.severity)
+            except ValueError:
+                pass
+        # Evidence
+        for eid in _safe_json_loads(contra.evidence_ids_json, []):
+            try:
+                e_uuid = uuid.UUID(str(eid))
+                if e_uuid in evidence_map:
+                    add_edge(contra_node, f"{GraphNodeType.evidence.value}:{e_uuid}", "conflicts_with", "conflicts with evidence", classification=contra.severity)
+            except ValueError:
+                pass
 
     # Direct Investigation -> Claim fallback edge if ResearchQuestion is filtered out by node_types filter
     if allowed_node_types and GraphNodeType.research_question.value not in allowed_node_types:

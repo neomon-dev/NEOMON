@@ -10,11 +10,12 @@ The local `NEOMON` directory and the `neomon-dev/NEOMON` GitHub repository were 
 2. **Milestone 1 — Foundation**: initial slice complete. Establish a runnable Next.js TypeScript dashboard shell, navigation, configuration template, and project scripts. Backend integration and persistence remain intentionally deferred.
 3. **Milestone 2 — Backend and AI infrastructure**: initial slice complete. Add FastAPI `/api/v1`, provider adapters, twelve agent foundations, SQLAlchemy/Alembic schema, SSE broker, demo mode, and frontend health/provider integration.
 4. **Milestone 3 — Research engine**: initial slice complete. Add real academic/web search, source retrieval, evidence extraction, normalization, persistence, SSE events, and investigation UI.
-5. **Milestone 4 — Multi-agent intelligence**: add claim decomposition through configured models and bounded planner/explorer/collector orchestration.
-6. **Milestone 5 — Knowledge graph**: persist and render evidence-derived provenance relationships.
-7. **Milestone 6 — Live intelligence**: add backend events and SSE monitoring.
-8. **Milestone 7 — Report engine**: add transparent assessments, references, and exports.
-9. **Milestone 8 — Quality and deployment**: test, secure, containerize, and document deployment.
+5. **Milestone 5 — MVP Completion**: complete. Bounded multi-agent debates (Advocate/Skeptic/Adjudicator), SSRF protection, live investigation monitoring, and persisted SSE replay.
+6. **Milestone 6 — Evidence Intelligence & Interactive Knowledge Graph**: complete. Evidence Explorer (`/evidence`), Source Intelligence (`/sources`), Agent Observatory (`/agents`), and React Flow Knowledge Graph (`/graph`).
+7. **Milestone 7 — Research Reliability, Report Intelligence & Knowledge Export**: complete. Local concurrency limiter (7A), 18-section academic reports (7B), and 9 standard export formats (7C).
+8. **Milestone 8A–8F — Advanced Research Intelligence System**: complete. Autonomous research gaps (8A), hypothesis generation (8B), cross-investigation synthesis (8C), contradiction intelligence (8D), longitudinal research trends (8E), and unified research intelligence hub (8F).
+9. **Milestone 8G — Research Quality Calibration & Scientific Evidence Validation**: complete. Unified canonical credibility (8G.1), publication lineage and explainable independence (8G.2), evidence-to-claim entailment validation (8G.3), calibrated 5D scoring and coverage separation (8G.4), provider failure penalties (8G.5), Scientific Quality Audit Workspace (`/quality-audit`, 8G.6), and export integration across all 9 formats (8G.7).
+10. **Milestone 9 — Production Deployment & Autonomous Monitoring**: containerization, periodic background literature re-evaluation, and production operations.
 
 ## Delivery rules
 

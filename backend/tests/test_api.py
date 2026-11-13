@@ -11,7 +11,8 @@ def test_health_is_versioned_and_explicit(client):
 def test_agents_expose_all_twelve_foundation_agents(client):
     response = client.get("/api/v1/agents")
     assert response.status_code == 200
-    assert len(response.json()) == 12
+    assert len(response.json()) >= 12
+    assert any(agent["identifier"] == "research_gap_analyst" for agent in response.json())
     assert all(agent["demo_mode"] is True for agent in response.json())
 
 

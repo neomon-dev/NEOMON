@@ -29,6 +29,10 @@ from app.schemas import (
     ReportSectionView,
     ReportVersionView,
 )
+from app.research.scientific_integrity import (
+    assess_source_credibility,
+    detect_source_independence_clusters,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -66,44 +70,55 @@ def compute_evidence_strength(
     doc_list = list(documents.values()) if isinstance(documents, dict) else list(documents)
 
     # 1. Source Independence (max 25 pts)
-    # Count distinct publisher domains / institutions
-    domains = set()
-    for src in source_list:
-        parsed = urlparse(src.canonical_url or src.original_url or "")
-        domain = parsed.netloc.lower().removeprefix("www.")
-        if domain:
-            domains.add(domain)
-        elif src.publisher:
-            domains.add(src.publisher.strip().lower())
-    domain_count = len(domains)
-    if domain_count == 0:
-        source_independence = 5.0
-    elif domain_count == 1:
-        source_independence = 10.0
-    elif domain_count == 2:
-        source_independence = 17.5
-    elif domain_count == 3:
-        source_independence = 22.0
+    # Group sources into independent clusters using syndication and shared study detection
+    source_payloads = [
+        {
+            "id": str(src.id),
+            "title": src.title,
+            "url": src.canonical_url or src.original_url,
+            "doi": src.doi,
+            "publisher": src.publisher,
+        }
+        for src in source_list
+    ]
+    clusters = detect_source_independence_clusters(source_payloads) if source_payloads else []
+    cluster_count = len(clusters)
+    if cluster_count == 0:
+        source_independence = 0.0
+    elif cluster_count == 1:
+        source_independence = 8.0
+    elif cluster_count == 2:
+        source_independence = 16.0
+    elif cluster_count == 3:
+        source_independence = 21.0
     else:
         source_independence = 25.0
 
     # 2. Source Quality (max 25 pts)
-    # Weighted by academic, institutional, and relevance scores
+    # Assessed using granular source credibility rubric (peer_reviewed, preprint, institutional, etc.)
     if source_list:
         quality_scores = []
         for src in source_list:
-            base_wt = 0.5
-            st = (src.source_type or "").lower()
-            if "academic" in st or "peer" in st or src.doi:
-                base_wt = 1.0
-            elif "institutional" in st or "government" in st:
-                base_wt = 0.85
+            authors_data = None
+            if getattr(src, "authors_json", None):
+                try:
+                    authors_data = json.loads(src.authors_json)
+                except Exception:
+                    authors_data = None
+            cred = assess_source_credibility(
+                publisher=src.publisher,
+                url=src.canonical_url or src.original_url,
+                doi=src.doi,
+                source_type_declared=src.source_type,
+                authors=authors_data,
+                publication_date=src.publication_date,
+            )
             relevance = getattr(src, "relevance_score", 0.7) or 0.7
-            quality_scores.append(base_wt * relevance)
+            quality_scores.append(cred.credibility_score * relevance)
         avg_quality = sum(quality_scores) / len(quality_scores)
         source_quality = round(avg_quality * 25.0, 1)
     else:
-        source_quality = 5.0
+        source_quality = 0.0
 
     # 3. Full-Text Coverage (max 20 pts)
     full_text_count = sum(1 for d in doc_list if getattr(d, "access_level", "") == "full_text")
@@ -114,13 +129,27 @@ def compute_evidence_strength(
         full_text_coverage = 0.0
 
     # 4. Methodological Rigor & Directness (max 15 pts)
+    unresolved_count = sum(
+        1
+        for e in evidence
+        if not getattr(e, "traceable", True)
+        or "[UNRESOLVED PROVENANCE]" in (getattr(e, "relevance_reason", "") or "")
+    )
     if evidence:
-        direct_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") == "direct")
-        direct_ratio = direct_count / len(evidence)
+        supporting_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") in {"direct", "supporting"})
+        contradicting_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") in {"contradicting", "counter"})
+        mitigating_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") == "mitigating")
+        limitation_count = sum(1 for e in evidence if "limitation" in getattr(e, "evidence_type", ""))
+        
         avg_ev_score = sum(getattr(e, "relevance_score", 0.5) for e in evidence) / len(evidence)
-        methodological_rigor = round((direct_ratio * 0.6 + avg_ev_score * 0.4) * 15.0, 1)
+        # Bonus for examining counter-perspectives/mitigating factors
+        multi_perspective_bonus = 3.0 if (contradicting_count > 0 or mitigating_count > 0 or limitation_count > 0) else 0.0
+        base_rigor = ((supporting_count / len(evidence)) * 7.0) + (avg_ev_score * 5.0) + multi_perspective_bonus
+        # Severe penalty for unresolved provenance
+        prov_penalty = min(6.0, unresolved_count * 2.0)
+        methodological_rigor = round(max(0.0, min(15.0, base_rigor - prov_penalty)), 1)
     else:
-        methodological_rigor = 2.0
+        methodological_rigor = 0.0
 
     # 5. Conflict Resolution & Adjudication Consistency (max 15 pts)
     if claims and decisions:
@@ -134,12 +163,18 @@ def compute_evidence_strength(
             if getattr(d, "decision", "")
             in {"strongly_supported", "moderately_supported", "weakly_supported"}
         )
-        res_score = eval_ratio * 12.0
-        if contradictory_resolved > 0 or supported_resolved > 0:
+        has_counter = any(
+            getattr(e, "evidence_type", "") in {"contradicting", "mitigating", "methodological_limitation"}
+            for e in evidence
+        )
+        res_score = eval_ratio * 10.0
+        if has_counter and (contradictory_resolved > 0 or supported_resolved > 0):
+            res_score += 5.0
+        elif supported_resolved > 0:
             res_score += 3.0
         conflict_resolution = round(min(15.0, res_score), 1)
     else:
-        conflict_resolution = 3.0
+        conflict_resolution = 0.0
 
     total_score = round(
         source_independence
@@ -162,6 +197,18 @@ def compute_evidence_strength(
     else:
         tier = "inconclusive"
 
+    reasons = [
+        f"Source Independence ({source_independence}/25): {cluster_count} independent publication cluster(s) detected.",
+        f"Source Quality ({source_quality}/25): Granular credibility assessment across {len(source_list)} source(s).",
+        f"Full-Text Coverage ({full_text_coverage}/20): {full_text_count}/{len(source_list)} full-text document(s) verified.",
+        f"Methodological Rigor ({methodological_rigor}/15): Evaluated {len(evidence)} evidence passage(s) with multi-perspective analysis.",
+        f"Conflict Resolution ({conflict_resolution}/15): Adjudicated {len(decisions)}/{len(claims)} claim(s) across evidence tensions.",
+    ]
+    if unresolved_count > 0:
+        reasons.append(f"Provenance Alert: {unresolved_count} passage(s) flagged for unresolved provenance.")
+
+    explanation = f"Classified as {tier.replace('_', ' ').title()} ({total_score}/100) based on deterministic 5-dimension rubric."
+
     return EvidenceStrengthSummary(
         score=total_score,
         tier=tier,
@@ -172,6 +219,8 @@ def compute_evidence_strength(
             methodological_rigor=methodological_rigor,
             conflict_resolution=conflict_resolution,
         ),
+        explanation=explanation,
+        reasons=reasons,
     )
 
 
@@ -342,12 +391,20 @@ def build_18_report_sections(
     )
 
     # 7. Supporting Evidence Analysis
-    supp_ev = [e for e in evidence if getattr(e, "evidence_type", "") in {"direct", "supporting"} or getattr(e, "relevance_score", 0.0) >= 0.7]
-    supp_text = f"Identified {len(supp_ev)} direct or highly relevant supporting passage(s).\n\n"
-    for i, ev in enumerate(supp_ev[:8], 1):
-        src = sources.get(ev.source_id)
-        src_title = src.title if src else "Unknown Source"
-        supp_text += f"{i}. \"{ev.exact_text[:300]}...\"\n   — Source: {src_title} (Score: {ev.relevance_score})\n\n"
+    supp_ev = [
+        e
+        for e in evidence
+        if getattr(e, "evidence_type", "") in {"direct", "supporting"}
+        and getattr(e, "traceable", True)
+    ]
+    if supp_ev:
+        supp_text = f"Identified {len(supp_ev)} direct, traceable supporting evidence passage(s):\n\n"
+        for i, ev in enumerate(supp_ev[:8], 1):
+            src = sources.get(ev.source_id)
+            src_title = src.title if src else "Unknown Source"
+            supp_text += f"{i}. \"{ev.exact_text[:300]}...\"\n   — Source: {src_title} (Relevance: {ev.relevance_score:.2f})\n\n"
+    else:
+        supp_text = "No direct supporting evidence passages met the strict inclusion threshold."
     sections.append(
         ReportSectionPayload(
             section_type="supporting_evidence",
@@ -360,23 +417,29 @@ def build_18_report_sections(
     )
 
     # 8. Contradicting & Conflicting Evidence Analysis
-    contra_ev = [e for e in evidence if getattr(e, "evidence_type", "") in {"contradicting", "counter"} or "limitation" in getattr(e, "evidence_type", "")]
+    contra_ev = [
+        e
+        for e in evidence
+        if getattr(e, "evidence_type", "") in {"contradicting", "counter", "mitigating", "methodological_limitation"}
+        and getattr(e, "traceable", True)
+    ]
     if contra_ev:
-        contra_text = f"Identified {len(contra_ev)} conflicting or countervailing evidence passage(s):\n\n"
-        for i, ev in enumerate(contra_ev[:6], 1):
+        contra_text = f"Identified {len(contra_ev)} conflicting, counter, or mitigating evidence passage(s):\n\n"
+        for i, ev in enumerate(contra_ev[:8], 1):
             src = sources.get(ev.source_id)
             src_title = src.title if src else "Unknown Source"
-            contra_text += f"{i}. \"{ev.exact_text[:300]}...\"\n   — Source: {src_title}\n\n"
+            type_label = ev.evidence_type.replace("_", " ").title()
+            contra_text += f"{i}. [{type_label}] \"{ev.exact_text[:300]}...\"\n   — Source: {src_title}\n\n"
     else:
-        contra_text = "No direct empirical contradictions were detected among the retrieved literature. However, methodological boundaries qualify the scope of positive assertions."
+        contra_text = "No direct empirical contradictions or mitigating factors were detected among the retrieved literature. However, methodological boundaries qualify the scope of positive assertions."
     sections.append(
         ReportSectionPayload(
             section_type="contradicting_evidence",
             title="Contradicting & Conflicting Evidence Analysis",
             content=contra_text.strip(),
             claim_ids=all_claim_ids,
-            evidence_ids=[e.id for e in contra_ev[:6]],
-            provenance=provenance_for_fn([e.id for e in contra_ev[:6]]),
+            evidence_ids=[e.id for e in contra_ev[:8]],
+            provenance=provenance_for_fn([e.id for e in contra_ev[:8]]),
         )
     )
 

@@ -1,9 +1,18 @@
 from fastapi import APIRouter
 
+from app.config import get_settings
 from app.errors import BackendError
 from app.providers import create_provider
 from app.providers.base import ProviderRequestError, validate_provider_endpoint
-from app.schemas import ProviderConfigRequest, ProviderStatus
+from app.research.providers import TavilyProvider
+from app.research.telemetry import tavily_telemetry
+from app.schemas import (
+    ProviderConfigRequest,
+    ProviderStatus,
+    TavilyStatusResponse,
+    TavilyTestRequest,
+    TavilyTestResponse,
+)
 
 router = APIRouter(prefix="/providers", tags=["providers"])
 
@@ -23,3 +32,29 @@ async def test_provider(config: ProviderConfigRequest) -> ProviderStatus:
         return await provider.test_connection()
     finally:
         await provider.close()
+
+
+@router.post("/tavily/test", response_model=TavilyTestResponse)
+async def test_tavily(request: TavilyTestRequest) -> TavilyTestResponse:
+    provider = TavilyProvider(api_key=request.api_key, search_depth=request.search_depth)
+    try:
+        result = await provider.test_connection(api_key=request.api_key, search_depth=request.search_depth)
+        return TavilyTestResponse(**result)
+    finally:
+        await provider.close()
+
+
+@router.get("/tavily/status", response_model=TavilyStatusResponse)
+async def get_tavily_status() -> TavilyStatusResponse:
+    settings = get_settings()
+    return TavilyStatusResponse(
+        provider="tavily",
+        enabled=settings.tavily_enabled,
+        api_key_configured=bool(settings.tavily_api_key),
+        search_depth=settings.tavily_search_depth,
+        max_results=settings.tavily_max_results,
+        include_domains=list(settings.tavily_include_domains),
+        exclude_domains=list(settings.tavily_exclude_domains),
+        telemetry=tavily_telemetry.get_summary(),
+    )
+

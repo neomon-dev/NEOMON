@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -36,13 +37,30 @@ class Settings(BaseSettings):
     local_provider_max_concurrency: int = Field(default=1, ge=1, le=10)
     remote_provider_max_concurrency: int = Field(default=4, ge=1, le=20)
     provider_retry_count: int = Field(default=2, ge=0, le=5)
+
+    # Tavily Search Provider Configuration
     tavily_api_key: str | None = None
+    tavily_enabled: bool = True
+    tavily_search_depth: str = "advanced"  # "basic" or "advanced"
+    tavily_max_results: int = Field(default=10, ge=1, le=20)
+    tavily_include_domains: list[str] = Field(default_factory=list)
+    tavily_exclude_domains: list[str] = Field(default_factory=list)
+    tavily_request_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+
     unpaywall_email: str | None = None
     unpaywall_api_key: str | None = None
     research_user_agent: str = "NEOMON/0.3 (+https://github.com/neomon-dev/NEOMON)"
     research_max_document_bytes: int = Field(default=5_000_000, ge=100_000, le=50_000_000)
 
-    @field_validator("allowed_origins", "allowed_local_provider_hosts", mode="before")
+    @field_validator("tavily_api_key", mode="before")
+    @classmethod
+    def resolve_tavily_api_key(cls, value: object) -> object:
+        if value:
+            return value
+        # Fall back to standard TAVILY_API_KEY if NEOMON_ prefix was not provided
+        return os.environ.get("TAVILY_API_KEY") or None
+
+    @field_validator("allowed_origins", "allowed_local_provider_hosts", "tavily_include_domains", "tavily_exclude_domains", mode="before")
     @classmethod
     def parse_allowed_origins(cls, value: object) -> object:
         if isinstance(value, str):

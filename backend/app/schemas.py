@@ -258,6 +258,8 @@ class EvidenceStrengthSummary(BaseModel):
     score: float = 0.0
     tier: str = "moderate"
     breakdown: EvidenceStrengthBreakdown = Field(default_factory=EvidenceStrengthBreakdown)
+    explanation: str = ""
+    reasons: list[str] = Field(default_factory=list)
 
 
 class ReportVersionView(BaseModel):
@@ -459,6 +461,11 @@ class GraphNodeType(StrEnum):
     source = "source"
     agent_argument = "agent_argument"
     adjudication_decision = "adjudication_decision"
+    research_gap = "research_gap"
+    hypothesis = "hypothesis"
+    contradiction = "contradiction"
+    cross_investigation = "cross_investigation"
+    research_trend = "research_trend"
 
 
 class GraphNodeView(BaseModel):
@@ -491,6 +498,11 @@ class GraphTotalCounts(BaseModel):
     sources: int = 0
     arguments: int = 0
     decisions: int = 0
+    research_gaps: int = 0
+    hypotheses: int = 0
+    contradictions: int = 0
+    cross_relationships: int = 0
+    trends: int = 0
 
 
 class InvestigationGraphResponse(BaseModel):
@@ -504,3 +516,620 @@ class InvestigationGraphResponse(BaseModel):
     node_type_counts: dict[str, int] = Field(default_factory=dict)
     relationship_type_counts: dict[str, int] = Field(default_factory=dict)
     empty_reason: str | None = None
+
+
+class TavilyTestRequest(BaseModel):
+    api_key: str | None = None
+    search_depth: str | None = "basic"
+
+
+class TavilyTestResponse(BaseModel):
+    connected: bool
+    provider: str = "tavily"
+    search_depth: str = "basic"
+    api_key_configured: bool
+    message: str | None = None
+    error: str | None = None
+
+
+class TavilyStatusResponse(BaseModel):
+    provider: str = "tavily"
+    enabled: bool
+    api_key_configured: bool
+    search_depth: str
+    max_results: int
+    include_domains: list[str] = Field(default_factory=list)
+    exclude_domains: list[str] = Field(default_factory=list)
+    telemetry: dict[str, Any] = Field(default_factory=dict)
+
+
+class GapSeverity(StrEnum):
+    critical = "critical"
+    high = "high"
+    moderate = "moderate"
+    low = "low"
+
+
+class GapCategory(StrEnum):
+    claim_coverage = "claim_coverage"
+    evidence_coverage = "evidence_coverage"
+    perspective = "perspective"
+    research_question = "research_question"
+
+
+class GapConfidence(StrEnum):
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
+class RecommendedAction(BaseModel):
+    action_type: str
+    description: str
+    suggested_queries: list[str] = Field(default_factory=list)
+    target_source_types: list[str] = Field(default_factory=list)
+    expected_contribution: str
+
+
+class ResearchGapView(BaseModel):
+    id: uuid.UUID
+    analysis_id: uuid.UUID
+    investigation_id: uuid.UUID
+    category: str
+    gap_type: str
+    title: str
+    description: str
+    claim_ids: list[uuid.UUID] = Field(default_factory=list)
+    evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    source_ids: list[uuid.UUID] = Field(default_factory=list)
+    supporting_explanation: str
+    missing_information: str
+    severity: str
+    research_priority: float = 5.0
+    confidence: str = "medium"
+    is_observed: bool = True
+    recommended_action: RecommendedAction
+    created_at: datetime | None = None
+
+
+class ResearchCoverageSummary(BaseModel):
+    coverage_score: float = 0.0
+    total_claims: int = 0
+    claims_with_direct_support: int = 0
+    claims_with_conflicts: int = 0
+    claims_unsupported: int = 0
+    claims_single_source: int = 0
+    total_sources: int = 0
+    independent_clusters: int = 0
+    full_text_count: int = 0
+    unresolved_provenance_count: int = 0
+    critical_gaps: int = 0
+    high_gaps: int = 0
+    moderate_gaps: int = 0
+    low_gaps: int = 0
+    narrative: str = ""
+
+
+class ResearchGapAnalysisResponse(BaseModel):
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    version_number: int = 1
+    summary: str
+    coverage: ResearchCoverageSummary
+    gaps: list[ResearchGapView] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class ResearchGapVersionView(BaseModel):
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    version_number: int
+    summary: str
+    coverage_score: float
+    critical_count: int
+    high_count: int
+    moderate_count: int
+    low_count: int
+    created_at: datetime | None = None
+
+
+class ResearchGapAnalyzeRequest(BaseModel):
+    provider_kind: str | None = None
+    model: str | None = None
+    temperature: float | None = 0.2
+    force_regenerate: bool = False
+
+
+# ===========================================================================
+# MILESTONE 8B: EVIDENCE-GROUNDED HYPOTHESIS GENERATION SCHEMAS
+# ===========================================================================
+
+class HypothesisCategory(StrEnum):
+    causal = "causal"
+    correlational = "correlational"
+    comparative = "comparative"
+    mechanistic = "mechanistic"
+    predictive = "predictive"
+    null = "null"
+    exploratory = "exploratory"
+
+
+class HypothesisStatus(StrEnum):
+    proposed = "proposed"
+    under_review = "under_review"
+    supported_by_subsequent_evidence = "supported_by_subsequent_evidence"
+    challenged_by_subsequent_evidence = "challenged_by_subsequent_evidence"
+    inconclusive = "inconclusive"
+    rejected = "rejected"
+    superseded = "superseded"
+
+
+class HypothesisEvaluationView(BaseModel):
+    id: uuid.UUID
+    hypothesis_id: uuid.UUID
+    reviewer_role: str
+    status: str
+    evidence_grounding_score: float = 5.0
+    novelty_score: float = 5.0
+    logical_consistency_score: float = 5.0
+    falsifiability_score: float = 5.0
+    testability_score: float = 5.0
+    methodological_feasibility_score: float = 5.0
+    review_comments: str = ""
+    created_at: datetime | None = None
+
+
+class HypothesisView(BaseModel):
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    title: str
+    statement: str
+    rationale: str
+    category: str
+    status: str = "proposed"
+    claim_ids: list[uuid.UUID] = Field(default_factory=list)
+    evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    gap_ids: list[uuid.UUID] = Field(default_factory=list)
+    supporting_evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    challenging_evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    proposed_mechanism: str = ""
+    independent_variables: list[str] = Field(default_factory=list)
+    dependent_variables: list[str] = Field(default_factory=list)
+    expected_outcome: str = ""
+    boundary_conditions: str = ""
+    assumptions: list[str] = Field(default_factory=list)
+    confounding_variables: list[str] = Field(default_factory=list)
+    suggested_methodology: str = ""
+    falsification_criteria: str = ""
+    generation_method: str = "deterministic"
+    confidence_level: str = "medium"
+    testability_score: float = 7.0
+    novelty_score: float = 6.0
+    evidence_grounding_score: float = 7.0
+    falsifiability_score: float = 8.0
+    evaluation_notes: str = ""
+    version_number: int = 1
+    evaluations: list[HypothesisEvaluationView] = Field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class HypothesisGenerateRequest(BaseModel):
+    provider_kind: str | None = None
+    model: str | None = None
+    temperature: float | None = 0.2
+    force_regenerate: bool = False
+    focus_gap_id: uuid.UUID | None = None
+
+
+class HypothesisStatusUpdateRequest(BaseModel):
+    status: str
+    review_comments: str = ""
+
+
+class HypothesisEvaluationRequest(BaseModel):
+    reviewer_role: str = "hypothesis_evaluator"
+    status: str = "reviewed"
+    evidence_grounding_score: float = 7.0
+    novelty_score: float = 6.0
+    logical_consistency_score: float = 8.0
+    falsifiability_score: float = 8.0
+    testability_score: float = 7.0
+    methodological_feasibility_score: float = 7.0
+    review_comments: str = ""
+
+
+class HypothesisGenerationResponse(BaseModel):
+    investigation_id: uuid.UUID
+    hypotheses: list[HypothesisView] = Field(default_factory=list)
+    total: int = 0
+
+
+# ===========================================================================
+# MILESTONE 8C: CROSS-INVESTIGATION KNOWLEDGE SYNTHESIS SCHEMAS
+# ===========================================================================
+
+class CrossRelationshipType(StrEnum):
+    supports = "supports"
+    challenges = "challenges"
+    extends = "extends"
+    refines = "refines"
+    overlaps_with = "overlaps_with"
+    shares_evidence_with = "shares_evidence_with"
+    provides_context_for = "provides_context_for"
+    contradicts = "contradicts"
+    depends_on = "depends_on"
+    supersedes = "supersedes"
+
+
+class CrossRelationshipView(BaseModel):
+    id: uuid.UUID
+    source_investigation_id: uuid.UUID
+    source_investigation_question: str | None = None
+    target_investigation_id: uuid.UUID
+    target_investigation_question: str | None = None
+    relationship_type: str
+    explanation: str
+    confidence: str = "medium"
+    detection_method: str = "deterministic"
+    claim_ids: list[uuid.UUID] = Field(default_factory=list)
+    evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    shared_evidence_count: int = 0
+    created_at: datetime | None = None
+
+
+class InvestigationSynthesisReportView(BaseModel):
+    id: uuid.UUID
+    title: str
+    summary: str
+    investigation_ids: list[uuid.UUID] = Field(default_factory=list)
+    shared_themes: list[dict[str, Any]] = Field(default_factory=list)
+    common_findings: list[dict[str, Any]] = Field(default_factory=list)
+    complementary_findings: list[dict[str, Any]] = Field(default_factory=list)
+    conflicting_findings: list[dict[str, Any]] = Field(default_factory=list)
+    shared_evidence: list[dict[str, Any]] = Field(default_factory=list)
+    independent_corroboration: list[dict[str, Any]] = Field(default_factory=list)
+    methodological_differences: list[dict[str, Any]] = Field(default_factory=list)
+    unresolved_questions: list[str] = Field(default_factory=list)
+    cross_investigation_gaps: list[str] = Field(default_factory=list)
+    recommended_future_investigations: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class CrossInvestigationSynthesisRequest(BaseModel):
+    investigation_ids: list[uuid.UUID]
+    provider_kind: str | None = None
+    model: str | None = None
+
+
+class CrossInvestigationSynthesisResponse(BaseModel):
+    report: InvestigationSynthesisReportView
+    relationships: list[CrossRelationshipView]
+
+
+class GlobalClaimSearchResult(BaseModel):
+    claim_id: uuid.UUID
+    investigation_id: uuid.UUID
+    investigation_question: str
+    claim_text: str
+    status: str
+    priority: int
+    evidence_count: int = 0
+
+
+class SharedEvidenceResult(BaseModel):
+    evidence_id: uuid.UUID
+    exact_text: str
+    source_id: uuid.UUID
+    source_title: str
+    investigation_ids: list[uuid.UUID] = Field(default_factory=list)
+    investigation_questions: list[str] = Field(default_factory=list)
+    is_syndicated: bool = False
+
+
+# ===========================================================================
+# MILESTONE 8D: CONTRADICTION INTELLIGENCE SCHEMAS
+# ===========================================================================
+
+class ContradictionCategory(StrEnum):
+    direct_factual = "direct_factual"
+    quantitative = "quantitative"
+    causal = "causal"
+    methodological = "methodological"
+    temporal = "temporal"
+    population_specific = "population_specific"
+    scope_dependent = "scope_dependent"
+    definition_based = "definition_based"
+    apparent = "apparent"
+    unresolved = "unresolved"
+
+
+class ContradictionSeverity(StrEnum):
+    critical = "critical"
+    high = "high"
+    moderate = "moderate"
+    low = "low"
+
+
+class ContradictionStatus(StrEnum):
+    newly_detected = "newly_detected"
+    under_investigation = "under_investigation"
+    scope_difference_identified = "scope_difference_identified"
+    methodological_difference_identified = "methodological_difference_identified"
+    partially_resolved = "partially_resolved"
+    resolved_with_evidence = "resolved_with_evidence"
+    unresolved = "unresolved"
+    requires_human_review = "requires_human_review"
+
+
+class ContradictionResolutionLogView(BaseModel):
+    id: uuid.UUID
+    contradiction_id: uuid.UUID
+    previous_status: str
+    new_status: str
+    resolution_rationale: str
+    resolving_evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class ResearchContradictionView(BaseModel):
+    id: uuid.UUID
+    primary_investigation_id: uuid.UUID
+    primary_investigation_question: str | None = None
+    secondary_investigation_id: uuid.UUID | None = None
+    secondary_investigation_question: str | None = None
+    title: str
+    description: str
+    category: str
+    severity: str = "moderate"
+    confidence: str = "medium"
+    detection_method: str = "deterministic"
+    status: str = "newly_detected"
+    claim_ids: list[uuid.UUID] = Field(default_factory=list)
+    evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+    source_ids: list[uuid.UUID] = Field(default_factory=list)
+    supporting_passages: list[dict[str, Any]] = Field(default_factory=list)
+    conflicting_passages: list[dict[str, Any]] = Field(default_factory=list)
+    scope_differences: str = ""
+    methodological_differences: str = ""
+    resolution_explanation: str = ""
+    recommended_research_action: str = ""
+    resolution_logs: list[ContradictionResolutionLogView] = Field(default_factory=list)
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class ContradictionResolveRequest(BaseModel):
+    new_status: str
+    resolution_rationale: str
+    resolving_evidence_ids: list[uuid.UUID] = Field(default_factory=list)
+
+
+class ContradictionDetectRequest(BaseModel):
+    investigation_id: uuid.UUID | None = None
+    cross_investigation: bool = True
+    provider_kind: str | None = None
+    model: str | None = None
+
+
+# ===========================================================================
+# MILESTONE 8E: RESEARCH TREND INTELLIGENCE SCHEMAS
+# ===========================================================================
+
+class TrendClassification(StrEnum):
+    emerging_topic = "emerging_topic"
+    growing_activity = "growing_activity"
+    stable_topic = "stable_topic"
+    declining_activity = "declining_activity"
+    changing_consensus = "changing_consensus"
+    increasing_disagreement = "increasing_disagreement"
+    breakthrough = "breakthrough"
+    persistent_gap = "persistent_gap"
+    insufficient_historical_data = "insufficient_historical_data"
+
+
+class ResearchTrendTopicView(BaseModel):
+    id: uuid.UUID
+    analysis_id: uuid.UUID
+    topic_name: str
+    classification: str
+    activity_score: float = 50.0
+    quality_score: float = 50.0
+    independence_score: float = 50.0
+    growth_rate: float = 0.0
+    contradiction_count: int = 0
+    gap_count: int = 0
+    temporal_observations_count: int = 0
+    investigation_ids: list[uuid.UUID] = Field(default_factory=list)
+    source_ids: list[uuid.UUID] = Field(default_factory=list)
+    summary_narrative: str = ""
+    created_at: datetime | None = None
+
+
+class ResearchTrendAnalysisResponse(BaseModel):
+    id: uuid.UUID
+    title: str
+    summary: str
+    total_investigations_analyzed: int = 0
+    total_sources_analyzed: int = 0
+    total_evidence_analyzed: int = 0
+    temporal_span_start: str | None = None
+    temporal_span_end: str | None = None
+    topics: list[ResearchTrendTopicView] = Field(default_factory=list)
+    emerging_themes: list[dict[str, Any]] = Field(default_factory=list)
+    consensus_shifts: list[dict[str, Any]] = Field(default_factory=list)
+    persistent_gaps: list[dict[str, Any]] = Field(default_factory=list)
+    active_contradictions_count: int = 0
+    recommendations: list[dict[str, Any]] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class ResearchTrendAnalyzeRequest(BaseModel):
+    provider_kind: str | None = None
+    model: str | None = None
+    temperature: float | None = 0.2
+
+
+# ===========================================================================
+# MILESTONE 8F: UNIFIED RESEARCH INTELLIGENCE SCHEMAS
+# ===========================================================================
+
+class GlobalSearchCategory(StrEnum):
+    all = "all"
+    investigation = "investigation"
+    claim = "claim"
+    evidence = "evidence"
+    source = "source"
+    hypothesis = "hypothesis"
+    gap = "gap"
+    contradiction = "contradiction"
+    topic = "topic"
+
+
+class GlobalResearchSearchResultItem(BaseModel):
+    id: str
+    entity_type: str
+    title: str
+    snippet: str
+    investigation_id: str | None = None
+    investigation_question: str | None = None
+    severity_or_status: str | None = None
+    score: float | None = None
+    created_at: datetime | None = None
+
+
+class GlobalResearchSearchResponse(BaseModel):
+    items: list[GlobalResearchSearchResultItem] = Field(default_factory=list)
+    total: int = 0
+    query: str
+
+
+class UnifiedIntelligenceOverview(BaseModel):
+    total_investigations: int = 0
+    connected_investigations: int = 0
+    total_claims: int = 0
+    total_evidence: int = 0
+    total_sources: int = 0
+    total_gaps: int = 0
+    total_hypotheses: int = 0
+    active_contradictions: int = 0
+    resolved_contradictions: int = 0
+    total_cross_relationships: int = 0
+    active_trends_count: int = 0
+    system_status: str = "operational"
+    last_updated: datetime | None = None
+
+
+# ===========================================================================
+# MILESTONE 8G: RESEARCH QUALITY CALIBRATION SCHEMAS
+# ===========================================================================
+
+class SourceCredibilityAssessmentView(BaseModel):
+    id: uuid.UUID
+    source_id: uuid.UUID
+    source_type: str
+    verification_status: str
+    venue: str | None = None
+    is_peer_reviewed: bool = False
+    is_primary: bool = False
+    confidence: float = 0.5
+    reasons: list[str] = Field(default_factory=list)
+    assessed_at: datetime | None = None
+
+
+class SourceLineageRelationshipView(BaseModel):
+    id: uuid.UUID
+    source_id: uuid.UUID
+    related_source_id: uuid.UUID
+    relationship_type: str
+    confidence: float = 0.5
+    shared_identifiers: list[str] = Field(default_factory=list)
+    explanation: str = ""
+    created_at: datetime | None = None
+
+
+class SourceLineageClusterView(BaseModel):
+    cluster_id: str
+    cluster_name: str
+    primary_source_id: str | None = None
+    member_source_ids: list[str] = Field(default_factory=list)
+    relationship_type: str
+    explanation: str
+    effective_independence_weight: float = 1.0
+
+
+class SourceLineageOverviewResponse(BaseModel):
+    investigation_id: uuid.UUID
+    total_sources: int
+    effective_independent_count: float
+    independence_ratio: float
+    lineage_summary: str
+    clusters: list[SourceLineageClusterView] = Field(default_factory=list)
+    relationships: list[SourceLineageRelationshipView] = Field(default_factory=list)
+
+
+class EvidenceClaimValidationView(BaseModel):
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    claim_id: uuid.UUID
+    claim_text: str = ""
+    evidence_id: uuid.UUID
+    evidence_text: str = ""
+    entailment_classification: str
+    entailment_strength: float = 0.5
+    explanation: str = ""
+    missing_inferential_steps: list[str] = Field(default_factory=list)
+    correlation_vs_causation_flag: bool = False
+    validation_method: str = "deterministic_heuristic"
+    validator_model: str | None = None
+    status: str = "validated"
+    created_at: datetime | None = None
+
+
+class ProviderFailureImpactView(BaseModel):
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    provider: str
+    operation: str
+    query: str
+    failure_type: str
+    retry_attempts: int = 0
+    impact_severity: str
+    missing_category: str | None = None
+    explanation: str = ""
+    created_at: datetime | None = None
+
+
+class QualityCalibrationAuditView(BaseModel):
+    investigation_id: uuid.UUID
+    investigation_question: str
+    calibrated_tier: str
+    raw_score: float
+    calibrated_score: float
+    coverage_score: float
+    failure_penalty: float
+    dimension_breakdown: dict[str, float] = Field(default_factory=dict)
+    calibration_reasons: list[str] = Field(default_factory=list)
+    verified_peer_reviewed_count: int = 0
+    primary_source_count: int = 0
+    total_sources: int = 0
+    total_claims: int = 0
+    total_evidence: int = 0
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+class InvestigationQualityAuditItem(BaseModel):
+    investigation_id: uuid.UUID
+    question: str
+    quality_status: str
+    calibrated_tier: str
+    calibrated_score: float
+    raw_score: float
+    coverage_score: float
+    failure_penalty: float
+    source_count: int
+    evidence_count: int
+    updated_at: datetime | None = None
+
+

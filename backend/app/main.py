@@ -15,7 +15,24 @@ from app.errors import (
     validation_error_handler,
 )
 from app.events import EventBroker
-from app.routers import agents, analysis, events, export, graph, health, providers, research, workspace
+from app.routers import (
+    agents,
+    analysis,
+    contradictions,
+    events,
+    export,
+    gaps,
+    graph,
+    health,
+    hypotheses,
+    intelligence,
+    providers,
+    quality_audit,
+    research,
+    synthesis,
+    trends,
+    workspace,
+)
 
 
 @asynccontextmanager
@@ -61,6 +78,20 @@ def create_app() -> FastAPI:
     app.include_router(workspace.router, prefix=prefix)
     app.include_router(graph.router, prefix=prefix)
     app.include_router(export.router, prefix=prefix)
+    app.include_router(gaps.router, prefix=prefix)
+    app.include_router(gaps.router)
+    app.include_router(hypotheses.router, prefix=prefix)
+    app.include_router(hypotheses.router)
+    app.include_router(synthesis.router, prefix=prefix)
+    app.include_router(synthesis.router)
+    app.include_router(contradictions.router, prefix=prefix)
+    app.include_router(contradictions.router)
+    app.include_router(trends.router, prefix=prefix)
+    app.include_router(trends.router)
+    app.include_router(intelligence.router, prefix=prefix)
+    app.include_router(intelligence.router)
+    app.include_router(quality_audit.router, prefix=prefix)
+    app.include_router(quality_audit.router)
     return app
 
 

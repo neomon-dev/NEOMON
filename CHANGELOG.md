@@ -50,3 +50,19 @@
   - Machine-readable research snapshot JSON (`.json`) with full database graph serialization.
   - RFC 4180 compliant tabular CSV exports for Evidence passages and Sources catalog.
   - Responsive Knowledge Export panel in the investigation interface with direct download endpoints.
+- Added Milestone 8A (Autonomous Research Gap Discovery):
+  - Autonomous gap analysis engine detecting claim coverage gaps, missing empirical studies, uncorroborated single-source claims, unresolved contradictions, and blind-spot research questions.
+  - Interactive Research Gap Workspace with prioritized exploration and follow-up query suggestions.
+- Added Milestones 8B–8F (Advanced Research Intelligence System):
+  - 8B: Hypothesis generation engine proposing testable hypotheses with testability and falsifiability scoring.
+  - 8C: Cross-investigation synthesis connecting findings, shared evidence, and bridges across research topics.
+  - 8D: Contradiction intelligence subsystem discovering, tracking, and resolving cross-investigation tensions.
+  - 8E: Longitudinal research trends analyzing temporal velocity, emerging themes, and consensus shifts.
+  - 8F: Unified Research Intelligence Hub with global entity search, interconnected intelligence views, and cross-investigation knowledge graph.
+- Added Milestone 8G (Research Quality Calibration & Scientific Evidence Validation):
+  - 8G.1: Unified Source Credibility Classification separating Source Type, Verification Status, and Evidence Quality Attributes (never equates DOI presence with peer review).
+  - 8G.2: Explainable Source Independence and Publication Lineage clustering (collapses syndication and derivative news).
+  - 8G.3: Logical Evidence-to-Claim Entailment Validation (distinguishes direct support, contextual relevance, correlation vs causation, and refutation).
+  - 8G.4 & 8G.5: Calibrated 5-Dimension Evidence Strength Scoring and Provider Retrieval Failure Impact Penalties (enforces coverage thresholds and failure deductions; resolves NVIDIA and RAM shortages regression benchmarks).
+  - 8G.6: Scientific Quality Audit Workspace (`/quality-audit`) with 5 KPI summary cards, 5D breakdown, lineage explorer, entailment matrix, and failure impact log.
+  - 8G.7: Calibrated research quality integration across all 9 export formats (Markdown, PDF, JSON, HTML graph, SVG, JSON-LD, Evidence CSV, Sources CSV, Manifest).

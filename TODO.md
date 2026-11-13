@@ -73,6 +73,26 @@
 - [x] Implement responsive Knowledge Export panel in investigation detail UI with direct download endpoints.
 - [x] Enforce zero secret/credential leakage and complete provenance linking in exported artifacts.
 
+## Milestone 8A–8F completed — Advanced Research Intelligence System
+
+- [x] Milestone 8A: Autonomous Research Gap Discovery engine with prioritized exploration and follow-up query suggestions.
+- [x] Milestone 8B: Hypothesis generation engine proposing testable hypotheses with testability and falsifiability scoring.
+- [x] Milestone 8C: Cross-investigation synthesis connecting findings, shared evidence, and bridges across research topics.
+- [x] Milestone 8D: Contradiction intelligence subsystem discovering, tracking, and resolving cross-investigation tensions.
+- [x] Milestone 8E: Longitudinal research trends analyzing temporal velocity, emerging themes, and consensus shifts.
+- [x] Milestone 8F: Unified Research Intelligence Hub with global entity search, interconnected intelligence views, and cross-investigation knowledge graph.
+
+## Milestone 8G completed — Research Quality Calibration & Scientific Evidence Validation
+
+- [x] 8G.1: Unified Source Credibility Classification separating Source Type, Verification Status, and Evidence Quality Attributes (never equates DOI presence with peer review).
+- [x] 8G.2: Explainable Source Independence and Publication Lineage clustering (collapses syndication and derivative news).
+- [x] 8G.3: Logical Evidence-to-Claim Entailment Validation (distinguishes direct support, contextual relevance, correlation vs causation, and refutation).
+- [x] 8G.4: Calibrated 5-Dimension Evidence Strength Scoring enforcing coverage thresholds (coverage < 70% caps tier at Moderate).
+- [x] 8G.5: Retrieval Failure Impact Assessment penalizing provider failures (-12 to -20 pts for critical loss; -6 to -10 pts for significant coverage).
+- [x] 8G.6: Scientific Quality Audit Workspace (`/quality-audit`) with 5 KPI summary cards, 5D breakdown, lineage explorer, entailment matrix, and failure impact log.
+- [x] 8G.7: Calibrated research quality integration across all 9 export formats (Markdown, PDF, JSON, HTML graph, SVG, JSON-LD, Evidence CSV, Sources CSV, Manifest).
+- [x] Resolve Regression Benchmark A (NVIDIA) and Regression Benchmark B (RAM shortages).
+
 ## Upcoming
 
 - [ ] Add deployment automation (Docker Compose / production containerization).

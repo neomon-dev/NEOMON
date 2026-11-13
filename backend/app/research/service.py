@@ -20,9 +20,15 @@ from app.research.providers import (
     UnpaywallProvider,
     build_research_providers,
 )
-from app.research.query_planner import generate_queries
+from app.research.query_planner import generate_queries, generate_web_queries
 from app.research.retrieval import RetrievalError, RetrievedDocument, retrieve_document
 from app.research.relevance import assess_result
+from app.research.scientific_integrity import (
+    assess_source_credibility,
+    detect_source_independence_clusters,
+    verify_evidence_provenance,
+)
+from app.research.telemetry import tavily_telemetry
 from app.schemas import EventType, InvestigationCreate, ResearchMode
 
 
@@ -95,8 +101,13 @@ async def _run_investigation_impl(
             errors.append(f"{provider.name}: {exc}")
             return []
 
+    web_queries = generate_web_queries(investigation.question, request.timeframe)
     try:
-        tasks = [search_one(provider, query) for provider in providers for query in queries]
+        tasks = []
+        for provider in providers:
+            p_queries = web_queries if provider.name == "tavily" else queries
+            for query in p_queries:
+                tasks.append(search_one(provider, query))
         batches = await asyncio.gather(*tasks)
         results = deduplicate_results([item for batch in batches for item in batch])
         for result in results:
@@ -105,6 +116,9 @@ async def _run_investigation_impl(
             result.relevance_status = assessment.status
             result.relevance_reasons = list(assessment.reasons)
         results = sorted(results, key=lambda item: item.relevance_score, reverse=True)[: request.max_sources]
+        for r in results:
+            if r.provider == "tavily":
+                tavily_telemetry.results_retained += 1
     finally:
         await asyncio.gather(*(provider.close() for provider in providers))
         await unpaywall.close()
@@ -145,9 +159,33 @@ async def _run_investigation_impl(
         source.open_access_status = "full_text_available" if document.access_level == "full_text" else "abstract_only"
         if document.access_level == "full_text":
             full_text_count += 1
+        is_tavily = any(r.url == source.canonical_url and r.provider == "tavily" for r in results)
+        if is_tavily:
+            if document.access_level == "full_text":
+                tavily_telemetry.full_text_successes += 1
+            else:
+                tavily_telemetry.full_text_failures += 1
         await publish(broker, EventType.research_document_retrieved, investigation.id, session=session, source_id=str(source.id))
         for item in extract_evidence(document.content, claim.text, passages=document.passages):
-            evidence_count += 1
+            # Strict provenance verification before evidence acceptance
+            prov_check = verify_evidence_provenance(
+                exact_text=item.exact_text,
+                document_content=document.content,
+                section_name=item.section_name,
+                document_headings=document.headings,
+                page_number=item.page_number,
+                page_count=document.page_count,
+            )
+            is_traceable = prov_check.is_verified
+            if is_traceable:
+                evidence_count += 1
+                rel_reason = item.relevance_reason
+            else:
+                rel_reason = f"[UNRESOLVED PROVENANCE: {prov_check.reason}] {item.relevance_reason}"
+
+            if is_tavily and is_traceable:
+                tavily_telemetry.evidence_passages_extracted += 1
+
             session.add(
                 Evidence(
                     source_id=source.id,
@@ -161,8 +199,8 @@ async def _run_investigation_impl(
                     page_number=item.page_number,
                     section_name=item.section_name,
                     retrieval_timestamp=datetime.now(UTC),
-                    relevance_reason=item.relevance_reason,
-                    traceable=True,
+                    relevance_reason=rel_reason,
+                    traceable=is_traceable,
                 )
             )
             await publish(
@@ -175,23 +213,50 @@ async def _run_investigation_impl(
                 page_number=item.page_number,
             )
 
+    all_included_sources: list[dict[str, object]] = []
     for result in results:
         included = result.relevance_status == "relevant"
+        if result.provider == "tavily":
+            if included:
+                tavily_telemetry.sources_accepted += 1
+            else:
+                tavily_telemetry.sources_rejected += 1
         if included:
             relevant_source_count += 1
+            all_included_sources.append({
+                "id": result.url,
+                "title": result.title,
+                "url": result.url,
+                "doi": result.doi,
+                "publisher": result.publisher,
+                "authors": result.authors,
+            })
+
+        cred_eval = assess_source_credibility(
+            publisher=result.publisher,
+            url=result.url,
+            doi=result.doi,
+            source_type_declared=result.source_type,
+            authors=result.authors,
+            publication_date=result.publication_date,
+        )
+        combined_reasons = list(result.relevance_reasons)
+        combined_reasons.append(f"Credibility tier: {cred_eval.credibility_tier.upper()} ({cred_eval.credibility_score:.2f})")
+        combined_reasons.extend(cred_eval.reasons)
+
         source = Source(
             investigation_id=investigation.id,
             title=result.title,
             canonical_url=result.url,
             original_url=result.url,
-            source_type=result.source_type,
+            source_type=cred_eval.source_type.value,
             publisher=result.publisher,
             authors_json=json.dumps(result.authors),
             publication_date=result.publication_date,
             doi=result.doi,
             retrieval_timestamp=datetime.now(UTC),
             relevance_score=result.relevance_score,
-            relevance_reasons_json=json.dumps(result.relevance_reasons),
+            relevance_reasons_json=json.dumps(combined_reasons),
             inclusion_status="included" if included else "filtered",
             rejection_reason=None if included else "; ".join(result.relevance_reasons),
             open_access_status="not_checked" if included else "not_applicable",
@@ -279,11 +344,15 @@ async def _run_investigation_impl(
                     extraction_quality="medium",
                 )
                 await persist_document(source, abstract)
+    clusters = detect_source_independence_clusters(all_included_sources) if all_included_sources else []
+    cluster_count = len(clusters)
     investigation.relevant_source_count = relevant_source_count
     investigation.full_text_count = full_text_count
     investigation.quality_status = (
-        "strong"
-        if relevant_source_count >= 3 and evidence_count >= 3 and full_text_count >= 1
+        "very_strong"
+        if relevant_source_count >= 5 and evidence_count >= 5 and full_text_count >= 2 and cluster_count >= 3
+        else "strong"
+        if relevant_source_count >= 3 and evidence_count >= 3 and full_text_count >= 1 and cluster_count >= 2
         else "limited"
         if relevant_source_count and evidence_count
         else "insufficient_evidence"
@@ -293,12 +362,14 @@ async def _run_investigation_impl(
         gaps.append("No sources met the transparent relevance threshold.")
     if not evidence_count:
         gaps.append("No traceable relevant passages were extracted.")
+    if cluster_count < 2 and relevant_source_count > 1:
+        gaps.append("Multiple sources originate from the same cluster or syndicated publisher, limiting independence.")
     if errors:
         gaps.append(f"{len(errors)} provider or retrieval operation(s) failed.")
     investigation.evidence_gap = " ".join(gaps) or None
     investigation.quality_summary = (
-        f"{relevant_source_count} relevant source(s), {full_text_count} full-text document(s), "
-        f"and {evidence_count} traceable evidence passage(s)."
+        f"{relevant_source_count} relevant source(s) across {cluster_count} independent cluster(s), "
+        f"{full_text_count} full-text document(s), and {evidence_count} traceable evidence passage(s)."
     )
     investigation.status = "completed" if results else "failed"
     await session.commit()

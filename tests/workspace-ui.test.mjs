@@ -456,3 +456,27 @@ test("Investigation Detail UI includes Milestone 7B Report Intelligence and 7C K
   assert.match(content, /endpoint: "sources-csv"/);
 });
 
+test("Investigation Detail UI includes Milestone 8A Research Gap Discovery Workspace and entrypoints", () => {
+  const invPagePath = path.join(rootDir, "app", "investigations", "[id]", "page.tsx");
+  const invContent = fs.readFileSync(invPagePath, "utf8");
+  assert.match(invContent, /ResearchGapWorkspace/);
+  assert.match(invContent, /Research Gaps & Horizon/);
+
+  const gapsPagePath = path.join(rootDir, "app", "gaps", "page.tsx");
+  assert.equal(fs.existsSync(gapsPagePath), true, "app/gaps/page.tsx must exist");
+
+  const componentPath = path.join(rootDir, "components", "research-gap-workspace.tsx");
+  assert.equal(fs.existsSync(componentPath), true, "components/research-gap-workspace.tsx must exist");
+  const compContent = fs.readFileSync(componentPath, "utf8");
+  assert.match(compContent, /AUTONOMOUS GAP DISCOVERY · MILESTONE 8A/);
+  assert.match(compContent, /Evidence Coverage/);
+  assert.match(compContent, /Run Gap Discovery/);
+  assert.match(compContent, /copy-query-button/);
+  assert.match(compContent, /gap-missing-info-box/);
+
+  const appShellPath = path.join(rootDir, "components", "app-shell.tsx");
+  const shellContent = fs.readFileSync(appShellPath, "utf8");
+  assert.match(shellContent, /Research gaps/);
+  assert.match(shellContent, /\/gaps/);
+});
+

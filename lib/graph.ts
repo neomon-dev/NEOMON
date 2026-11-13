@@ -8,7 +8,12 @@ export type GraphNodeType =
   | "document"
   | "source"
   | "agent_argument"
-  | "adjudication_decision";
+  | "adjudication_decision"
+  | "research_gap"
+  | "hypothesis"
+  | "contradiction"
+  | "cross_investigation"
+  | "research_trend";
 
 export type GraphNodeView = {
   id: string;
@@ -40,6 +45,11 @@ export type GraphTotalCounts = {
   sources: number;
   arguments: number;
   decisions: number;
+  research_gaps?: number;
+  hypotheses?: number;
+  contradictions?: number;
+  cross_relationships?: number;
+  trends?: number;
 };
 
 export type InvestigationGraphResponse = {
@@ -71,6 +81,11 @@ export const NODE_TYPE_ORDER: GraphNodeType[] = [
   "evidence",
   "document",
   "source",
+  "research_gap",
+  "hypothesis",
+  "contradiction",
+  "cross_investigation",
+  "research_trend",
 ];
 
 export const NODE_TYPE_META: Record<
@@ -133,6 +148,41 @@ export const NODE_TYPE_META: Record<
     accent: "#47c7a0",
     bg: "#112424",
   },
+  research_gap: {
+    label: "Research gap",
+    shortLabel: "GAP",
+    tier: 3,
+    accent: "#f97316",
+    bg: "#2b1810",
+  },
+  hypothesis: {
+    label: "Research hypothesis",
+    shortLabel: "HYP",
+    tier: 2,
+    accent: "#a855f7",
+    bg: "#261338",
+  },
+  contradiction: {
+    label: "Contradiction",
+    shortLabel: "CONTRA",
+    tier: 3,
+    accent: "#ef4444",
+    bg: "#3b1219",
+  },
+  cross_investigation: {
+    label: "Cross-Investigation",
+    shortLabel: "SYNTH",
+    tier: 1,
+    accent: "#06b6d4",
+    bg: "#0e2a38",
+  },
+  research_trend: {
+    label: "Research trend",
+    shortLabel: "TREND",
+    tier: 1,
+    accent: "#eab308",
+    bg: "#382e0e",
+  },
 };
 
 export function edgeStrokeFor(relationshipType: string): {
@@ -144,8 +194,24 @@ export function edgeStrokeFor(relationshipType: string): {
       return { stroke: "#55d5a0" };
     case "contradicts":
       return { stroke: "#e27d8f" };
+    case "mitigates":
+      return { stroke: "#b388ff", strokeDasharray: "4 2" };
     case "contextualizes":
       return { stroke: "#4b9dff", strokeDasharray: "6 3" };
+    case "has_gap":
+      return { stroke: "#f97316", strokeDasharray: "4 2" };
+    case "affects":
+      return { stroke: "#fb923c", strokeDasharray: "3 3" };
+    case "hypothesizes":
+      return { stroke: "#a855f7", strokeDasharray: "4 2" };
+    case "supports_hypothesis":
+      return { stroke: "#55d5a0", strokeDasharray: "3 3" };
+    case "challenges":
+      return { stroke: "#ef4444" };
+    case "synthesizes_with":
+      return { stroke: "#06b6d4", strokeDasharray: "5 3" };
+    case "tracks_trend":
+      return { stroke: "#eab308", strokeDasharray: "4 2" };
     case "methodological_limitation":
       return { stroke: "#e6bd67", strokeDasharray: "6 3" };
     case "source_criticism":
@@ -162,8 +228,10 @@ export function edgeStrokeFor(relationshipType: string): {
 export function nodeAccentFor(node: GraphNodeView): string {
   if (node.type === "evidence") {
     if (node.status === "contradicting") return "#e27d8f";
+    if (node.status === "mitigating") return "#b388ff";
     if (node.status === "methodological_limitation") return "#e6bd67";
     if (node.status === "contextual") return "#4b9dff";
+    if (node.status === "insufficient") return "#718096";
     return "#55d5a0";
   }
   if (node.type === "adjudication_decision") {

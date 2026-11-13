@@ -23,6 +23,11 @@ from app.models import (
     Source,
 )
 from app.schemas import AnalysisCoverageSummary, EvidenceStrengthSummary
+from app.research.scientific_integrity import assess_source_credibility
+from app.research.source_credibility import evaluate_canonical_credibility
+from app.research.source_lineage import analyze_source_lineage
+from app.analysis.entailment_service import validate_evidence_claim_entailment_heuristic
+from app.analysis.quality_calibration_service import calculate_calibrated_quality
 
 
 def _escape_csv(val: Any) -> str:
@@ -88,10 +93,23 @@ def generate_markdown_export(
         "",
     ])
 
+    # Compute or include calibrated quality evaluation
+    cal_breakdown = calculate_calibrated_quality(sources, claims, evidence)
+
+    lines.extend([
+        "> [!IMPORTANT]",
+        f"> **Calibrated Research Quality Tier:** **{cal_breakdown.calibrated_tier}**",
+        f"> - Calibrated Score: **{cal_breakdown.calibrated_score}/100** (Raw Score: {cal_breakdown.raw_score}/100)",
+        f"> - Research Coverage Score: **{cal_breakdown.coverage_score:.1f}%**",
+        f"> - Provider Failure Penalty: **-{cal_breakdown.failure_penalty:.1f} pts**",
+        f"> - Calibration Rationale: {'; '.join(cal_breakdown.reasons[:2]) if cal_breakdown.reasons else 'Empirically calibrated.'}",
+        "",
+    ])
+
     if strength:
         lines.extend([
             "> [!NOTE]",
-            f"> **Evidence Strength Rating:** **{strength.score}/100** ({strength.tier.replace('_', ' ').upper()})",
+            f"> **Raw Evidence Strength Rating:** **{strength.score}/100** ({strength.tier.replace('_', ' ').upper()})",
             f"> - Source Independence: {strength.breakdown.source_independence}/25",
             f"> - Source Quality: {strength.breakdown.source_quality}/25",
             f"> - Full-Text Coverage: {strength.breakdown.full_text_coverage}/20",
@@ -139,7 +157,8 @@ def generate_pdf_export(
     current_page.append(f"Topic: {investigation.question}")
     current_page.append(f"Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')} | Mode: {investigation.mode}")
     if strength:
-        current_page.append(f"Evidence Strength Score: {strength.score}/100 ({strength.tier.upper()})")
+        q_status = (investigation.quality_status or "insufficient_evidence").replace("_", " ").upper()
+        current_page.append(f"Evidence Strength Score: {strength.score}/100 ({strength.tier.upper()}) | Calibrated Quality: {q_status}")
     current_page.append("--------------------------------------------------------------------------------")
     current_page.append("")
 
@@ -277,6 +296,10 @@ def generate_structured_json_export(
     coverage: AnalysisCoverageSummary | None,
     strength: EvidenceStrengthSummary | None,
 ) -> dict[str, Any]:
+    cal_breakdown = calculate_calibrated_quality(sources, claims, evidence)
+    lineage_res = analyze_source_lineage(sources)
+    claim_map = {c.id: c.text for c in claims}
+
     return {
         "schema_version": "1.0.0",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -287,6 +310,24 @@ def generate_structured_json_export(
             "status": investigation.status,
             "quality_status": investigation.quality_status,
             "created_at": investigation.created_at.isoformat() if investigation.created_at else None,
+        },
+        "quality_calibration": {
+            "calibrated_tier": cal_breakdown.calibrated_tier,
+            "calibrated_score": cal_breakdown.calibrated_score,
+            "raw_score": cal_breakdown.raw_score,
+            "coverage_score": cal_breakdown.coverage_score,
+            "failure_penalty": cal_breakdown.failure_penalty,
+            "dimension_breakdown": {
+                "empirical_depth": cal_breakdown.empirical_depth,
+                "source_credibility": cal_breakdown.source_credibility,
+                "methodological_rigor": cal_breakdown.methodological_rigor,
+                "consensus_stability": cal_breakdown.consensus_stability,
+                "source_independence": cal_breakdown.source_independence,
+            },
+            "reasons": cal_breakdown.reasons,
+            "lineage_clusters_count": len(lineage_res.clusters),
+            "effective_independent_count": lineage_res.effective_independent_count,
+            "independence_ratio": lineage_res.independence_ratio,
         },
         "evidence_strength": strength.model_dump(mode="json") if strength else None,
         "coverage": coverage.model_dump(mode="json") if coverage else None,
@@ -307,6 +348,34 @@ def generate_structured_json_export(
                 "canonical_url": s.canonical_url,
                 "original_url": s.original_url,
                 "source_type": s.source_type,
+                "canonical_source_type": evaluate_canonical_credibility(
+                    url=s.canonical_url or s.original_url,
+                    publisher=s.publisher,
+                    doi=s.doi,
+                    source_type_declared=s.source_type,
+                    title=s.title,
+                ).source_type.value,
+                "verification_status": evaluate_canonical_credibility(
+                    url=s.canonical_url or s.original_url,
+                    publisher=s.publisher,
+                    doi=s.doi,
+                    source_type_declared=s.source_type,
+                    title=s.title,
+                ).verification_status.value,
+                "is_peer_reviewed": evaluate_canonical_credibility(
+                    url=s.canonical_url or s.original_url,
+                    publisher=s.publisher,
+                    doi=s.doi,
+                    source_type_declared=s.source_type,
+                    title=s.title,
+                ).is_peer_reviewed,
+                "is_primary": evaluate_canonical_credibility(
+                    url=s.canonical_url or s.original_url,
+                    publisher=s.publisher,
+                    doi=s.doi,
+                    source_type_declared=s.source_type,
+                    title=s.title,
+                ).is_primary,
                 "publisher": s.publisher,
                 "doi": s.doi,
                 "publication_date": s.publication_date,
@@ -336,6 +405,20 @@ def generate_structured_json_export(
                 "exact_text": e.exact_text,
                 "evidence_type": e.evidence_type,
                 "relevance_score": e.relevance_score,
+                "entailment": validate_evidence_claim_entailment_heuristic(
+                    claim_id=str(e.claim_id or ""),
+                    claim_text=claim_map.get(e.claim_id, ""),
+                    evidence_id=str(e.id),
+                    evidence_text=e.exact_text,
+                    surrounding_context=e.surrounding_context,
+                ).entailment_classification.value,
+                "correlation_vs_causation": validate_evidence_claim_entailment_heuristic(
+                    claim_id=str(e.claim_id or ""),
+                    claim_text=claim_map.get(e.claim_id, ""),
+                    evidence_id=str(e.id),
+                    evidence_text=e.exact_text,
+                    surrounding_context=e.surrounding_context,
+                ).correlation_vs_causation_flag,
                 "page_number": e.page_number,
                 "section_name": e.section_name,
                 "traceable": e.traceable,
@@ -454,13 +537,26 @@ def generate_standalone_html_graph(
             "status": ev.evidence_type,
             "x": ex,
             "y": ey,
-            "color": "#10b981" if ev.evidence_type == "supporting" else "#f43f5e" if ev.evidence_type == "contradicting" else "#eab308",
+            "color": (
+                "#10b981" if ev.evidence_type in {"supporting", "direct"}
+                else "#f43f5e" if ev.evidence_type in {"contradicting", "counter"}
+                else "#8b5cf6" if ev.evidence_type == "mitigating"
+                else "#06b6d4" if ev.evidence_type == "methodological_limitation"
+                else "#eab308" if ev.evidence_type == "contextual"
+                else "#64748b"
+            ),
         })
         if ev.claim_id:
             edges.append({
                 "source": eid,
                 "target": f"claim-{ev.claim_id}",
-                "label": "substantiates" if ev.evidence_type != "contradicting" else "challenges",
+                "label": (
+                    "substantiates" if ev.evidence_type in {"supporting", "direct"}
+                    else "challenges" if ev.evidence_type in {"contradicting", "counter"}
+                    else "mitigates" if ev.evidence_type == "mitigating"
+                    else "limits" if ev.evidence_type == "methodological_limitation"
+                    else "contextualizes"
+                ),
             })
         if ev.source_id in src_map:
             sid = f"src-{ev.source_id}"
@@ -713,7 +809,14 @@ def generate_svg_graph_export(
         angle = (2 * math.pi * ev_idx) / max(1, min(len(evidence), 30))
         ex = cx + int(420 * math.cos(angle))
         ey = cy + int(420 * math.sin(angle))
-        col = "#10b981" if ev.evidence_type == "supporting" else "#f43f5e" if ev.evidence_type == "contradicting" else "#eab308"
+        col = (
+            "#10b981" if ev.evidence_type in {"supporting", "direct"}
+            else "#f43f5e" if ev.evidence_type in {"contradicting", "counter"}
+            else "#8b5cf6" if ev.evidence_type == "mitigating"
+            else "#06b6d4" if ev.evidence_type == "methodological_limitation"
+            else "#eab308" if ev.evidence_type == "contextual"
+            else "#64748b"
+        )
         if ev.claim_id and ev.claim_id in claim_positions:
             tx, ty = claim_positions[ev.claim_id]
             svg_elements.append(f'<line x1="{ex}" y1="{ey}" x2="{tx}" y2="{ty}" stroke="#1e293b" stroke-width="1.2" stroke-dasharray="3,3" />')
@@ -769,6 +872,8 @@ def generate_json_ld_export(
             },
         })
 
+    cal_breakdown = calculate_calibrated_quality(sources, claims, evidence)
+
     return {
         "@context": {
             "@vocab": "https://schema.org/",
@@ -778,6 +883,14 @@ def generate_json_ld_export(
         "headline": investigation.question,
         "description": report.executive_summary if report else investigation.question,
         "dateCreated": investigation.created_at.isoformat() if investigation.created_at else None,
+        "scientificQuality": {
+            "@type": "QualityAssessment",
+            "calibratedTier": cal_breakdown.calibrated_tier,
+            "calibratedScore": cal_breakdown.calibrated_score,
+            "rawScore": cal_breakdown.raw_score,
+            "coverageScore": cal_breakdown.coverage_score,
+            "failurePenalty": cal_breakdown.failure_penalty,
+        },
         "creator": {
             "@type": "Organization",
             "name": "NEOMON Multi-Agent Research Intelligence",
@@ -808,9 +921,13 @@ def generate_evidence_csv(
         "exact_text",
         "evidence_type",
         "relevance_score",
+        "entailment_classification",
+        "correlation_vs_causation",
+        "missing_inferential_steps",
         "page_number",
         "section_name",
         "traceable",
+        "verified_provenance",
     ])
 
     claim_map = {c.id: c.text for c in claims}
@@ -819,6 +936,17 @@ def generate_evidence_csv(
     for ev in evidence:
         c_text = claim_map.get(ev.claim_id, "")
         s_title, s_url = source_map.get(ev.source_id, ("", ""))
+        has_unresolved = "[UNRESOLVED PROVENANCE]" in (ev.relevance_reason or "")
+        verified_prov = bool(ev.traceable and not has_unresolved)
+
+        val = validate_evidence_claim_entailment_heuristic(
+            claim_id=str(ev.claim_id or ""),
+            claim_text=c_text,
+            evidence_id=str(ev.id),
+            evidence_text=ev.exact_text,
+            surrounding_context=ev.surrounding_context,
+        )
+
         writer.writerow([
             _escape_csv(ev.id),
             _escape_csv(ev.claim_id),
@@ -829,9 +957,13 @@ def generate_evidence_csv(
             _escape_csv(ev.exact_text),
             _escape_csv(ev.evidence_type),
             _escape_csv(ev.relevance_score),
+            _escape_csv(val.entailment_classification.value),
+            _escape_csv(val.correlation_vs_causation_flag),
+            _escape_csv("; ".join(val.missing_inferential_steps)),
             _escape_csv(ev.page_number),
             _escape_csv(ev.section_name),
             _escape_csv(ev.traceable),
+            _escape_csv(verified_prov),
         ])
 
     return output.getvalue()
@@ -846,25 +978,51 @@ def generate_sources_csv(sources: list[Source]) -> str:
         "canonical_url",
         "original_url",
         "source_type",
+        "canonical_source_type",
+        "verification_status",
+        "is_peer_reviewed",
+        "is_primary",
         "publisher",
         "doi",
         "publication_date",
         "relevance_score",
+        "credibility_tier",
+        "credibility_score",
         "inclusion_status",
         "open_access_status",
     ])
 
     for s in sources:
+        cred = assess_source_credibility(
+            publisher=s.publisher,
+            url=s.canonical_url or s.original_url,
+            doi=s.doi,
+            source_type_declared=s.source_type,
+            publication_date=s.publication_date,
+        )
+        canonical = evaluate_canonical_credibility(
+            url=s.canonical_url or s.original_url,
+            publisher=s.publisher,
+            doi=s.doi,
+            source_type_declared=s.source_type,
+            title=s.title,
+        )
         writer.writerow([
             _escape_csv(s.id),
             _escape_csv(s.title),
             _escape_csv(s.canonical_url),
             _escape_csv(s.original_url),
             _escape_csv(s.source_type),
+            _escape_csv(canonical.source_type.value),
+            _escape_csv(canonical.verification_status.value),
+            _escape_csv(canonical.is_peer_reviewed),
+            _escape_csv(canonical.is_primary),
             _escape_csv(s.publisher),
             _escape_csv(s.doi),
             _escape_csv(s.publication_date),
             _escape_csv(s.relevance_score),
+            _escape_csv(cred.credibility_tier),
+            _escape_csv(cred.credibility_score),
             _escape_csv(s.inclusion_status),
             _escape_csv(s.open_access_status),
         ])

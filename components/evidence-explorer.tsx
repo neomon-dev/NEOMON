@@ -17,7 +17,9 @@ const PAGE_SIZE = 20;
 function evidenceTypeBadgeClass(evidenceType: string): string {
   if (evidenceType === "supporting") return "exec-status-badge status-supporting";
   if (evidenceType === "contradicting") return "exec-status-badge status-failed";
+  if (evidenceType === "mitigating") return "exec-status-badge status-mitigating";
   if (evidenceType === "methodological_limitation") return "exec-status-badge status-methodological";
+  if (evidenceType === "insufficient") return "exec-status-badge status-insufficient";
   return "exec-status-badge status-contextual";
 }
 
@@ -210,8 +212,10 @@ export function EvidenceExplorer() {
               <option value="all">All classifications</option>
               <option value="supporting">Supporting</option>
               <option value="contradicting">Contradicting</option>
-              <option value="contextual">Contextual</option>
+              <option value="mitigating">Mitigating (Counterbalancing)</option>
               <option value="methodological_limitation">Methodological limitation</option>
+              <option value="contextual">Contextual</option>
+              <option value="insufficient">Insufficient</option>
             </select>
             <select
               aria-label="Filter by minimum relevance"

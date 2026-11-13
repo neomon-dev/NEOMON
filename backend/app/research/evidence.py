@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass
 
-from app.research.relevance import assess_text, classify_evidence, question_focus
+from app.research.relevance import _terms, assess_text, classify_evidence, question_focus
 
 
 @dataclass
@@ -38,7 +38,7 @@ def _looks_like_boilerplate(sentence: str) -> bool:
 
 
 def _has_outcome_signal(sentence: str) -> bool:
-    terms = set(re.findall(r"[a-z0-9]{3,}", sentence.casefold()))
+    terms = _terms(sentence)
     return bool(
         terms
         & {
@@ -55,6 +55,12 @@ def _has_outcome_signal(sentence: str) -> bool:
             "time",
             "productivity",
             "significant",
+            "positive",
+            "negative",
+            "benefit",
+            "risk",
+            "effect",
+            "impact",
         }
     )
 
@@ -74,14 +80,14 @@ def extract_evidence(
             if _looks_like_boilerplate(sentence):
                 continue
             assessment = assess_text(claim, sentence)
-            sentence_terms = set(re.findall(r"[a-z0-9]{3,}", sentence.casefold()))
+            sentence_terms = _terms(sentence)
             subject_overlap = len(subject_terms & sentence_terms)
             outcome_overlap = len(outcome_terms & sentence_terms)
-            evidence_type, classification_reason = classify_evidence(sentence)
+            evidence_type, classification_reason = classify_evidence(sentence, claim=claim)
             if (
-                (assessment.score < 0.2 and evidence_type not in {"methodological_limitation", "contradicting"})
-                or                 (subject_overlap == 0 and evidence_type not in {"methodological_limitation", "contradicting"})
-                or (outcome_terms and outcome_overlap == 0 and not _has_outcome_signal(sentence))
+                (assessment.score < 0.2 and evidence_type not in {"methodological_limitation", "contradicting", "mitigating"})
+                or (subject_terms and subject_overlap == 0 and evidence_type not in {"methodological_limitation", "contradicting", "mitigating"})
+                or (outcome_terms and outcome_overlap == 0 and not _has_outcome_signal(sentence) and evidence_type not in {"methodological_limitation", "contradicting", "mitigating"})
             ):
                 continue
             context = " ".join(sentences[max(0, index - 1): min(len(sentences), index + 2)])
@@ -96,7 +102,10 @@ def extract_evidence(
                     section_name=section_name,
                 )
             )
-    unique: dict[tuple[int | None, str], ExtractedEvidence] = {}
+    unique: dict[str, ExtractedEvidence] = {}
     for item in evidence:
-        unique[(item.page_number, item.exact_text)] = item
+        # Deduplicate identical sentences to avoid artificial inflation, preserving earliest genuine section
+        if item.exact_text not in unique:
+            unique[item.exact_text] = item
     return sorted(unique.values(), key=lambda item: item.relevance_score, reverse=True)[:limit]
+

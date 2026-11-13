@@ -21,8 +21,8 @@ def normalize_doi(value: str | None) -> str | None:
 def _title_terms(value: str) -> set[str]:
     return {
         term
-        for term in re.findall(r"[a-z0-9]{3,}", value.casefold())
-        if term not in {"the", "and", "for", "with", "from", "study"}
+        for term in re.findall(r"[a-z0-9]{2,}", value.casefold())
+        if term not in {"the", "and", "for", "with", "from", "study", "what", "how", "does", "are"}
     }
 
 

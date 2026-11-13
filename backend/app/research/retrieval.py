@@ -30,17 +30,31 @@ class RetrievedDocument:
     page_count: int | None = None
 
 
+_VOID_ELEMENTS = {
+    "area",
+    "base",
+    "br",
+    "col",
+    "embed",
+    "hr",
+    "img",
+    "input",
+    "link",
+    "meta",
+    "param",
+    "source",
+    "track",
+    "wbr",
+}
+
+
 class _HTMLTextParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.title: str | None = None
         self.headings: list[str] = []
         self.parts: list[tuple[str | None, str]] = []
-        self._stack: list[str] = []
-        self._excluded_stack: list[bool] = []
-        self._excluded_depth = 0
-        self._content_depth = 0
-        self._abstract_depth = 0
+        self._stack: list[tuple[str, bool, bool, bool]] = []  # (tag, excluded, is_content, is_abstract)
         self._section: str | None = None
 
     @staticmethod
@@ -53,45 +67,52 @@ class _HTMLTextParser(HTMLParser):
             for marker in ("nav", "menu", "sidebar", "cookie", "advert", "social", "related", "share", "promo", "search-form", "breadcrumb")
         )
 
+    @property
+    def is_excluded(self) -> bool:
+        return any(excluded for _, excluded, _, _ in self._stack)
+
+    @property
+    def content_depth(self) -> int:
+        return sum(1 for _, _, is_content, _ in self._stack if is_content)
+
+    @property
+    def abstract_depth(self) -> int:
+        return sum(1 for _, _, _, is_abstract in self._stack if is_abstract)
+
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        self._stack.append(tag)
+        if tag in _VOID_ELEMENTS:
+            return
         excluded = self._is_boilerplate(tag, attrs)
-        self._excluded_stack.append(excluded)
-        if excluded:
-            self._excluded_depth += 1
         values = " ".join(value or "" for key, value in attrs if key in {"id", "class", "role"}).casefold()
-        if tag in {"article", "main"}:
-            self._content_depth += 1
-        if "abstract" in values:
-            self._abstract_depth += 1
+        is_content = tag in {"article", "main"}
+        is_abstract = "abstract" in values
+        self._stack.append((tag, excluded, is_content, is_abstract))
 
     def handle_endtag(self, tag: str) -> None:
-        excluded = self._excluded_stack.pop() if self._excluded_stack else False
-        if excluded:
-            self._excluded_depth = max(0, self._excluded_depth - 1)
-        if tag in {"article", "main"}:
-            self._content_depth = max(0, self._content_depth - 1)
-        if tag == "div" and self._abstract_depth:
-            self._abstract_depth -= 1
-        if self._stack:
-            self._stack.pop()
+        while self._stack:
+            stacked_tag, _, _, _ = self._stack.pop()
+            if stacked_tag in {"article", "section", "main", "footer", "aside", "nav"}:
+                self._section = None
+            if stacked_tag == tag:
+                break
 
     def handle_data(self, data: str) -> None:
         text = " ".join(data.split())
-        if not text or self._excluded_depth:
+        if not text or self.is_excluded:
             return
-        tag = self._stack[-1] if self._stack else None
+        tag = self._stack[-1][0] if self._stack else None
         if tag == "title":
             self.title = text[:500]
         if tag in {"h1", "h2", "h3"}:
             self.headings.append(text[:300])
             self._section = text[:300]
-        if self._content_depth or tag in {"body", "p", "h1", "h2", "h3", "h4", "li"}:
+        if self.content_depth or tag in {"body", "p", "h1", "h2", "h3", "h4", "li", "blockquote", "div", "section"}:
             self.parts.append((self._section, text))
 
     @property
     def abstract_only(self) -> bool:
-        return bool(self.parts) and self._abstract_depth > 0
+        return bool(self.parts) and self.abstract_depth > 0
+
 
 
 async def _validate_public_host(hostname: str) -> None:
@@ -151,7 +172,7 @@ async def retrieve_document(url: str) -> RetrievedDocument:
             if not content:
                 raise RetrievalError("HTML document did not contain extractable research text.")
             access_level = "full_text" if len(content) >= 1800 and len(parser.headings) >= 2 else "abstract_only"
-            quality = "high" if parser._content_depth or len(content) >= 1200 else "medium"
+            quality = "high" if parser.content_depth or len(content) >= 1200 else "medium"
             return RetrievedDocument(
                 url,
                 str(response.url),

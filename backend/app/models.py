@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text, Uuid, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -38,6 +38,29 @@ class Investigation(Base):
     sources: Mapped[list["Source"]] = relationship(back_populates="investigation")
     claims: Mapped[list["Claim"]] = relationship(back_populates="investigation")
     analysis_jobs: Mapped[list["AnalysisJob"]] = relationship(back_populates="investigation")
+    gap_analyses: Mapped[list["ResearchGapAnalysis"]] = relationship(back_populates="investigation")
+    hypotheses: Mapped[list["ResearchHypothesis"]] = relationship(back_populates="investigation")
+    source_cross_relationships: Mapped[list["CrossInvestigationRelationship"]] = relationship(
+        foreign_keys="[CrossInvestigationRelationship.source_investigation_id]", back_populates="source_investigation"
+    )
+    target_cross_relationships: Mapped[list["CrossInvestigationRelationship"]] = relationship(
+        foreign_keys="[CrossInvestigationRelationship.target_investigation_id]", back_populates="target_investigation"
+    )
+    contradictions_as_primary: Mapped[list["ResearchContradiction"]] = relationship(
+        foreign_keys="[ResearchContradiction.primary_investigation_id]", back_populates="primary_investigation"
+    )
+    contradictions_as_secondary: Mapped[list["ResearchContradiction"]] = relationship(
+        foreign_keys="[ResearchContradiction.secondary_investigation_id]", back_populates="secondary_investigation"
+    )
+    quality_calibration: Mapped["ResearchQualityCalibration | None"] = relationship(
+        back_populates="investigation", uselist=False, cascade="all, delete-orphan"
+    )
+    failure_impacts: Mapped[list["ProviderFailureImpact"]] = relationship(
+        back_populates="investigation", cascade="all, delete-orphan"
+    )
+    claim_validations: Mapped[list["EvidenceClaimValidation"]] = relationship(
+        back_populates="investigation", cascade="all, delete-orphan"
+    )
 
 
 class Agent(Base):
@@ -134,6 +157,15 @@ class Source(Base):
     documents: Mapped[list["Document"]] = relationship(back_populates="source")
     open_access_locations: Mapped[list["OpenAccessLocation"]] = relationship(back_populates="source")
     evidence: Mapped[list["Evidence"]] = relationship(back_populates="source")
+    credibility_assessment: Mapped["SourceCredibilityAssessment | None"] = relationship(
+        back_populates="source", uselist=False, cascade="all, delete-orphan"
+    )
+    lineage_out: Mapped[list["SourceLineageRelationship"]] = relationship(
+        foreign_keys="[SourceLineageRelationship.source_id]", back_populates="source", cascade="all, delete-orphan"
+    )
+    lineage_in: Mapped[list["SourceLineageRelationship"]] = relationship(
+        foreign_keys="[SourceLineageRelationship.related_source_id]", back_populates="related_source", cascade="all, delete-orphan"
+    )
 
 
 class Document(Base):
@@ -196,6 +228,9 @@ class Claim(Base):
     dependencies_json: Mapped[str] = mapped_column(Text, default="[]")
     investigation: Mapped[Investigation] = relationship(back_populates="claims")
     evidence_relationships: Mapped[list["ClaimEvidenceRelationship"]] = relationship(back_populates="claim")
+    validations: Mapped[list["EvidenceClaimValidation"]] = relationship(
+        back_populates="claim", cascade="all, delete-orphan"
+    )
 
 
 class AnalysisJob(Base):
@@ -362,6 +397,9 @@ class Evidence(Base):
     relevance_reason: Mapped[str] = mapped_column(Text, default="")
     traceable: Mapped[bool] = mapped_column(default=True)
     source: Mapped[Source] = relationship(back_populates="evidence")
+    validations: Mapped[list["EvidenceClaimValidation"]] = relationship(
+        back_populates="evidence", cascade="all, delete-orphan"
+    )
 
 
 class ClaimEvidenceRelationship(Base):
@@ -395,3 +433,438 @@ class ExtractionExecution(Base):
     status: Mapped[str] = mapped_column(String(24))
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ResearchGapAnalysis(Base):
+    __tablename__ = "research_gap_analyses"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    version_number: Mapped[int] = mapped_column(default=1)
+    summary: Mapped[str] = mapped_column(Text)
+    critical_count: Mapped[int] = mapped_column(default=0)
+    high_count: Mapped[int] = mapped_column(default=0)
+    moderate_count: Mapped[int] = mapped_column(default=0)
+    low_count: Mapped[int] = mapped_column(default=0)
+    coverage_score: Mapped[float] = mapped_column(Float, default=0.0)
+    coverage_summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    investigation: Mapped[Investigation] = relationship(back_populates="gap_analyses")
+    gaps: Mapped[list["ResearchGap"]] = relationship(
+        back_populates="analysis", cascade="all, delete-orphan"
+    )
+
+
+class ResearchGap(Base):
+    __tablename__ = "research_gaps"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_gap_analyses.id", ondelete="CASCADE"), index=True
+    )
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    category: Mapped[str] = mapped_column(String(40), index=True)
+    gap_type: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(250))
+    description: Mapped[str] = mapped_column(Text)
+    claim_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    evidence_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    source_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    supporting_explanation: Mapped[str] = mapped_column(Text)
+    missing_information: Mapped[str] = mapped_column(Text)
+    severity: Mapped[str] = mapped_column(String(20), index=True)
+    research_priority: Mapped[float] = mapped_column(Float, default=5.0)
+    confidence: Mapped[str] = mapped_column(String(20), default="medium")
+    is_observed: Mapped[bool] = mapped_column(default=True)
+    recommended_action_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    analysis: Mapped[ResearchGapAnalysis] = relationship(back_populates="gaps")
+
+
+# ===========================================================================
+# MILESTONE 8B: EVIDENCE-GROUNDED HYPOTHESIS GENERATION
+# ===========================================================================
+
+class ResearchHypothesis(Base):
+    __tablename__ = "research_hypotheses"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    statement: Mapped[str] = mapped_column(Text)
+    rationale: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(50), index=True)
+    status: Mapped[str] = mapped_column(String(40), index=True, default="proposed")
+    claim_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    evidence_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    gap_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    supporting_evidence_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    challenging_evidence_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    proposed_mechanism: Mapped[str] = mapped_column(Text, default="")
+    independent_variables_json: Mapped[str] = mapped_column(Text, default="[]")
+    dependent_variables_json: Mapped[str] = mapped_column(Text, default="[]")
+    expected_outcome: Mapped[str] = mapped_column(Text, default="")
+    boundary_conditions: Mapped[str] = mapped_column(Text, default="")
+    assumptions_json: Mapped[str] = mapped_column(Text, default="[]")
+    confounding_variables_json: Mapped[str] = mapped_column(Text, default="[]")
+    suggested_methodology: Mapped[str] = mapped_column(Text, default="")
+    falsification_criteria: Mapped[str] = mapped_column(Text, default="")
+    generation_method: Mapped[str] = mapped_column(String(40), default="deterministic")
+    confidence_level: Mapped[str] = mapped_column(String(20), default="medium")
+    testability_score: Mapped[float] = mapped_column(Float, default=7.0)
+    novelty_score: Mapped[float] = mapped_column(Float, default=6.0)
+    evidence_grounding_score: Mapped[float] = mapped_column(Float, default=7.0)
+    falsifiability_score: Mapped[float] = mapped_column(Float, default=8.0)
+    evaluation_notes: Mapped[str] = mapped_column(Text, default="")
+    version_number: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    investigation: Mapped[Investigation] = relationship(back_populates="hypotheses")
+    evaluations: Mapped[list["HypothesisEvaluation"]] = relationship(
+        back_populates="hypothesis", cascade="all, delete-orphan"
+    )
+
+
+class HypothesisEvaluation(Base):
+    __tablename__ = "hypothesis_evaluations"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    hypothesis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_hypotheses.id", ondelete="CASCADE"), index=True
+    )
+    reviewer_role: Mapped[str] = mapped_column(String(60), default="hypothesis_evaluator")
+    status: Mapped[str] = mapped_column(String(40), default="reviewed")
+    evidence_grounding_score: Mapped[float] = mapped_column(Float, default=5.0)
+    novelty_score: Mapped[float] = mapped_column(Float, default=5.0)
+    logical_consistency_score: Mapped[float] = mapped_column(Float, default=5.0)
+    falsifiability_score: Mapped[float] = mapped_column(Float, default=5.0)
+    testability_score: Mapped[float] = mapped_column(Float, default=5.0)
+    methodological_feasibility_score: Mapped[float] = mapped_column(Float, default=5.0)
+    review_comments: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    hypothesis: Mapped[ResearchHypothesis] = relationship(back_populates="evaluations")
+
+
+# ===========================================================================
+# MILESTONE 8C: CROSS-INVESTIGATION KNOWLEDGE SYNTHESIS
+# ===========================================================================
+
+class CrossInvestigationRelationship(Base):
+    __tablename__ = "cross_investigation_relationships"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    source_investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    target_investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    relationship_type: Mapped[str] = mapped_column(String(50), index=True)
+    explanation: Mapped[str] = mapped_column(Text)
+    confidence: Mapped[str] = mapped_column(String(20), default="medium")
+    detection_method: Mapped[str] = mapped_column(String(40), default="deterministic")
+    claim_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    evidence_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    shared_evidence_count: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    source_investigation: Mapped[Investigation] = relationship(
+        foreign_keys=[source_investigation_id], back_populates="source_cross_relationships"
+    )
+    target_investigation: Mapped[Investigation] = relationship(
+        foreign_keys=[target_investigation_id], back_populates="target_cross_relationships"
+    )
+
+
+class InvestigationSynthesisReport(Base):
+    __tablename__ = "investigation_synthesis_reports"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(300))
+    summary: Mapped[str] = mapped_column(Text)
+    investigation_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    shared_themes_json: Mapped[str] = mapped_column(Text, default="[]")
+    common_findings_json: Mapped[str] = mapped_column(Text, default="[]")
+    complementary_findings_json: Mapped[str] = mapped_column(Text, default="[]")
+    conflicting_findings_json: Mapped[str] = mapped_column(Text, default="[]")
+    shared_evidence_json: Mapped[str] = mapped_column(Text, default="[]")
+    independent_corroboration_json: Mapped[str] = mapped_column(Text, default="[]")
+    methodological_differences_json: Mapped[str] = mapped_column(Text, default="[]")
+    unresolved_questions_json: Mapped[str] = mapped_column(Text, default="[]")
+    cross_investigation_gaps_json: Mapped[str] = mapped_column(Text, default="[]")
+    recommended_future_investigations_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+# ===========================================================================
+# MILESTONE 8D: CONTRADICTION INTELLIGENCE
+# ===========================================================================
+
+class ResearchContradiction(Base):
+    __tablename__ = "research_contradictions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    primary_investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    secondary_investigation_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("investigations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(50), index=True)
+    severity: Mapped[str] = mapped_column(String(20), index=True, default="moderate")
+    confidence: Mapped[str] = mapped_column(String(20), default="medium")
+    detection_method: Mapped[str] = mapped_column(String(40), default="deterministic")
+    status: Mapped[str] = mapped_column(String(40), index=True, default="newly_detected")
+    claim_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    evidence_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    source_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    supporting_passages_json: Mapped[str] = mapped_column(Text, default="[]")
+    conflicting_passages_json: Mapped[str] = mapped_column(Text, default="[]")
+    scope_differences: Mapped[str] = mapped_column(Text, default="")
+    methodological_differences: Mapped[str] = mapped_column(Text, default="")
+    resolution_explanation: Mapped[str] = mapped_column(Text, default="")
+    recommended_research_action: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    primary_investigation: Mapped[Investigation] = relationship(
+        foreign_keys=[primary_investigation_id], back_populates="contradictions_as_primary"
+    )
+    secondary_investigation: Mapped[Investigation | None] = relationship(
+        foreign_keys=[secondary_investigation_id], back_populates="contradictions_as_secondary"
+    )
+    resolution_logs: Mapped[list["ContradictionResolutionLog"]] = relationship(
+        back_populates="contradiction", cascade="all, delete-orphan"
+    )
+
+
+class ContradictionResolutionLog(Base):
+    __tablename__ = "contradiction_resolution_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    contradiction_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_contradictions.id", ondelete="CASCADE"), index=True
+    )
+    previous_status: Mapped[str] = mapped_column(String(40))
+    new_status: Mapped[str] = mapped_column(String(40))
+    resolution_rationale: Mapped[str] = mapped_column(Text)
+    resolving_evidence_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    contradiction: Mapped[ResearchContradiction] = relationship(back_populates="resolution_logs")
+
+
+# ===========================================================================
+# MILESTONE 8E: RESEARCH TREND INTELLIGENCE
+# ===========================================================================
+
+class ResearchTrendAnalysis(Base):
+    __tablename__ = "research_trend_analyses"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(300))
+    summary: Mapped[str] = mapped_column(Text)
+    total_investigations_analyzed: Mapped[int] = mapped_column(default=0)
+    total_sources_analyzed: Mapped[int] = mapped_column(default=0)
+    total_evidence_analyzed: Mapped[int] = mapped_column(default=0)
+    temporal_span_start: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    temporal_span_end: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    trend_topics_json: Mapped[str] = mapped_column(Text, default="[]")
+    emerging_themes_json: Mapped[str] = mapped_column(Text, default="[]")
+    consensus_shifts_json: Mapped[str] = mapped_column(Text, default="[]")
+    persistent_gaps_json: Mapped[str] = mapped_column(Text, default="[]")
+    active_contradictions_count: Mapped[int] = mapped_column(default=0)
+    recommendations_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    topics: Mapped[list["ResearchTrendTopic"]] = relationship(
+        back_populates="analysis", cascade="all, delete-orphan"
+    )
+
+
+class ResearchTrendTopic(Base):
+    __tablename__ = "research_trend_topics"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    analysis_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("research_trend_analyses.id", ondelete="CASCADE"), index=True
+    )
+    topic_name: Mapped[str] = mapped_column(String(200), index=True)
+    classification: Mapped[str] = mapped_column(String(50), index=True)
+    activity_score: Mapped[float] = mapped_column(Float, default=50.0)
+    quality_score: Mapped[float] = mapped_column(Float, default=50.0)
+    independence_score: Mapped[float] = mapped_column(Float, default=50.0)
+    growth_rate: Mapped[float] = mapped_column(Float, default=0.0)
+    contradiction_count: Mapped[int] = mapped_column(default=0)
+    gap_count: Mapped[int] = mapped_column(default=0)
+    temporal_observations_count: Mapped[int] = mapped_column(default=0)
+    investigation_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    source_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    summary_narrative: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    analysis: Mapped[ResearchTrendAnalysis] = relationship(back_populates="topics")
+
+
+# ===========================================================================
+# MILESTONE 8G: RESEARCH QUALITY CALIBRATION & SCIENTIFIC EVIDENCE VALIDATION
+# ===========================================================================
+
+class SourceCredibilityAssessment(Base):
+    __tablename__ = "source_credibility_assessments"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), index=True
+    )
+    source_type: Mapped[str] = mapped_column(String(60), index=True)
+    verification_status: Mapped[str] = mapped_column(String(40), index=True, default="unverified")
+    venue: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    is_peer_reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    reasons_json: Mapped[str] = mapped_column(Text, default="[]")
+    assessed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    source: Mapped[Source] = relationship(back_populates="credibility_assessment")
+
+
+class SourceLineageRelationship(Base):
+    __tablename__ = "source_lineage_relationships"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), index=True
+    )
+    related_source_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), index=True
+    )
+    relationship_type: Mapped[str] = mapped_column(String(60), index=True)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    shared_identifiers_json: Mapped[str] = mapped_column(Text, default="[]")
+    explanation: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    source: Mapped[Source] = relationship(
+        foreign_keys=[source_id], back_populates="lineage_out"
+    )
+    related_source: Mapped[Source] = relationship(
+        foreign_keys=[related_source_id], back_populates="lineage_in"
+    )
+
+
+class EvidenceClaimValidation(Base):
+    __tablename__ = "evidence_claim_validations"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    claim_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("claims.id", ondelete="CASCADE"), index=True
+    )
+    evidence_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("evidence.id", ondelete="CASCADE"), index=True
+    )
+    entailment_classification: Mapped[str] = mapped_column(String(60), index=True)
+    entailment_strength: Mapped[float] = mapped_column(Float, default=0.5)
+    explanation: Mapped[str] = mapped_column(Text, default="")
+    missing_inferential_steps_json: Mapped[str] = mapped_column(Text, default="[]")
+    correlation_vs_causation_flag: Mapped[bool] = mapped_column(Boolean, default=False)
+    validation_method: Mapped[str] = mapped_column(String(40), default="deterministic_heuristic")
+    validator_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), default="validated")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    investigation: Mapped[Investigation] = relationship(back_populates="claim_validations")
+    claim: Mapped[Claim] = relationship(back_populates="validations")
+    evidence: Mapped[Evidence] = relationship(back_populates="validations")
+
+
+class ResearchQualityCalibration(Base):
+    __tablename__ = "research_quality_calibrations"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True, unique=True
+    )
+    calibrated_tier: Mapped[str] = mapped_column(String(40), index=True, default="Moderate")
+    raw_score: Mapped[float] = mapped_column(Float, default=0.0)
+    calibrated_score: Mapped[float] = mapped_column(Float, default=0.0)
+    coverage_score: Mapped[float] = mapped_column(Float, default=0.0)
+    failure_penalty: Mapped[float] = mapped_column(Float, default=0.0)
+    dimension_breakdown_json: Mapped[str] = mapped_column(Text, default="{}")
+    calibration_reasons_json: Mapped[str] = mapped_column(Text, default="[]")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    investigation: Mapped[Investigation] = relationship(back_populates="quality_calibration")
+
+
+class ProviderFailureImpact(Base):
+    __tablename__ = "provider_failure_impacts"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    investigation_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("investigations.id", ondelete="CASCADE"), index=True
+    )
+    provider: Mapped[str] = mapped_column(String(60))
+    operation: Mapped[str] = mapped_column(String(80))
+    query: Mapped[str] = mapped_column(Text)
+    failure_type: Mapped[str] = mapped_column(String(60))
+    retry_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    impact_severity: Mapped[str] = mapped_column(String(40), index=True, default="harmless_optional")
+    missing_category: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    explanation: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    investigation: Mapped[Investigation] = relationship(back_populates="failure_impacts")
+
