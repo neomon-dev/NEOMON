@@ -56,6 +56,7 @@ class LineageAnalysisResult:
     effective_independent_count: float
     independence_ratio: float
     lineage_summary: str
+    weighted_independence_count: float = 0.0
 
 
 def _clean_title_tokens(title: str) -> set[str]:
@@ -198,15 +199,32 @@ def analyze_source_lineage(sources_input: list[Any]) -> LineageAnalysisResult:
                 ))
                 continue
 
-            if sim >= 0.45:
-                # Moderate title overlap: potentially related secondary reporting
+            if sim >= 0.38:
+                # Moderate title overlap: derivative reporting around common announcement or subject
+                is_trade_press = any(w in url_a or w in url_b for w in ("tech", "verge", "anand", "toms", "arstechnica", "cnet", "venturebeat", "zdnet", "engadget", "eetimes"))
+                rel_type = SourceLineageType.DERIVATIVE_REPORTING if is_trade_press else SourceLineageType.POTENTIALLY_RELATED
                 relationships.append(LineageRelationship(
                     source_id=id_a,
                     related_source_id=id_b,
-                    relationship_type=SourceLineageType.POTENTIALLY_RELATED,
+                    relationship_type=rel_type,
                     confidence=round(sim, 2),
                     shared_identifiers=[],
-                    explanation=f"Substantial conceptual overlap ({sim:.0%}) in headlines suggests common subject coverage.",
+                    explanation=f"Substantial title overlap ({sim:.0%}) indicates derivative secondary reporting around a common subject.",
+                ))
+                continue
+
+            # Check 4: Shared commercial entity / product announcement without independent methodology
+            tokens_a = _clean_title_tokens(title_a)
+            tokens_b = _clean_title_tokens(title_b)
+            common_tokens = tokens_a & tokens_b
+            if len(common_tokens) >= 3 and not (doi_a or doi_b):
+                relationships.append(LineageRelationship(
+                    source_id=id_a,
+                    related_source_id=id_b,
+                    relationship_type=SourceLineageType.DERIVATIVE_REPORTING,
+                    confidence=0.70,
+                    shared_identifiers=list(common_tokens)[:3],
+                    explanation=f"Shared entity coverage ({', '.join(list(common_tokens)[:3])}) reflects derivative commercial reporting on same topic.",
                 ))
 
     # Build disjoint connected components (Clusters)
@@ -269,6 +287,25 @@ def analyze_source_lineage(sources_input: list[Any]) -> LineageAnalysisResult:
             rel_label = "independent_source"
             explanation = f"Independent primary source with unique methodology and distinct provenance: '{primary_title[:60]}'."
 
+        # Scientific independence weight based on methodology and source types in cluster
+        has_academic_or_doi = any(
+            by_id[cid].get("doi") or "academic" in (by_id[cid].get("source_type") or "").lower()
+            for cid in component
+        )
+        is_gov_or_inst = any(
+            urlsplit(by_id[cid].get("url") or "").netloc.lower().endswith((".gov", ".mil", ".int", ".org"))
+            for cid in component
+        )
+
+        if has_academic_or_doi:
+            weight = 1.0  # Scholarly peer-reviewed or academic study
+        elif is_gov_or_inst:
+            weight = 0.9  # Primary institutional authority
+        elif len(component) > 1:
+            weight = 0.5  # Multi-outlet derivative secondary reporting
+        else:
+            weight = 0.6  # Standalone secondary trade source
+
         clusters.append(SourceCluster(
             cluster_id=f"cluster-{cluster_idx}",
             cluster_name=f"Lineage Cluster {cluster_idx}: {primary_title[:50]}",
@@ -276,13 +313,13 @@ def analyze_source_lineage(sources_input: list[Any]) -> LineageAnalysisResult:
             member_source_ids=component,
             relationship_type=rel_label,
             explanation=explanation,
-            effective_independence_weight=1.0,
+            effective_independence_weight=weight,
         ))
         cluster_idx += 1
 
-    # Effective independent count = number of independent clusters
-    effective_count = float(len(clusters))
-    ratio = round(effective_count / max(1, total_sources), 3)
+    cluster_count = float(len(clusters))
+    weighted_count = round(sum(c.effective_independence_weight for c in clusters), 1)
+    ratio = round(cluster_count / max(1, total_sources), 3)
 
     summary = (
         f"Analyzed {total_sources} sources into {len(clusters)} effective independent lineage clusters "
@@ -294,7 +331,8 @@ def analyze_source_lineage(sources_input: list[Any]) -> LineageAnalysisResult:
         clusters=clusters,
         relationships=relationships,
         total_sources=total_sources,
-        effective_independent_count=effective_count,
+        effective_independent_count=cluster_count,
         independence_ratio=ratio,
         lineage_summary=summary,
+        weighted_independence_count=weighted_count,
     )

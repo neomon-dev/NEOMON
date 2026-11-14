@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from app.analysis.protocol import ReportSectionView
 
@@ -125,6 +125,7 @@ class InvestigationCreate(BaseModel):
     source_preferences: list[str] = Field(default_factory=list, max_length=20)
     max_queries: int = Field(default=8, ge=1, le=30)
     max_sources: int = Field(default=20, ge=1, le=100)
+    workspace_id: uuid.UUID | None = None
 
 
 class InvestigationResponse(BaseModel):
@@ -140,6 +141,8 @@ class InvestigationResponse(BaseModel):
     relevant_source_count: int = 0
     full_text_count: int = 0
     evidence_gap: str | None = None
+    workspace_id: uuid.UUID | None = None
+    owner_id: uuid.UUID | None = None
 
 
 class ResearchQueryResponse(BaseModel):
@@ -466,6 +469,9 @@ class GraphNodeType(StrEnum):
     contradiction = "contradiction"
     cross_investigation = "cross_investigation"
     research_trend = "research_trend"
+    autonomous_workflow = "autonomous_workflow"
+    research_cycle = "research_cycle"
+    research_action = "research_action"
 
 
 class GraphNodeView(BaseModel):
@@ -503,6 +509,9 @@ class GraphTotalCounts(BaseModel):
     contradictions: int = 0
     cross_relationships: int = 0
     trends: int = 0
+    autonomous_workflows: int = 0
+    research_cycles: int = 0
+    research_actions: int = 0
 
 
 class InvestigationGraphResponse(BaseModel):
@@ -1131,5 +1140,233 @@ class InvestigationQualityAuditItem(BaseModel):
     source_count: int
     evidence_count: int
     updated_at: datetime | None = None
+
+
+# ===========================================================================
+# MILESTONE 9: AUTONOMOUS RESEARCH WORKFLOW SCHEMAS
+# ===========================================================================
+
+class AutonomousWorkflowCreateRequest(BaseModel):
+    investigation_id: uuid.UUID
+    title: str
+    research_objective: str
+    autonomy_mode: str = "bounded"  # "assisted", "supervised", "bounded"
+    budget_max_cycles: int = 5
+    budget_max_searches: int = 20
+    budget_max_sources: int = 50
+    budget_max_documents: int = 20
+    budget_max_duration_seconds: int = 1800
+    stop_on_sufficient_evidence: bool = True
+    stop_on_diminishing_returns: bool = True
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def map_aliases(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "max_cycles" in data and "budget_max_cycles" not in data:
+                data["budget_max_cycles"] = data["max_cycles"]
+            if "max_searches" in data and "budget_max_searches" not in data:
+                data["budget_max_searches"] = data["max_searches"]
+            if "max_searches_per_cycle" in data and "budget_max_searches" not in data:
+                data["budget_max_searches"] = data["max_searches_per_cycle"] * data.get("max_cycles", 5)
+            if "max_sources" in data and "budget_max_sources" not in data:
+                data["budget_max_sources"] = data["max_sources"]
+            if "max_sources_total" in data and "budget_max_sources" not in data:
+                data["budget_max_sources"] = data["max_sources_total"]
+            if "max_documents" in data and "budget_max_documents" not in data:
+                data["budget_max_documents"] = data["max_documents"]
+            if "max_duration_seconds" in data and "budget_max_duration_seconds" not in data:
+                data["budget_max_duration_seconds"] = data["max_duration_seconds"]
+        return data
+
+
+class ResearchActionView(BaseModel):
+    id: uuid.UUID
+    workflow_id: uuid.UUID
+    cycle_id: uuid.UUID
+    action_type: str
+    target_entity_type: str = ""
+    target_entity_id: uuid.UUID | None = None
+    objective: str
+    rationale: str
+    search_queries: list[str] = Field(default_factory=list)
+    target_providers: list[str] = Field(default_factory=list)
+    priority: int = 3
+    expected_information_gain: float = 0.5
+    estimated_cost: float = 1.0
+    status: str = "pending"
+    requires_approval: bool = False
+    approval_notes: str = ""
+    execution_result: dict[str, Any] = Field(default_factory=dict)
+    error_message: str | None = None
+    created_at: datetime | None = None
+    completed_at: datetime | None = None
+
+
+class ResearchWorkflowCycleView(BaseModel):
+    id: uuid.UUID
+    workflow_id: uuid.UUID
+    cycle_number: int
+    cycle_goal: str
+    status: str
+    actions_total: int = 0
+    actions_completed: int = 0
+    actions_failed: int = 0
+    sources_acquired: int = 0
+    evidence_acquired: int = 0
+    claims_updated: int = 0
+    contradictions_detected: int = 0
+    gaps_updated: int = 0
+    information_gain_score: float = 0.0
+    evaluation_summary: str = ""
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    actions: list[ResearchActionView] = Field(default_factory=list)
+
+
+class AutonomousWorkflowView(BaseModel):
+    id: uuid.UUID
+    investigation_id: uuid.UUID
+    investigation_question: str = ""
+    title: str
+    research_objective: str
+    status: str
+    autonomy_mode: str
+    current_cycle_number: int = 0
+    total_cycles_completed: int = 0
+    stopping_reason: str | None = None
+    stopping_explanation: str = ""
+    scientific_confidence: str = "medium"
+
+    # Budgets
+    budget_max_cycles: int = 5
+    budget_max_searches: int = 20
+    budget_max_sources: int = 50
+    budget_max_documents: int = 20
+    budget_max_duration_seconds: int = 1800
+
+    # Resource Accounting
+    spent_searches: int = 0
+    spent_sources: int = 0
+    spent_documents: int = 0
+    spent_llm_calls: int = 0
+    consecutive_low_value_cycles: int = 0
+
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    cycles: list[ResearchWorkflowCycleView] = Field(default_factory=list)
+
+
+class ActionApprovalRequest(BaseModel):
+    rejection_reason: str | None = None
+
+
+class WorkflowContinueRequest(BaseModel):
+    additional_cycles: int = 2
+
+
+class ResearchWorkflowReportView(BaseModel):
+    id: uuid.UUID
+    workflow_id: uuid.UUID
+    investigation_id: uuid.UUID
+    title: str
+    executive_summary: str
+    research_objective: str
+    cycles_summary: list[dict[str, Any]] = Field(default_factory=list)
+    total_queries_executed: int = 0
+    total_sources_acquired: int = 0
+    total_evidence_extracted: int = 0
+    claims_reassessed_count: int = 0
+    contradictions_resolved_count: int = 0
+    remaining_uncertainties: list[str] = Field(default_factory=list)
+    recommended_next_actions: list[str] = Field(default_factory=list)
+    stopping_reason: str
+    stopping_explanation: str
+    calibrated_quality_tier: str = "Moderate"
+    calibrated_quality_score: float = 0.0
+    created_at: datetime | None = None
+
+
+# ===========================================================================
+# MILESTONE 10: COLLABORATION & MULTI-USER WORKSPACE SCHEMAS
+# ===========================================================================
+
+from app.collaboration.schemas import (
+    UserRegisterRequest,
+    UserLoginRequest,
+    UserResponse,
+    AuthTokenResponse,
+    ChangePasswordRequest,
+    PasswordResetRequest,
+    PasswordResetConfirmRequest,
+    UserProfileUpdateRequest,
+    WorkspaceCreateRequest,
+    WorkspaceUpdateRequest,
+    WorkspaceResponse,
+    WorkspaceMemberResponse,
+    WorkspaceMemberRoleUpdateRequest,
+    TransferOwnershipRequest,
+    InvitationCreateRequest,
+    InvitationResponse,
+    InvitationDetailResponse,
+    ThreadCreateRequest,
+    CommentCreateRequest,
+    CommentUpdateRequest,
+    CommentResponse,
+    ThreadResponse,
+    AnnotationCreateRequest,
+    AnnotationStatusUpdateRequest,
+    AnnotationResponse,
+    ReviewRequestCreate,
+    ReviewDecisionSubmit,
+    ReviewDecisionResponse,
+    ReviewRequestResponse,
+    NotificationResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdateRequest,
+    ActivityResponse,
+)
+
+
+# Milestone 10 Collaboration Re-exports
+from app.collaboration.schemas import (
+    UserRegisterRequest,
+    UserLoginRequest,
+    UserResponse,
+    AuthTokenResponse,
+    ChangePasswordRequest,
+    PasswordResetRequest,
+    PasswordResetConfirmRequest,
+    UserProfileUpdateRequest,
+    WorkspaceCreateRequest,
+    WorkspaceUpdateRequest,
+    WorkspaceResponse,
+    WorkspaceMemberResponse,
+    WorkspaceMemberRoleUpdateRequest,
+    TransferOwnershipRequest,
+    InvitationCreateRequest,
+    InvitationResponse,
+    InvitationDetailResponse,
+    ThreadCreateRequest,
+    CommentCreateRequest,
+    CommentUpdateRequest,
+    CommentResponse,
+    ThreadResponse,
+    AnnotationCreateRequest,
+    AnnotationStatusUpdateRequest,
+    AnnotationResponse,
+    ReviewRequestCreate,
+    ReviewDecisionSubmit,
+    ReviewDecisionResponse,
+    ReviewRequestResponse,
+    NotificationResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdateRequest,
+    ActivityResponse,
+)
 
 

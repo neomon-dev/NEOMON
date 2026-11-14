@@ -13,7 +13,10 @@ export type GraphNodeType =
   | "hypothesis"
   | "contradiction"
   | "cross_investigation"
-  | "research_trend";
+  | "research_trend"
+  | "autonomous_workflow"
+  | "research_cycle"
+  | "research_action";
 
 export type GraphNodeView = {
   id: string;
@@ -50,6 +53,9 @@ export type GraphTotalCounts = {
   contradictions?: number;
   cross_relationships?: number;
   trends?: number;
+  workflows?: number;
+  cycles?: number;
+  actions?: number;
 };
 
 export type InvestigationGraphResponse = {
@@ -75,6 +81,9 @@ export type KnowledgeNodeData = GraphNodeView & {
 export const NODE_TYPE_ORDER: GraphNodeType[] = [
   "investigation",
   "research_question",
+  "autonomous_workflow",
+  "research_cycle",
+  "research_action",
   "claim",
   "adjudication_decision",
   "agent_argument",
@@ -183,6 +192,27 @@ export const NODE_TYPE_META: Record<
     accent: "#eab308",
     bg: "#382e0e",
   },
+  autonomous_workflow: {
+    label: "Autonomous workflow",
+    shortLabel: "WORKFLOW",
+    tier: 0,
+    accent: "#f59e0b",
+    bg: "#2d2008",
+  },
+  research_cycle: {
+    label: "Research cycle",
+    shortLabel: "CYCLE",
+    tier: 1,
+    accent: "#38bdf8",
+    bg: "#0c2536",
+  },
+  research_action: {
+    label: "Research action",
+    shortLabel: "ACTION",
+    tier: 2,
+    accent: "#ec4899",
+    bg: "#311025",
+  },
 };
 
 export function edgeStrokeFor(relationshipType: string): {
@@ -212,6 +242,18 @@ export function edgeStrokeFor(relationshipType: string): {
       return { stroke: "#06b6d4", strokeDasharray: "5 3" };
     case "tracks_trend":
       return { stroke: "#eab308", strokeDasharray: "4 2" };
+    case "investigates":
+      return { stroke: "#f59e0b", strokeDasharray: "5 3" };
+    case "executes_cycle":
+      return { stroke: "#38bdf8" };
+    case "performs_action":
+      return { stroke: "#ec4899" };
+    case "targets_claim":
+      return { stroke: "#6baaff", strokeDasharray: "4 2" };
+    case "targets_gap":
+      return { stroke: "#f97316", strokeDasharray: "4 2" };
+    case "targets_hypothesis":
+      return { stroke: "#a855f7", strokeDasharray: "4 2" };
     case "methodological_limitation":
       return { stroke: "#e6bd67", strokeDasharray: "6 3" };
     case "source_criticism":

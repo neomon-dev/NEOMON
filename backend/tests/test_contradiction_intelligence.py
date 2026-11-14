@@ -205,8 +205,8 @@ async def test_contradictions_api_endpoints(db_session: AsyncSession):
     db_session.add_all([ev1, ev2])
     await db_session.commit()
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    from tests.conftest import authed_async_client
+    async with authed_async_client() as client:
         # POST /research/contradictions/detect
         detect_res = await client.post(
             "/api/v1/research/contradictions/detect",

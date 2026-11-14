@@ -8,6 +8,8 @@ from sqlalchemy import and_, case, desc, exists, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.definitions import AGENT_DEFINITIONS
+from app.auth.dependencies import get_current_user
+from app.collaboration.permission_service import PermissionService, DEFAULT_GLOBAL_WORKSPACE_ID
 from app.config import get_settings
 from app.db import get_session
 from app.errors import BackendError
@@ -23,6 +25,7 @@ from app.models import (
     Investigation,
     OpenAccessLocation,
     Source,
+    User,
 )
 from app.schemas import (
     AgentExecutionObservatoryItem,
@@ -66,12 +69,13 @@ def _duration_seconds(start: Any, end: Any) -> float | None:
     return round(max(0.0, (e - s).total_seconds()), 3)
 
 
-async def _ensure_investigation(session: AsyncSession, investigation_id: uuid.UUID | None) -> None:
+async def _ensure_investigation(
+    session: AsyncSession, user: User, investigation_id: uuid.UUID | None
+) -> None:
     if investigation_id is None:
         return
-    inv = await session.get(Investigation, investigation_id)
-    if inv is None:
-        raise BackendError("Investigation not found.", 404, "investigation_not_found")
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, investigation_id, "read")
 
 
 @router.get("/research/evidence", response_model=WorkspaceEvidencePageResponse)
@@ -89,13 +93,24 @@ async def list_workspace_evidence(
     sort: str = Query(default="relevance_desc", pattern="^(relevance_desc|relevance_asc|recent_desc)$"),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> WorkspaceEvidencePageResponse:
-    await _ensure_investigation(session, investigation_id)
+    await _ensure_investigation(session, user, investigation_id)
+    perm = PermissionService(session)
+    user_workspaces = await perm.get_user_workspaces(user.id)
+    if not user_workspaces:
+        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+
+    inv_scope = Investigation.workspace_id.in_(user_workspaces)
+    if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:
+        inv_scope = or_(inv_scope, Investigation.workspace_id.is_(None))
 
     conditions: list[Any] = []
     if investigation_id is not None:
         conditions.append(Source.investigation_id == investigation_id)
+    else:
+        conditions.append(Source.investigation_id.in_(select(Investigation.id).where(inv_scope)))
     if source_id is not None:
         conditions.append(Evidence.source_id == source_id)
     if claim_id is not None:
@@ -276,13 +291,24 @@ async def list_workspace_sources(
     sort: str = Query(default="relevance_desc", pattern="^(relevance_desc|relevance_asc|recent_desc|evidence_desc)$"),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> WorkspaceSourcePageResponse:
-    await _ensure_investigation(session, investigation_id)
+    await _ensure_investigation(session, user, investigation_id)
+    perm = PermissionService(session)
+    user_workspaces = await perm.get_user_workspaces(user.id)
+    if not user_workspaces:
+        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+
+    inv_scope = Investigation.workspace_id.in_(user_workspaces)
+    if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:
+        inv_scope = or_(inv_scope, Investigation.workspace_id.is_(None))
 
     conditions: list[Any] = []
     if investigation_id is not None:
         conditions.append(Source.investigation_id == investigation_id)
+    else:
+        conditions.append(Source.investigation_id.in_(select(Investigation.id).where(inv_scope)))
     if source_id is not None:
         conditions.append(Source.id == source_id)
     if inclusion_status:
@@ -473,17 +499,30 @@ async def read_agent_observatory(
     status: str | None = None,
     limit: int = Query(default=30, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AgentObservatoryResponse:
-    await _ensure_investigation(session, investigation_id)
+    await _ensure_investigation(session, user, investigation_id)
+    perm = PermissionService(session)
+    user_workspaces = await perm.get_user_workspaces(user.id)
+    if not user_workspaces:
+        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+
+    inv_scope = Investigation.workspace_id.in_(user_workspaces)
+    if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:
+        inv_scope = or_(inv_scope, Investigation.workspace_id.is_(None))
+
     settings = get_settings()
     name_map = {item.identifier: item.name for item in AGENT_DEFINITIONS}
 
     job_conditions: list[Any] = []
     if investigation_id is not None:
         job_conditions.append(AnalysisJob.investigation_id == investigation_id)
-    if job_id is not None:
+    elif job_id is not None:
         job_conditions.append(AnalysisJob.id == job_id)
+        job_conditions.append(AnalysisJob.investigation_id.in_(select(Investigation.id).where(inv_scope)))
+    else:
+        job_conditions.append(AnalysisJob.investigation_id.in_(select(Investigation.id).where(inv_scope)))
 
     jobs_stmt = select(AnalysisJob.status)
     if job_conditions:

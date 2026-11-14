@@ -71,6 +71,8 @@ export function ContradictionWorkspace() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [severityFilter, setSeverityFilter] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 20;
   const [loading, setLoading] = useState<boolean>(true);
   const [detecting, setDetecting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +164,16 @@ export function ContradictionWorkspace() {
       return true;
     });
   }, [contradictions, selectedInvId, statusFilter, categoryFilter, severityFilter]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedInvId, statusFilter, categoryFilter, severityFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredContradictions.length / pageSize));
+  const paginatedContradictions = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredContradictions.slice(start, start + pageSize);
+  }, [filteredContradictions, currentPage, pageSize]);
 
   return (
     <div className="contradiction-workspace" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -304,7 +316,45 @@ export function ContradictionWorkspace() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {filteredContradictions.map((c) => {
+          {/* Pagination bar top */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontSize: "13px",
+              color: "var(--muted)",
+              padding: "4px 8px",
+            }}
+          >
+            <span>
+              Showing {Math.min((currentPage - 1) * pageSize + 1, filteredContradictions.length)}–
+              {Math.min(currentPage * pageSize, filteredContradictions.length)} of {filteredContradictions.length} contradictions
+            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                className="button secondary"
+                style={{ padding: "4px 10px", fontSize: "12px" }}
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <span>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                className="button secondary"
+                style={{ padding: "4px 10px", fontSize: "12px" }}
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+
+          {paginatedContradictions.map((c) => {
             const sev = SEVERITY_COLORS[c.severity.toLowerCase()] || { bg: "rgba(255,255,255,0.08)", text: "#cbd5e1" };
             const statusLabel = STATUS_LABELS[c.status] || c.status;
 
@@ -451,6 +501,46 @@ export function ContradictionWorkspace() {
               </div>
             );
           })}
+
+          {/* Pagination bar bottom */}
+          {totalPages > 1 && (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                fontSize: "13px",
+                color: "var(--muted)",
+                padding: "8px",
+              }}
+            >
+              <span>
+                Showing {Math.min((currentPage - 1) * pageSize + 1, filteredContradictions.length)}–
+                {Math.min(currentPage * pageSize, filteredContradictions.length)} of {filteredContradictions.length} contradictions
+              </span>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  className="button secondary"
+                  style={{ padding: "4px 10px", fontSize: "12px" }}
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  className="button secondary"
+                  style={{ padding: "4px 10px", fontSize: "12px" }}
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

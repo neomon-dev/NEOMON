@@ -24,6 +24,8 @@ from app.analysis.report_service import (
     save_report_version,
 )
 from app.analysis.service import compute_analysis_coverage
+from app.auth.dependencies import get_current_user
+from app.collaboration.permission_service import PermissionService
 from app.db import get_session
 from app.errors import BackendError
 from app.models import (
@@ -40,6 +42,7 @@ from app.models import (
     ReportVersion,
     ResearchReport,
     Source,
+    User,
 )
 from app.schemas import (
     AnalysisCoverageSummary,
@@ -113,9 +116,11 @@ async def start_analysis(
     investigation_id: uuid.UUID,
     payload: AnalysisStartRequest,
     request: Request,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AnalysisJobResponse:
-    investigation = await _investigation(session, investigation_id)
+    perm = PermissionService(session)
+    investigation = await perm.check_investigation_access(user, investigation_id, "write")
     if payload.provider is not None:
         from app.providers.base import ProviderRequestError, validate_provider_endpoint
 
@@ -169,9 +174,12 @@ async def start_analysis(
 
 @router.get("/investigations/{investigation_id}/analysis", response_model=AnalysisJobResponse)
 async def read_analysis(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> AnalysisJobResponse:
-    await _investigation(session, investigation_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, investigation_id, "read")
     job = await session.scalar(select(AnalysisJob).where(AnalysisJob.investigation_id == investigation_id))
     if job is None:
         raise BackendError("No analysis job exists for this investigation.", 404, "analysis_not_found")
@@ -180,9 +188,13 @@ async def read_analysis(
 
 @router.get("/analysis/{job_id}/coverage", response_model=AnalysisCoverageSummary)
 async def read_analysis_coverage(
-    job_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> AnalysisCoverageSummary:
     job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "read")
     claims = list((await session.scalars(select(Claim).where(Claim.investigation_id == job.investigation_id))).all())
     executions = list((await session.scalars(select(AnalysisAgentExecution).where(AnalysisAgentExecution.job_id == job.id))).all())
     arguments = list((await session.scalars(select(AgentArgument).where(AgentArgument.job_id == job.id))).all())
@@ -192,21 +204,30 @@ async def read_analysis_coverage(
 
 
 @router.post("/analysis/{job_id}/cancel", response_model=AnalysisJobResponse)
-async def cancel_analysis(job_id: uuid.UUID, request: Request) -> AnalysisJobResponse:
+async def cancel_analysis(
+    job_id: uuid.UUID,
+    request: Request,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AnalysisJobResponse:
+    job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "write")
     if not await request.app.state.analysis_manager.cancel(str(job_id)):
         raise BackendError("Analysis job not found.", 404, "analysis_not_found")
-    from app.db import SessionFactory
-
-    async with SessionFactory() as session:
-        job = await session.get(AnalysisJob, job_id)
-        if job is None:
-            raise BackendError("Analysis job not found.", 404, "analysis_not_found")
-        return await _build_job_response(session, job)
+    await session.refresh(job)
+    return await _build_job_response(session, job)
 
 
 @router.get("/analysis/{job_id}/executions", response_model=list[AgentExecutionView])
-async def list_executions(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[AgentExecutionView]:
-    await _job(session, job_id)
+async def list_executions(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[AgentExecutionView]:
+    job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "read")
     rows = (await session.scalars(select(AnalysisAgentExecution).where(AnalysisAgentExecution.job_id == job_id))).all()
     views: list[AgentExecutionView] = []
     for row in rows:
@@ -233,8 +254,14 @@ async def list_executions(job_id: uuid.UUID, session: AsyncSession = Depends(get
 
 
 @router.get("/analysis/{job_id}/claims", response_model=list[ClaimAnalysisView])
-async def list_analysis_claims(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[ClaimAnalysisView]:
+async def list_analysis_claims(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ClaimAnalysisView]:
     job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "read")
     claims = (
         await session.scalars(select(Claim).where(Claim.investigation_id == job.investigation_id).order_by(Claim.id))
     ).all()
@@ -254,8 +281,14 @@ async def list_analysis_claims(job_id: uuid.UUID, session: AsyncSession = Depend
 
 
 @router.get("/analysis/{job_id}/arguments", response_model=list[ArgumentView])
-async def list_arguments(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[ArgumentView]:
-    await _job(session, job_id)
+async def list_arguments(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[ArgumentView]:
+    job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "read")
     rows = (await session.scalars(select(AgentArgument).where(AgentArgument.job_id == job_id))).all()
     return [
         ArgumentView(
@@ -276,8 +309,14 @@ async def list_arguments(job_id: uuid.UUID, session: AsyncSession = Depends(get_
 
 
 @router.get("/analysis/{job_id}/debates", response_model=list[DebateRoundView])
-async def list_debates(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[DebateRoundView]:
-    await _job(session, job_id)
+async def list_debates(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DebateRoundView]:
+    job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "read")
     rows = (await session.scalars(select(DebateRound).where(DebateRound.job_id == job_id).order_by(DebateRound.round_number))).all()
     return [
         DebateRoundView(
@@ -292,8 +331,14 @@ async def list_debates(job_id: uuid.UUID, session: AsyncSession = Depends(get_se
 
 
 @router.get("/analysis/{job_id}/decisions", response_model=list[DecisionView])
-async def list_decisions(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> list[DecisionView]:
-    await _job(session, job_id)
+async def list_decisions(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[DecisionView]:
+    job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "read")
     rows = (await session.scalars(select(AdjudicationDecision).where(AdjudicationDecision.job_id == job_id))).all()
     return [
         DecisionView(
@@ -310,8 +355,14 @@ async def list_decisions(job_id: uuid.UUID, session: AsyncSession = Depends(get_
 
 
 @router.get("/analysis/{job_id}/report", response_model=AnalysisReportResponse)
-async def read_report(job_id: uuid.UUID, session: AsyncSession = Depends(get_session)) -> AnalysisReportResponse:
+async def read_report(
+    job_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> AnalysisReportResponse:
     job = await _job(session, job_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, job.investigation_id, "read")
     report = await session.scalar(select(ResearchReport).where(ResearchReport.job_id == job_id))
     if report is None:
         raise BackendError("Analysis report is not available.", 404, "report_not_found")
@@ -358,9 +409,13 @@ async def read_report(job_id: uuid.UUID, session: AsyncSession = Depends(get_ses
 
 @router.get("/investigations/{investigation_id}/reports", response_model=list[ReportVersionView])
 async def list_investigation_reports(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> list[ReportVersionView]:
     await _investigation(session, investigation_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, investigation_id, "read")
     return await list_report_versions(session, investigation_id)
 
 
@@ -368,9 +423,12 @@ async def list_investigation_reports(
 async def read_investigation_report_version(
     investigation_id: uuid.UUID,
     version_or_id: str,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> AnalysisReportResponse:
     await _investigation(session, investigation_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, investigation_id, "read")
     row, raw_sections = await get_report_version(session, investigation_id, version_or_id)
     if row is None:
         raise BackendError("Report version not found.", 404, "version_not_found")
@@ -414,9 +472,13 @@ async def read_investigation_report_version(
 
 @router.post("/investigations/{investigation_id}/reports/generate", response_model=AnalysisReportResponse)
 async def regenerate_investigation_report(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> AnalysisReportResponse:
     inv = await _investigation(session, investigation_id)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, investigation_id, "write")
     job = await session.scalar(
         select(AnalysisJob)
         .where(AnalysisJob.investigation_id == investigation_id)
@@ -510,4 +572,4 @@ async def regenerate_investigation_report(
         )
     await session.commit()
 
-    return await read_report(job.id, session)
+    return await read_report(job.id, user, session)

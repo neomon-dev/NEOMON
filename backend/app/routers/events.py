@@ -2,12 +2,15 @@ import asyncio
 import json
 import uuid
 
-from fastapi import APIRouter, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import SessionFactory
+from app.auth.dependencies import get_current_user
+from app.collaboration.permission_service import PermissionService
+from app.db import SessionFactory, get_session
 from app.errors import BackendError
-from app.models import Investigation
+from app.models import Investigation, User
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -18,12 +21,12 @@ async def events(
     investigation_id: uuid.UUID | None = Query(default=None),
     last_event_id_query: uuid.UUID | None = Query(default=None, alias="last_event_id"),
     last_event_id_header: str | None = Header(default=None, alias="Last-Event-ID"),
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ) -> StreamingResponse:
+    perm = PermissionService(session)
     if investigation_id is not None:
-        async with SessionFactory() as session:
-            investigation = await session.get(Investigation, investigation_id)
-            if investigation is None:
-                raise BackendError("Investigation not found.", 404, "not_found")
+        await perm.check_investigation_access(user, investigation_id, "read")
 
     broker = request.app.state.event_broker
     cursor_uuid: uuid.UUID | None = last_event_id_query

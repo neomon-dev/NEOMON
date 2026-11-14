@@ -5,9 +5,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.gap_service import gap_engine
+from app.auth.dependencies import get_current_user
+from app.collaboration.permission_service import PermissionService
 from app.db import get_session
 from app.errors import BackendError
-from app.models import Investigation
+from app.models import Investigation, User
 from app.schemas import (
     ResearchGapAnalysisResponse,
     ResearchGapAnalyzeRequest,
@@ -18,21 +20,22 @@ from app.schemas import (
 router = APIRouter(prefix="/research/investigations/{investigation_id}/gaps", tags=["research_gaps"])
 
 
-async def _verify_investigation_exists(investigation_id: uuid.UUID, session: AsyncSession) -> Investigation:
-    investigation = await session.get(Investigation, investigation_id)
-    if investigation is None:
-        raise BackendError("Investigation not found.", 404, "not_found")
-    return investigation
+async def _verify_investigation_exists(
+    investigation_id: uuid.UUID, user: User, session: AsyncSession, capability: str = "read"
+) -> Investigation:
+    perm = PermissionService(session)
+    return await perm.check_investigation_access(user, investigation_id, capability)
 
 
 @router.post("/analyze", response_model=ResearchGapAnalysisResponse)
 async def analyze_investigation_gaps(
     investigation_id: uuid.UUID,
     payload: ResearchGapAnalyzeRequest | None = None,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchGapAnalysisResponse:
     """Analyze an investigation and persist a new versioned research gap analysis."""
-    await _verify_investigation_exists(investigation_id, session)
+    await _verify_investigation_exists(investigation_id, user, session, "write")
     req = payload or ResearchGapAnalyzeRequest()
     try:
         return await gap_engine.analyze_investigation(
@@ -49,10 +52,11 @@ async def analyze_investigation_gaps(
 @router.get("", response_model=ResearchGapAnalysisResponse)
 async def get_latest_investigation_gaps(
     investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchGapAnalysisResponse:
     """Get the latest research gap analysis with coverage summary and gaps."""
-    await _verify_investigation_exists(investigation_id, session)
+    await _verify_investigation_exists(investigation_id, user, session, "read")
     latest = await gap_engine.get_latest_gap_analysis(session, investigation_id)
     if latest is None:
         # Generate on-demand if no analysis exists yet
@@ -67,10 +71,11 @@ async def get_latest_investigation_gaps(
 @router.get("/versions", response_model=list[ResearchGapVersionView])
 async def list_gap_analysis_versions(
     investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ResearchGapVersionView]:
     """List historical gap analysis versions for an investigation."""
-    await _verify_investigation_exists(investigation_id, session)
+    await _verify_investigation_exists(investigation_id, user, session, "read")
     return await gap_engine.list_gap_analysis_versions(session, investigation_id)
 
 
@@ -78,10 +83,11 @@ async def list_gap_analysis_versions(
 async def get_gap_analysis_version(
     investigation_id: uuid.UUID,
     version_or_id: str,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchGapAnalysisResponse:
     """Retrieve a specific gap analysis version by version number or analysis UUID."""
-    await _verify_investigation_exists(investigation_id, session)
+    await _verify_investigation_exists(investigation_id, user, session, "read")
     result = await gap_engine.get_gap_analysis_by_version_or_id(session, investigation_id, version_or_id)
     if result is None:
         raise BackendError(f"Gap analysis version '{version_or_id}' not found.", 404, "not_found")
@@ -96,10 +102,11 @@ async def list_gap_items(
     min_priority: float | None = Query(default=None),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
     """List individual research gap items with filtering and pagination."""
-    await _verify_investigation_exists(investigation_id, session)
+    await _verify_investigation_exists(investigation_id, user, session, "read")
     items, total = await gap_engine.list_gap_items(
         session=session,
         investigation_id=investigation_id,

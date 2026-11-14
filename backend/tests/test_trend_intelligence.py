@@ -120,8 +120,8 @@ async def test_trend_api_routes(db_session: AsyncSession):
     db_session.add_all([source, claim])
     await db_session.commit()
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    from tests.conftest import authed_async_client
+    async with authed_async_client() as client:
         # POST /research/trends/analyze
         post_res = await client.post("/api/v1/research/trends/analyze", json={})
         assert post_res.status_code == 200

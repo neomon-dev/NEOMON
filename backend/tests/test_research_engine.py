@@ -227,7 +227,8 @@ def test_refresh_source_persists_orm_document_and_enforces_investigation_scope()
 
     inv_id, other_id, src_id = asyncio.run(seed())
     try:
-        with TestClient(app) as client:
+        from tests.conftest import authed_client
+        with authed_client() as client:
             retrieved = RetrievedDocument(
                 url="https://example.org/paper",
                 final_url="https://example.org/paper.pdf",

@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.entailment_service import validate_evidence_claim_entailment_heuristic
 from app.analysis.quality_calibration_service import calibrate_investigation_quality
+from app.auth.dependencies import get_current_user
+from app.collaboration.permission_service import PermissionService, DEFAULT_GLOBAL_WORKSPACE_ID
 from app.db import get_session
 from app.errors import BackendError
 from app.models import (
@@ -21,6 +23,7 @@ from app.models import (
     Source,
     SourceCredibilityAssessment,
     SourceLineageRelationship,
+    User,
 )
 from app.research.source_credibility import evaluate_canonical_credibility
 from app.research.source_lineage import analyze_source_lineage
@@ -39,11 +42,24 @@ router = APIRouter(prefix="/research", tags=["quality_audit"])
 
 @router.get("/quality/audits", response_model=list[InvestigationQualityAuditItem])
 async def list_quality_audits(
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[InvestigationQualityAuditItem]:
-    """List research quality calibration status for all investigations."""
+    """List research quality calibration status for all investigations accessible to user."""
+    perm = PermissionService(session)
+    user_workspaces = await perm.get_user_workspaces(user.id)
+    if not user_workspaces:
+        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+
+    scope_cond = Investigation.workspace_id.in_(user_workspaces)
+    if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:
+        from sqlalchemy import or_
+        scope_cond = or_(scope_cond, Investigation.workspace_id.is_(None))
+
     inv_res = await session.execute(
-        select(Investigation).order_by(Investigation.updated_at.desc())
+        select(Investigation)
+        .where(scope_cond)
+        .order_by(Investigation.updated_at.desc())
     )
     invs = list(inv_res.scalars().all())
 
@@ -72,6 +88,7 @@ async def list_quality_audits(
         raw_score = cal.raw_score if cal else 0.0
         coverage_score = cal.coverage_score if cal else 0.0
         failure_penalty = cal.failure_penalty if cal else 0.0
+        op_comp = max(0.0, round(100.0 - (failure_penalty * 2.5), 1))
 
         items.append(
             InvestigationQualityAuditItem(
@@ -83,6 +100,9 @@ async def list_quality_audits(
                 raw_score=raw_score,
                 coverage_score=coverage_score,
                 failure_penalty=failure_penalty,
+                operational_completeness=op_comp,
+                research_coverage=coverage_score,
+                evidence_strength=calibrated_score,
                 source_count=src_count,
                 evidence_count=ev_count,
                 updated_at=inv.updated_at,
@@ -94,26 +114,26 @@ async def list_quality_audits(
 @router.post("/investigations/{investigation_id}/quality/calibrate", response_model=QualityCalibrationAuditView)
 async def calibrate_quality(
     investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> QualityCalibrationAuditView:
     """Trigger complete calibration of research quality for an investigation."""
-    inv = await session.get(Investigation, investigation_id)
-    if not inv:
-        raise BackendError(f"Investigation {investigation_id} not found", status_code=404)
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, investigation_id, "write")
 
     cal_dict = await calibrate_investigation_quality(session, investigation_id)
-    return await get_quality_audit(investigation_id, session)
+    return await get_quality_audit(investigation_id, user, session)
 
 
 @router.get("/investigations/{investigation_id}/quality/audit", response_model=QualityCalibrationAuditView)
 async def get_quality_audit(
     investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> QualityCalibrationAuditView:
     """Retrieve full calibrated research quality audit for an investigation."""
-    inv = await session.get(Investigation, investigation_id)
-    if not inv:
-        raise BackendError(f"Investigation {investigation_id} not found", status_code=404)
+    perm = PermissionService(session)
+    inv = await perm.check_investigation_access(user, investigation_id, "read")
 
     cal_res = await session.execute(
         select(ResearchQualityCalibration).where(
@@ -176,14 +196,21 @@ async def get_quality_audit(
         if cred.is_primary:
             primary_count += 1
 
+    op_comp = dim_breakdown.get("operational_completeness", max(0.0, round(100.0 - ((cal.failure_penalty if cal else 0.0) * 2.5), 1)))
+    cov_score = cal.coverage_score if cal else 0.0
+    ev_strength = cal.calibrated_score if cal else 0.0
+
     return QualityCalibrationAuditView(
         investigation_id=inv.id,
         investigation_question=inv.question,
         calibrated_tier=cal.calibrated_tier if cal else "Inconclusive",
         raw_score=cal.raw_score if cal else 0.0,
         calibrated_score=cal.calibrated_score if cal else 0.0,
-        coverage_score=cal.coverage_score if cal else 0.0,
+        coverage_score=cov_score,
         failure_penalty=cal.failure_penalty if cal else 0.0,
+        operational_completeness=float(op_comp),
+        research_coverage=float(cov_score),
+        evidence_strength=float(ev_strength),
         dimension_breakdown=dim_breakdown,
         calibration_reasons=reasons,
         verified_peer_reviewed_count=peer_count,
@@ -199,12 +226,12 @@ async def get_quality_audit(
 @router.get("/investigations/{investigation_id}/quality/lineage", response_model=SourceLineageOverviewResponse)
 async def get_source_lineage(
     investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> SourceLineageOverviewResponse:
     """Retrieve publication lineage analysis and explainable independent clusters."""
-    inv = await session.get(Investigation, investigation_id)
-    if not inv:
-        raise BackendError(f"Investigation {investigation_id} not found", status_code=404)
+    perm = PermissionService(session)
+    inv = await perm.check_investigation_access(user, investigation_id, "read")
 
     sources_res = await session.execute(
         select(Source).where(Source.investigation_id == investigation_id)
@@ -255,12 +282,12 @@ async def get_source_lineage(
 @router.get("/investigations/{investigation_id}/quality/validations", response_model=list[EvidenceClaimValidationView])
 async def get_entailment_validations(
     investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[EvidenceClaimValidationView]:
     """Retrieve evidence-to-claim entailment validations with correlation flags and missing steps."""
-    inv = await session.get(Investigation, investigation_id)
-    if not inv:
-        raise BackendError(f"Investigation {investigation_id} not found", status_code=404)
+    perm = PermissionService(session)
+    inv = await perm.check_investigation_access(user, investigation_id, "read")
 
     claims_res = await session.execute(
         select(Claim).where(Claim.investigation_id == investigation_id)
@@ -323,12 +350,12 @@ async def get_entailment_validations(
 @router.get("/investigations/{investigation_id}/quality/failures", response_model=list[ProviderFailureImpactView])
 async def get_provider_failures(
     investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ProviderFailureImpactView]:
     """Retrieve provider retrieval failures and their assessed impact severity."""
-    inv = await session.get(Investigation, investigation_id)
-    if not inv:
-        raise BackendError(f"Investigation {investigation_id} not found", status_code=404)
+    perm = PermissionService(session)
+    inv = await perm.check_investigation_access(user, investigation_id, "read")
 
     fails_res = await session.execute(
         select(ProviderFailureImpact).where(

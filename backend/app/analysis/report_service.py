@@ -96,6 +96,8 @@ def compute_evidence_strength(
 
     # 2. Source Quality (max 25 pts)
     # Assessed using granular source credibility rubric (peer_reviewed, preprint, institutional, etc.)
+    peer_count = 0
+    primary_count = 0
     if source_list:
         quality_scores = []
         for src in source_list:
@@ -113,10 +115,16 @@ def compute_evidence_strength(
                 authors=authors_data,
                 publication_date=src.publication_date,
             )
+            if cred.is_peer_reviewed:
+                peer_count += 1
+            if cred.is_primary:
+                primary_count += 1
             relevance = getattr(src, "relevance_score", 0.7) or 0.7
             quality_scores.append(cred.credibility_score * relevance)
         avg_quality = sum(quality_scores) / len(quality_scores)
         source_quality = round(avg_quality * 25.0, 1)
+        if peer_count == 0 and primary_count == 0:
+            source_quality = min(12.5, source_quality)
     else:
         source_quality = 0.0
 
@@ -135,8 +143,10 @@ def compute_evidence_strength(
         if not getattr(e, "traceable", True)
         or "[UNRESOLVED PROVENANCE]" in (getattr(e, "relevance_reason", "") or "")
     )
+    direct_support_count = 0
     if evidence:
-        supporting_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") in {"direct", "supporting"})
+        direct_support_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") in {"direct", "supporting"})
+        supporting_count = direct_support_count
         contradicting_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") in {"contradicting", "counter"})
         mitigating_count = sum(1 for e in evidence if getattr(e, "evidence_type", "") == "mitigating")
         limitation_count = sum(1 for e in evidence if "limitation" in getattr(e, "evidence_type", ""))
@@ -148,6 +158,9 @@ def compute_evidence_strength(
         # Severe penalty for unresolved provenance
         prov_penalty = min(6.0, unresolved_count * 2.0)
         methodological_rigor = round(max(0.0, min(15.0, base_rigor - prov_penalty)), 1)
+        # Strict empirical depth safeguard: zero direct proof caps methodological rigor
+        if direct_support_count == 0:
+            methodological_rigor = min(6.0, methodological_rigor)
     else:
         methodological_rigor = 0.0
 
@@ -186,10 +199,17 @@ def compute_evidence_strength(
     )
     total_score = max(0.0, min(100.0, total_score))
 
+    # Calibrated tier determination with Milestone 9.2 safeguards
     if total_score >= 85.0:
-        tier = "very_strong"
+        if direct_support_count < 2 or peer_count == 0:
+            tier = "strong" if direct_support_count >= 1 else "moderate"
+        else:
+            tier = "very_strong"
     elif total_score >= 70.0:
-        tier = "strong"
+        if direct_support_count == 0:
+            tier = "moderate"
+        else:
+            tier = "strong"
     elif total_score >= 50.0:
         tier = "moderate"
     elif total_score >= 30.0:
@@ -204,6 +224,10 @@ def compute_evidence_strength(
         f"Methodological Rigor ({methodological_rigor}/15): Evaluated {len(evidence)} evidence passage(s) with multi-perspective analysis.",
         f"Conflict Resolution ({conflict_resolution}/15): Adjudicated {len(decisions)}/{len(claims)} claim(s) across evidence tensions.",
     ]
+    if direct_support_count == 0:
+        reasons.append("Empirical Directness Alert: Zero direct empirical proof passages; findings rest on secondary commentary (tier capped to moderate).")
+    if peer_count == 0 and primary_count == 0:
+        reasons.append("Credibility Alert: Zero verified peer-reviewed publications or primary studies present.")
     if unresolved_count > 0:
         reasons.append(f"Provenance Alert: {unresolved_count} passage(s) flagged for unresolved provenance.")
 

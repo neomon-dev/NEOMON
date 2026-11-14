@@ -2,8 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { requestJson } from "@/lib/api";
+import {
+  createAnnotation,
+  listAnnotations,
+  EvidenceAnnotation,
+} from "@/lib/collaboration";
+import { useAuth } from "@/lib/auth-context";
 import {
   agentStatusBadgeClass,
   formatLabel,
@@ -52,6 +58,34 @@ export function EvidenceExplorer() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const { activeWorkspace } = useAuth();
+  const [annotations, setAnnotations] = useState<EvidenceAnnotation[]>([]);
+  const [showAnnotateForm, setShowAnnotateForm] = useState(false);
+  const [annotationType, setAnnotationType] = useState("methodological_concern");
+  const [annotationComment, setAnnotationComment] = useState("");
+  const [annotationRationale, setAnnotationRationale] = useState("");
+  const [savingAnnotation, setSavingAnnotation] = useState(false);
+
+  const loadItemAnnotations = useCallback(async (evId: string) => {
+    if (!evId) return;
+    try {
+      const data = await listAnnotations({
+        workspace_id: activeWorkspace?.id || "00000000000000000000000000000002",
+        evidence_id: evId,
+      });
+      setAnnotations(data);
+    } catch {
+      setAnnotations([]);
+    }
+  }, [activeWorkspace]);
+
+  useEffect(() => {
+    if (selectedId) {
+      loadItemAnnotations(selectedId);
+      setShowAnnotateForm(false);
+    }
+  }, [selectedId, loadItemAnnotations]);
 
   useEffect(() => {
     let active = true;
@@ -497,6 +531,162 @@ export function EvidenceExplorer() {
                     >
                       Agent runs
                     </Link>
+                    <button
+                      type="button"
+                      className="outline-button compact-button"
+                      style={{ color: "#38bdf8", borderColor: "#0284c7" }}
+                      onClick={() => setShowAnnotateForm((v) => !v)}
+                    >
+                      {showAnnotateForm ? "Close Annotation" : "✏️ Annotate Evidence"}
+                    </button>
+                  </div>
+
+                  {/* Collaborative Annotations Section */}
+                  <div style={{ marginTop: 16, borderTop: "1px solid #1e293b", paddingTop: 14 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <p className="eyebrow blue" style={{ margin: 0 }}>
+                        Peer Annotations ({annotations.length})
+                      </p>
+                    </div>
+
+                    {annotations.length > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+                        {annotations.map((ann) => (
+                          <div
+                            key={ann.id}
+                            style={{
+                              background: "#080e1a",
+                              border: "1px solid #1e293b",
+                              borderRadius: 6,
+                              padding: "8px 10px",
+                              fontSize: 12,
+                            }}
+                          >
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
+                              <span style={{ fontWeight: 600, color: "#38bdf8", textTransform: "uppercase", fontSize: 10 }}>
+                                {ann.annotation_type.replace("_", " ")}
+                              </span>
+                              <span className="muted" style={{ fontSize: 10 }}>
+                                {ann.author_name}
+                              </span>
+                            </div>
+                            <p style={{ margin: 0, color: "#cbd5e1" }}>{ann.comment}</p>
+                            {ann.reviewer_rationale && (
+                              <p className="muted" style={{ margin: "4px 0 0", fontSize: 11, fontStyle: "italic" }}>
+                                {ann.reviewer_rationale}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+                        No annotations recorded for this evidence passage yet.
+                      </p>
+                    )}
+
+                    {showAnnotateForm && (
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          if (!annotationComment.trim()) return;
+                          setSavingAnnotation(true);
+                          try {
+                            await createAnnotation({
+                              workspace_id: activeWorkspace?.id || "00000000000000000000000000000002",
+                              investigation_id: selected.investigation_id,
+                              evidence_id: selected.id,
+                              annotation_type: annotationType,
+                              comment: annotationComment.trim(),
+                              reviewer_rationale: annotationRationale.trim() || undefined,
+                            });
+                            setAnnotationComment("");
+                            setAnnotationRationale("");
+                            setShowAnnotateForm(false);
+                            await loadItemAnnotations(selected.id);
+                          } catch (err) {
+                            alert(err instanceof Error ? err.message : "Failed to save annotation.");
+                          } finally {
+                            setSavingAnnotation(false);
+                          }
+                        }}
+                        style={{
+                          background: "#080e1a",
+                          border: "1px solid #1e3a5f",
+                          borderRadius: 6,
+                          padding: 12,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 8,
+                        }}
+                      >
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#f8fafc" }}>
+                          Add Scientific Annotation
+                        </span>
+                        <div>
+                          <label style={{ display: "block", fontSize: 11, color: "#94a3b8", marginBottom: 2 }}>
+                            Annotation Type
+                          </label>
+                          <select
+                            value={annotationType}
+                            onChange={(e) => setAnnotationType(e.target.value)}
+                            style={{
+                              width: "100%",
+                              padding: "6px 8px",
+                              background: "#0f172a",
+                              border: "1px solid #1e293b",
+                              borderRadius: 4,
+                              color: "#f8fafc",
+                              fontSize: 12,
+                            }}
+                          >
+                            <option value="methodological_concern">Methodological Concern</option>
+                            <option value="credibility_concern">Credibility Concern</option>
+                            <option value="supporting">Supporting Observation</option>
+                            <option value="contradicting">Contradicting Note</option>
+                            <option value="citation_correction">Citation Correction</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: 11, color: "#94a3b8", marginBottom: 2 }}>
+                            Scientific Comment *
+                          </label>
+                          <textarea
+                            required
+                            rows={2}
+                            placeholder="Explain the methodological or credibility issue..."
+                            value={annotationComment}
+                            onChange={(e) => setAnnotationComment(e.target.value)}
+                            style={{
+                              width: "100%",
+                              padding: "6px 8px",
+                              background: "#0f172a",
+                              border: "1px solid #1e293b",
+                              borderRadius: 4,
+                              color: "#f8fafc",
+                              fontSize: 12,
+                            }}
+                          />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 4 }}>
+                          <button
+                            type="button"
+                            className="outline-button compact-button"
+                            onClick={() => setShowAnnotateForm(false)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={savingAnnotation}
+                            className="outline-button compact-button"
+                            style={{ background: "#2563eb", color: "#fff", borderColor: "#2563eb" }}
+                          >
+                            {savingAnnotation ? "Saving..." : "Save Annotation"}
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </div>
                 </aside>
               )}

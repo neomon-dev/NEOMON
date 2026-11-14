@@ -335,7 +335,8 @@ def test_workspace_evidence_sources_and_observatory_pagination_filters_and_isola
 
     asyncio.run(seed())
     try:
-        with TestClient(app) as client:
+        from tests.conftest import authed_client
+        with authed_client() as client:
             # 1. Evidence filtering, provenance, missing provenance handling, and isolation
             ev_resp = client.get(f"/api/v1/research/evidence?investigation_id={inv1_id}&limit=1&offset=0")
             assert ev_resp.status_code == 200

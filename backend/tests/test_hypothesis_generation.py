@@ -169,8 +169,8 @@ async def test_hypotheses_api_routes(db_session: AsyncSession):
     """Test API endpoints for hypotheses listing, generation, and status update."""
     inv = await _create_test_investigation(db_session, "How does distributed consensus scale?")
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    from tests.conftest import authed_async_client
+    async with authed_async_client() as client:
         # Generate
         gen_res = await client.post(
             f"/api/v1/research/investigations/{inv.id}/hypotheses/generate",

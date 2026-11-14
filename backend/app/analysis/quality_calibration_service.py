@@ -53,6 +53,16 @@ class DimensionBreakdown:
     calibrated_score: float  # 0 to 100
     calibrated_tier: str  # Very Strong, Strong, Moderate, Weak, Inconclusive
     reasons: list[str] = field(default_factory=list)
+    # Milestone 9.2: 3 decoupled quality dimensions & empirical metrics
+    operational_completeness: float = 100.0
+    research_coverage: float = 0.0
+    evidence_strength: float = 0.0
+    direct_support_count: int = 0
+    partial_support_count: int = 0
+    contextual_count: int = 0
+    contradiction_count: int = 0
+    verified_peer_reviewed_count: int = 0
+    effective_clusters: float = 0.0
 
 
 def calculate_calibrated_quality(
@@ -69,7 +79,7 @@ def calculate_calibrated_quality(
     # 1. Lineage & Independence Analysis (Max 20 pts)
     # ---------------------------------------------------------
     lineage_res = analyze_source_lineage(sources)
-    effective_clusters = lineage_res.effective_independent_count
+    effective_clusters = getattr(lineage_res, "weighted_independence_count", lineage_res.effective_independent_count) or lineage_res.effective_independent_count
     total_sources = len(sources)
 
     if total_sources == 0:
@@ -85,6 +95,15 @@ def calculate_calibrated_quality(
             calibrated_score=0.0,
             calibrated_tier="Inconclusive",
             reasons=["No research sources available to assess."],
+            operational_completeness=0.0,
+            research_coverage=0.0,
+            evidence_strength=0.0,
+            direct_support_count=0,
+            partial_support_count=0,
+            contextual_count=0,
+            contradiction_count=0,
+            verified_peer_reviewed_count=0,
+            effective_clusters=0.0,
         )
 
     # Base independence on true lineage clusters, not raw URL count
@@ -94,11 +113,12 @@ def calculate_calibrated_quality(
         deducted = min(10.0, (total_sources - effective_clusters) * 1.5)
         source_independence = max(3.0, source_independence - deducted)
         reasons.append(
-            f"Lineage analysis collapsed {total_sources} sources into {effective_clusters:.0f} independent clusters "
-            f"({lineage_res.independence_ratio:.0%} independence ratio). Independence score calibrated to {source_independence:.1f}/20."
+            f"Lineage analysis collapsed {total_sources} sources into {lineage_res.effective_independent_count:.0f} clusters "
+            f"({lineage_res.independence_ratio:.0%} independence ratio, effective weighted count: {effective_clusters:.1f}). "
+            f"Independence score calibrated to {source_independence:.1f}/20."
         )
     else:
-        reasons.append(f"Sources demonstrate full institutional and publication independence ({effective_clusters:.0f} distinct clusters).")
+        reasons.append(f"Sources demonstrate full institutional and publication independence ({effective_clusters:.1f} distinct clusters).")
 
     # ---------------------------------------------------------
     # 2. Canonical Source Credibility (Max 25 pts)
@@ -130,9 +150,14 @@ def calculate_calibrated_quality(
     avg_credibility = sum(e.credibility_score for e in cred_evals) / max(1, len(cred_evals))
     source_credibility = round(avg_credibility * 25.0, 1)
 
-    if verified_peer_reviewed_count == 0:
+    if verified_peer_reviewed_count == 0 and primary_source_count == 0:
+        source_credibility = min(12.5, source_credibility)
         reasons.append(
-            "Zero verified peer-reviewed publications identified. All sources are preprints, industry whitepapers, or secondary journalism."
+            "Source credibility capped at 12.5/25: zero verified peer-reviewed publications or primary studies present. Corpus consists of secondary reporting or unverified web articles."
+        )
+    elif verified_peer_reviewed_count == 0:
+        reasons.append(
+            "Zero verified peer-reviewed publications identified. Sources include primary industry/institutional materials or secondary journalism."
         )
     else:
         reasons.append(
@@ -143,6 +168,7 @@ def calculate_calibrated_quality(
     # 3. Empirical Depth & Entailment Validation (Max 25 pts)
     # ---------------------------------------------------------
     direct_support_count = 0
+    partial_support_count = 0
     contextual_count = 0
     contradiction_count = 0
     correlation_flaws = 0
@@ -164,6 +190,8 @@ def calculate_calibrated_quality(
         )
         if val.entailment_classification == EntailmentClassification.DIRECT_SUPPORT:
             direct_support_count += 1
+        elif val.entailment_classification == EntailmentClassification.PARTIAL_SUPPORT:
+            partial_support_count += 1
         elif val.entailment_classification == EntailmentClassification.CONTEXTUAL_SUPPORT:
             contextual_count += 1
         elif val.entailment_classification == EntailmentClassification.DIRECT_CONTRADICTION:
@@ -175,16 +203,34 @@ def calculate_calibrated_quality(
     total_evidence = len(evidence)
     if total_evidence > 0:
         direct_ratio = direct_support_count / total_evidence
+        partial_ratio = partial_support_count / total_evidence
         contextual_ratio = contextual_count / total_evidence
-        # Reward direct empirical proof significantly more than contextual background
-        empirical_depth = round(min(25.0, (direct_support_count * 5.0) + (contextual_count * 1.5)), 1)
+        
+        # Scoring: Direct (+4.0 max 20), Partial (+1.5 max 8), Contextual (+0.25 max 4)
+        raw_depth = min(25.0, (min(20.0, direct_support_count * 4.0) + min(8.0, partial_support_count * 1.5) + min(4.0, contextual_count * 0.25)))
+        
+        # STRICT SAFEGUARDS FOR EMPIRICAL DEPTH
+        if direct_support_count == 0 and partial_support_count == 0:
+            empirical_depth = min(5.0, raw_depth)
+            reasons.append(
+                "Empirical depth strictly capped at 5.0/25: zero direct empirical proof passages and zero partial mechanisms; investigation relies entirely on contextual commentary."
+            )
+        elif direct_support_count == 0 and partial_support_count > 0:
+            empirical_depth = min(10.0, raw_depth)
+            reasons.append(
+                f"Empirical depth capped at 10.0/25: zero direct empirical proof passages; {partial_support_count} partial mechanism passage(s) identified."
+            )
+        else:
+            empirical_depth = raw_depth
+
         if correlation_flaws > 0:
-            empirical_depth = max(3.0, empirical_depth - (correlation_flaws * 2.0))
+            empirical_depth = max(2.0, empirical_depth - (correlation_flaws * 1.5))
             reasons.append(
                 f"Flagged {correlation_flaws} evidence passage(s) conflating correlation with causation without mechanistic proof."
             )
         reasons.append(
-            f"Empirical depth calibrated: {direct_support_count} direct proof passage(s) ({direct_ratio:.0%}) and "
+            f"Empirical depth calibrated: {direct_support_count} direct proof passage(s) ({direct_ratio:.0%}), "
+            f"{partial_support_count} partial mechanism passage(s) ({partial_ratio:.0%}), and "
             f"{contextual_count} contextual background passage(s) ({contextual_ratio:.0%})."
         )
     else:
@@ -269,41 +315,74 @@ def calculate_calibrated_quality(
     )
     calibrated_score = max(0.0, round(raw_score - failure_penalty, 1))
 
-    # TIER DETERMINATION WITH STRICT CALIBRATION BOUNDARIES
+    # 3 Distinct Quality Dimensions (Milestone 9.2 Decoupling)
+    operational_completeness = max(0.0, round(100.0 - (failure_penalty * 2.5), 1))
+    research_coverage = coverage_score
+    evidence_strength = calibrated_score
+
+    # TIER DETERMINATION WITH STRICT SCIENTIFIC CALIBRATION BOUNDARIES
     tier = "Moderate"
 
     if calibrated_score >= 85.0:
         # Very Strong requirements:
         # 1. Calibrated score >= 85
         # 2. Coverage score >= 80%
-        # 3. Verified peer review >= 1 OR authoritative institutional >= 1
-        # 4. Zero critical retrieval failures
+        # 3. Direct proof >= 2
+        # 4. Verified peer review >= 1
+        # 5. Zero critical retrieval failures
+        # 6. Zero unaddressed contradictions
         if coverage_score < 80.0:
             tier = "Strong"
             reasons.append(
-                f"Score capped from 'Very Strong' to 'Strong' due to sub-threshold research coverage ({coverage_score:.1f}% < 80%)."
+                f"Quality tier capped from 'Very Strong' to 'Strong' due to sub-threshold research coverage ({coverage_score:.1f}% < 80%)."
             )
-        elif verified_peer_reviewed_count == 0 and primary_source_count == 0:
+        elif direct_support_count < 2:
+            tier = "Strong"
+            reasons.append(
+                f"Quality tier capped from 'Very Strong' to 'Strong': requires at least 2 direct empirical proof passages (found {direct_support_count})."
+            )
+        elif verified_peer_reviewed_count == 0:
             tier = "Moderate"
             reasons.append(
-                "Score capped from 'Very Strong' to 'Moderate' due to absence of verified peer-reviewed publications or primary studies."
+                "Quality tier capped from 'Very Strong' to 'Moderate' due to absence of verified peer-reviewed publications."
             )
         elif critical_failures_count > 0:
             tier = "Moderate"
             reasons.append(
-                f"Score capped to 'Moderate' due to {critical_failures_count} unresolved critical retrieval failure(s)."
+                f"Quality tier capped to 'Moderate' due to {critical_failures_count} unresolved critical retrieval failure(s)."
+            )
+        elif contradiction_count > 0:
+            tier = "Moderate"
+            reasons.append(
+                f"Quality tier capped to 'Moderate' due to {contradiction_count} active unadjudicated contradiction(s)."
             )
         else:
             tier = "Very Strong"
     elif calibrated_score >= 70.0:
-        if coverage_score < 65.0:
+        # Strong requirements:
+        # 1. Calibrated score >= 70
+        # 2. Coverage score >= 60%
+        # 3. Direct proof >= 1 OR (partial_support >= 2 AND verified_peer_reviewed >= 1)
+        # 4. Zero critical failures
+        # 5. Zero unaddressed contradictions
+        if direct_support_count == 0 and not (partial_support_count >= 2 and verified_peer_reviewed_count >= 1):
             tier = "Moderate"
             reasons.append(
-                f"Score capped from 'Strong' to 'Moderate' due to insufficient research coverage ({coverage_score:.1f}% < 65%)."
+                "Quality tier capped to 'Moderate': corpus contains zero direct empirical proof passages; findings rest on secondary contextual reporting."
+            )
+        elif coverage_score < 60.0:
+            tier = "Moderate"
+            reasons.append(
+                f"Quality tier capped from 'Strong' to 'Moderate' due to insufficient research coverage ({coverage_score:.1f}% < 60%)."
             )
         elif critical_failures_count > 0:
             tier = "Moderate"
-            reasons.append("Score capped to 'Moderate' due to critical retrieval failures.")
+            reasons.append("Quality tier capped to 'Moderate' due to critical retrieval failures.")
+        elif contradiction_count > 0:
+            tier = "Moderate"
+            reasons.append(
+                f"Quality tier capped to 'Moderate' due to {contradiction_count} active contradiction(s)."
+            )
         else:
             tier = "Strong"
     elif calibrated_score >= 50.0:
@@ -325,6 +404,15 @@ def calculate_calibrated_quality(
         calibrated_score=calibrated_score,
         calibrated_tier=tier,
         reasons=reasons,
+        operational_completeness=operational_completeness,
+        research_coverage=research_coverage,
+        evidence_strength=evidence_strength,
+        direct_support_count=direct_support_count,
+        partial_support_count=partial_support_count,
+        contextual_count=contextual_count,
+        contradiction_count=contradiction_count,
+        verified_peer_reviewed_count=verified_peer_reviewed_count,
+        effective_clusters=effective_clusters,
     )
 
 
@@ -437,6 +525,16 @@ async def calibrate_investigation_quality(
         "source_independence": breakdown.source_independence,
         "coverage_score": breakdown.coverage_score,
         "failure_penalty": breakdown.failure_penalty,
+        # Milestone 9.2: 3 decoupled dimensions & empirical metrics
+        "operational_completeness": breakdown.operational_completeness,
+        "research_coverage": breakdown.research_coverage,
+        "evidence_strength": breakdown.evidence_strength,
+        "direct_support_count": breakdown.direct_support_count,
+        "partial_support_count": breakdown.partial_support_count,
+        "contextual_count": breakdown.contextual_count,
+        "contradiction_count": breakdown.contradiction_count,
+        "verified_peer_reviewed_count": breakdown.verified_peer_reviewed_count,
+        "effective_clusters": breakdown.effective_clusters,
     }
 
     if existing_cal:
@@ -473,6 +571,9 @@ async def calibrate_investigation_quality(
         "calibrated_tier": breakdown.calibrated_tier,
         "coverage_score": breakdown.coverage_score,
         "failure_penalty": breakdown.failure_penalty,
+        "operational_completeness": breakdown.operational_completeness,
+        "research_coverage": breakdown.research_coverage,
+        "evidence_strength": breakdown.evidence_strength,
         "dimension_breakdown": dim_breakdown,
         "reasons": breakdown.reasons,
     }

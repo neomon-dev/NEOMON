@@ -44,7 +44,7 @@ _VERIFIED_JOURNAL_PUBLISHERS = {
     "oxford university press", "cambridge university press", "plos",
     "cell press", "frontiers", "pnas", "taylor & francis", "sage",
     "iop publishing", "royal society of chemistry", "american chemical society",
-    "american physical society", "biorxiv", "medrxiv"
+    "american physical society"
 }
 
 _VERIFIED_JOURNAL_HOSTS = {

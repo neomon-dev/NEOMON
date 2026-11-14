@@ -38,6 +38,44 @@ class Settings(BaseSettings):
     remote_provider_max_concurrency: int = Field(default=4, ge=1, le=20)
     provider_retry_count: int = Field(default=2, ge=0, le=5)
 
+    # Production Database Configuration
+    database_pool_size: int = Field(default=10, ge=1, le=50)
+    database_max_overflow: int = Field(default=20, ge=0, le=50)
+    database_pool_timeout: float = Field(default=30.0, gt=0, le=120)
+    database_pool_recycle: int = Field(default=1800, ge=60, le=7200)
+    database_pool_pre_ping: bool = True
+
+    # Redis and Caching
+    redis_url: str | None = None
+    cache_default_ttl_seconds: int = Field(default=300, ge=1, le=86400)
+
+    # Background Job Worker
+    worker_enabled: bool = True
+    worker_concurrency: int = Field(default=4, ge=1, le=16)
+    worker_poll_interval_seconds: float = Field(default=1.0, gt=0.1, le=10.0)
+    worker_graceful_shutdown_timeout: float = Field(default=15.0, gt=1.0, le=60.0)
+    job_heartbeat_timeout_seconds: int = Field(default=120, ge=30, le=600)
+
+    @property
+    def worker_poll_interval(self) -> float:
+        return self.worker_poll_interval_seconds
+
+    @property
+    def rate_limit_general_rpm(self) -> int:
+        return self.rate_limit_default_rpm
+
+    # Rate Limiting
+    rate_limit_enabled: bool = True
+    rate_limit_auth_rpm: int = Field(default=10, ge=1, le=120)
+    rate_limit_research_rpm: int = Field(default=30, ge=1, le=300)
+    rate_limit_export_rpm: int = Field(default=20, ge=1, le=200)
+    rate_limit_default_rpm: int = Field(default=120, ge=1, le=1000)
+    trusted_proxies: list[str] = Field(default_factory=lambda: ["127.0.0.1", "::1"])
+
+    # Observability & Logging
+    log_level: str = "INFO"
+    log_format: str = "auto"  # "auto", "json", "human"
+
     # Tavily Search Provider Configuration
     tavily_api_key: str | None = None
     tavily_enabled: bool = True
@@ -60,7 +98,7 @@ class Settings(BaseSettings):
         # Fall back to standard TAVILY_API_KEY if NEOMON_ prefix was not provided
         return os.environ.get("TAVILY_API_KEY") or None
 
-    @field_validator("allowed_origins", "allowed_local_provider_hosts", "tavily_include_domains", "tavily_exclude_domains", mode="before")
+    @field_validator("allowed_origins", "allowed_local_provider_hosts", "tavily_include_domains", "tavily_exclude_domains", "trusted_proxies", mode="before")
     @classmethod
     def parse_allowed_origins(cls, value: object) -> object:
         if isinstance(value, str):
@@ -71,3 +109,7 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+settings = get_settings()
+

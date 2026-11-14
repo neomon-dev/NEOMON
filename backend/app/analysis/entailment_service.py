@@ -16,11 +16,13 @@ from typing import Any
 
 class EntailmentClassification(StrEnum):
     DIRECT_SUPPORT = "direct_support"
+    PARTIAL_SUPPORT = "partial_support"
     CONTEXTUAL_SUPPORT = "contextual_support"
     DIRECT_CONTRADICTION = "direct_contradiction"
     MITIGATING = "mitigating"
     METHODOLOGICAL_LIMITATION = "methodological_limitation"
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    UNVERIFIED_RELATIONSHIP = "unverified_relationship"
 
 
 @dataclass
@@ -39,8 +41,8 @@ class EntailmentValidationResult:
 
 # Causal mechanism phrases indicating direct causal assertion
 _CAUSAL_PHRASES = {
-    "causes", "caused by", "leads to", "leading to", "results in", "resulting in",
-    "drives", "driven by", "produces", "triggering", "triggers", "directly responsible",
+    "causes", "caused", "caused by", "leads to", "led to", "leading to", "results in", "resulted in", "resulting in",
+    "drives", "drove", "driven by", "produces", "produced", "triggering", "triggers", "triggered", "directly responsible",
     "attributable to", "because of", "explains why", "demonstrates that", "proves that"
 }
 
@@ -68,6 +70,25 @@ _LIMITATION_PHRASES = {
 _MITIGATING_PHRASES = {
     "partially mitigated", "mitigated by", "offset by", "compensated for", "adaptive response",
     "secondary adjustment", "cushioned by", "temporary effect", "dampened"
+}
+
+# Study intent / thesis statement phrases that describe objectives or framing rather than results
+_STUDY_INTENT_PHRASES = {
+    "aims to", "aimed to", "aim of this study", "aim of this paper", "purpose of this study",
+    "purpose of this paper", "purpose of this thesis", "objective was to", "objective is to",
+    "this paper explores", "this thesis explores", "this study examines", "this paper examines",
+    "we investigate whether", "we investigate the", "we explore the", "we examine the",
+    "sought to analyze", "sought to investigate", "hypothesized that", "focuses on whether",
+    "intended to assess", "this chapter describes", "this thesis investigates",
+}
+
+# Empirical findings phrases that denote proven results, data, or verified findings
+_FINDINGS_PHRASES = {
+    "found that", "demonstrates that", "showed that", "results show", "results indicate",
+    "empirical data reveals", "empirical data shows", "data reveals", "data shows",
+    "statistically significant", "statistically demonstrated", "empirically confirmed",
+    "observed a significant", "concluded that", "measurements confirmed", "measurements show",
+    "empirical measurements show", "experimental results show", "findings demonstrate", "analysis confirms",
 }
 
 
@@ -202,8 +223,27 @@ def validate_evidence_claim_entailment_heuristic(
             validation_method="deterministic_heuristic",
         )
 
+    # Study Intent vs Findings Flagging (Milestone 9.2: study objectives must not count as direct proof)
+    has_study_intent = any(sip in full_text for sip in _STUDY_INTENT_PHRASES)
+    has_findings = any(fp in full_text for fp in _FINDINGS_PHRASES)
+
+    if has_study_intent and not has_findings:
+        return EntailmentValidationResult(
+            claim_id=claim_id,
+            evidence_id=evidence_id,
+            entailment_classification=EntailmentClassification.CONTEXTUAL_SUPPORT,
+            entailment_strength=0.45,
+            explanation="Passage articulates study intent, hypothesis, or research framing; does not constitute empirical proof of the conclusion.",
+            missing_inferential_steps=[
+                "Passage describes the study's stated objective or thesis statement rather than verified findings or empirical data."
+            ],
+            correlation_vs_causation_flag=False,
+            validation_method="deterministic_heuristic",
+        )
+
     # Contextual vs Direct Support (Benchmark A & B problem)
-    if has_causal and overlap_ratio >= 0.40:
+    # Direct support requires demonstrable causal mechanism OR explicit empirical findings and high overlap
+    if (has_causal or has_findings) and overlap_ratio >= 0.45:
         return EntailmentValidationResult(
             claim_id=claim_id,
             evidence_id=evidence_id,
@@ -211,6 +251,21 @@ def validate_evidence_claim_entailment_heuristic(
             entailment_strength=0.88,
             explanation="Evidence articulates direct empirical support and demonstrable mechanism directly substantiating the claim.",
             missing_inferential_steps=[],
+            correlation_vs_causation_flag=False,
+            validation_method="deterministic_heuristic",
+        )
+
+    # Partial Support: establishes partial mechanism or sub-claim with moderate overlap
+    if (has_causal or has_findings) and overlap_ratio >= 0.28:
+        return EntailmentValidationResult(
+            claim_id=claim_id,
+            evidence_id=evidence_id,
+            entailment_classification=EntailmentClassification.PARTIAL_SUPPORT,
+            entailment_strength=0.72,
+            explanation="Evidence establishes partial empirical support or an intermediate step, but does not fully entail the complete causal assertion.",
+            missing_inferential_steps=[
+                "Substantiates an intermediate step or entity relation; full causal conclusion requires supplementary empirical confirmation."
+            ],
             correlation_vs_causation_flag=False,
             validation_method="deterministic_heuristic",
         )

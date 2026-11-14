@@ -13,6 +13,9 @@ export type InvestigationQualityAuditItem = {
   raw_score: number;
   coverage_score: number;
   failure_penalty: number;
+  operational_completeness?: number;
+  research_coverage?: number;
+  evidence_strength?: number;
   source_count: number;
   evidence_count: number;
   updated_at?: string | null;
@@ -26,7 +29,10 @@ export type QualityCalibrationAuditView = {
   calibrated_score: number;
   coverage_score: number;
   failure_penalty: number;
-  dimension_breakdown: Record<string, number>;
+  operational_completeness?: number;
+  research_coverage?: number;
+  evidence_strength?: number;
+  dimension_breakdown: Record<string, any>;
   calibration_reasons: string[];
   verified_peer_reviewed_count: number;
   primary_source_count: number;
@@ -281,6 +287,73 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
         </div>
       </div>
 
+      {/* Decoupled Scientific Dimensions Banner (Milestone 9.2) */}
+      {audit && (
+        <div className="rounded-xl border border-border/80 bg-surface/60 p-5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+              <span>⚖️</span> Three Decoupled Quality Dimensions
+            </h2>
+            <span className="text-xs text-slate-400">
+              Operational completion and question coverage are strictly separated from evidence strength
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
+            {/* Dimension A: Operational Completeness */}
+            <div className="rounded-lg bg-surface-muted/60 border border-border/60 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-300">Dimension A: Operational Completeness</span>
+                <span className="text-xs text-slate-400">Execution</span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-white">
+                  {(audit.operational_completeness ?? Math.max(0, 100 - audit.failure_penalty * 2.5)).toFixed(1)}%
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-slate-400">
+                Execution of planned search, retrieval, and analysis actions (penalized for provider dropouts).
+              </p>
+            </div>
+
+            {/* Dimension B: Research Coverage */}
+            <div className="rounded-lg bg-surface-muted/60 border border-border/60 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-cyan-300">Dimension B: Research Coverage</span>
+                <span className="text-xs text-slate-400">Breadth</span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-cyan-400">
+                  {(audit.research_coverage ?? audit.coverage_score).toFixed(1)}%
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-slate-400">
+                Coverage of atomic research claims and full-text document acquisition rate.
+              </p>
+            </div>
+
+            {/* Dimension C: Evidence Strength */}
+            <div className="rounded-lg bg-surface-muted/60 border border-border/60 p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-indigo-300">Dimension C: Evidence Strength</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-bold border ${tierColor(audit.calibrated_tier)}`}>
+                  {audit.calibrated_tier}
+                </span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="text-2xl font-bold text-white">
+                  {(audit.evidence_strength ?? audit.calibrated_score).toFixed(1)}
+                </span>
+                <span className="text-xs text-slate-400">/ 100</span>
+              </div>
+              <p className="mt-1.5 text-xs text-slate-400">
+                Direct empirical proof, verified peer review, and true publication independence.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards */}
       {audit && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -441,6 +514,41 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
                   );
                 })}
               </div>
+
+              {/* Empirical Proof Breakdown (Milestone 9.2) */}
+              {audit.dimension_breakdown && (
+                <div className="mt-4 pt-3 border-t border-border/40 space-y-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    Empirical Entailment Distribution
+                  </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="p-2 rounded bg-surface-muted/40 border border-border/40">
+                      <div className="text-[10px] text-slate-400 uppercase font-medium">Direct Proof</div>
+                      <div className="text-base font-bold text-emerald-400 mt-0.5">
+                        {audit.dimension_breakdown.direct_support_count ?? 0}
+                      </div>
+                    </div>
+                    <div className="p-2 rounded bg-surface-muted/40 border border-border/40">
+                      <div className="text-[10px] text-slate-400 uppercase font-medium">Partial Mechanism</div>
+                      <div className="text-base font-bold text-cyan-400 mt-0.5">
+                        {audit.dimension_breakdown.partial_support_count ?? 0}
+                      </div>
+                    </div>
+                    <div className="p-2 rounded bg-surface-muted/40 border border-border/40">
+                      <div className="text-[10px] text-slate-400 uppercase font-medium">Contextual</div>
+                      <div className="text-base font-bold text-amber-400 mt-0.5">
+                        {audit.dimension_breakdown.contextual_count ?? 0}
+                      </div>
+                    </div>
+                    <div className="p-2 rounded bg-surface-muted/40 border border-border/40">
+                      <div className="text-[10px] text-slate-400 uppercase font-medium">Contradictions</div>
+                      <div className="text-base font-bold text-rose-400 mt-0.5">
+                        {audit.dimension_breakdown.contradiction_count ?? 0}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {audit.failure_penalty > 0 && (
                 <div className="mt-4 pt-3 border-t border-border/40 flex justify-between items-center text-xs">

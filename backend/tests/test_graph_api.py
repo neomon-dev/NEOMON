@@ -353,7 +353,8 @@ def test_knowledge_graph_endpoints_nodes_edges_filters_and_isolation():
 
     asyncio.run(seed())
     try:
-        with TestClient(app) as client:
+        from tests.conftest import authed_client
+        with authed_client() as client:
             # 1. Full investigation graph retrieval
             resp = client.get(f"/api/v1/research/investigations/{inv1_id}/graph?expand_all=true")
             assert resp.status_code == 200

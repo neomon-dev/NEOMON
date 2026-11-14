@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth.dependencies import get_current_user
 from app.config import get_settings
 from app.errors import BackendError
+from app.models import User
 from app.providers import create_provider
 from app.providers.base import ProviderRequestError, validate_provider_endpoint
 from app.research.providers import TavilyProvider
@@ -18,7 +20,10 @@ router = APIRouter(prefix="/providers", tags=["providers"])
 
 
 @router.post("/test", response_model=ProviderStatus)
-async def test_provider(config: ProviderConfigRequest) -> ProviderStatus:
+async def test_provider(
+    config: ProviderConfigRequest,
+    user: User = Depends(get_current_user),
+) -> ProviderStatus:
     try:
         await validate_provider_endpoint(
             config.endpoint,
@@ -35,7 +40,10 @@ async def test_provider(config: ProviderConfigRequest) -> ProviderStatus:
 
 
 @router.post("/tavily/test", response_model=TavilyTestResponse)
-async def test_tavily(request: TavilyTestRequest) -> TavilyTestResponse:
+async def test_tavily(
+    request: TavilyTestRequest,
+    user: User = Depends(get_current_user),
+) -> TavilyTestResponse:
     provider = TavilyProvider(api_key=request.api_key, search_depth=request.search_depth)
     try:
         result = await provider.test_connection(api_key=request.api_key, search_depth=request.search_depth)
@@ -45,7 +53,9 @@ async def test_tavily(request: TavilyTestRequest) -> TavilyTestResponse:
 
 
 @router.get("/tavily/status", response_model=TavilyStatusResponse)
-async def get_tavily_status() -> TavilyStatusResponse:
+async def get_tavily_status(
+    user: User = Depends(get_current_user),
+) -> TavilyStatusResponse:
     settings = get_settings()
     return TavilyStatusResponse(
         provider="tavily",

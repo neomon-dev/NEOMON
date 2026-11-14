@@ -418,7 +418,8 @@ def test_analysis_api_claims_arguments_rerun_and_cancel_endpoints():
 
     inv_id = asyncio.run(seed())
     try:
-        with TestClient(app) as client:
+        from tests.conftest import authed_client
+        with authed_client() as client:
             with patch("app.analysis.manager.AnalysisManager.schedule"):
                 start_resp = client.post(
                     f"/api/v1/research/investigations/{inv_id}/analysis",
@@ -497,7 +498,8 @@ def test_duplicate_analysis_start_returns_409_conflict():
 
     inv_id = asyncio.run(seed())
     try:
-        with TestClient(app) as client:
+        from tests.conftest import authed_client
+        with authed_client() as client:
             conflict = client.post(
                 f"/api/v1/research/investigations/{inv_id}/analysis",
                 json={"max_debate_rounds": 2, "max_concurrent_agents": 2},

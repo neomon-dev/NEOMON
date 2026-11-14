@@ -29,7 +29,12 @@ function loadTsModule(relPath, mocks = {}) {
     if (specifier.startsWith("@/")) {
       const target = specifier.slice(2);
       if (target in mocks) return mocks[target];
-      return loadTsModule(`${target}.ts`, mocks);
+      const targetPath = fs.existsSync(path.join(rootDir, `${target}.tsx`))
+        ? `${target}.tsx`
+        : fs.existsSync(path.join(rootDir, `${target}.ts`))
+        ? `${target}.ts`
+        : `${target}.ts`;
+      return loadTsModule(targetPath, mocks);
     }
     if (specifier === "react" || specifier.startsWith("react/")) {
       return require(specifier);
@@ -102,6 +107,7 @@ test("EvidenceExplorer, SourceIntelligence, and AgentObservatory render loading 
     "lib/api": { requestJson: () => new Promise(() => {}) },
     "@/lib/workspace": workspaceHelpers,
     "lib/workspace": workspaceHelpers,
+    "@/lib/auth-context": { useAuth: () => ({ user: null, activeWorkspace: null, workspaces: [] }) },
   };
 
   const { EvidenceExplorer } = loadTsModule("components/evidence-explorer.tsx", commonMocks);

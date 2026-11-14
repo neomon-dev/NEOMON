@@ -1,0 +1,127 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: neomon-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-neomon}
+      POSTGRES_USER: ${POSTGRES_USER:-neomon}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-neomon_secure_password_change_in_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-neomon} -d ${POSTGRES_DB:-neomon}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neomon-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: neomon-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neomon-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: neomon-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NEOMON_ENVIRONMENT: production
+      NEOMON_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-neomon}:${POSTGRES_PASSWORD:-neomon_secure_password_change_in_production}@postgres:5432/${POSTGRES_DB:-neomon}
+      NEOMON_REDIS_URL: redis://redis:6379/0
+      NEOMON_LOG_FORMAT: json
+      NEOMON_LOG_LEVEL: info
+      NEOMON_WORKER_ENABLED: "false" # Dedicated worker container handles jobs
+      NEOMON_ALLOWED_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000","http://frontend:3000"]'
+    ports:
+      - "8000:8000"
+    volumes:
+      - neomon_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neomon-network
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: neomon-worker
+    restart: unless-stopped
+    command: ["python", "-c", "import asyncio; from app.jobs.worker import worker_service; asyncio.run(worker_service.start()); import time; time.sleep(86400*365)"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    environment:
+      NEOMON_ENVIRONMENT: production
+      NEOMON_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-neomon}:${POSTGRES_PASSWORD:-neomon_secure_password_change_in_production}@postgres:5432/${POSTGRES_DB:-neomon}
+      NEOMON_REDIS_URL: redis://redis:6379/0
+      NEOMON_LOG_FORMAT: json
+      NEOMON_WORKER_CONCURRENCY: 4
+    volumes:
+      - neomon_storage:/app/storage
+    networks:
+      - neomon-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: neomon-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_APP_NAME: NEOMON
+      NEXT_PUBLIC_API_URL: http://backend:8000/api/v1
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - neomon-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  neomon_storage:
+
+networks:
+  neomon-network:
+    driver: bridge

@@ -17,6 +17,9 @@ from app.analysis.export_service import (
 )
 from app.analysis.report_service import compute_evidence_strength
 from app.analysis.service import compute_analysis_coverage
+from app.auth.dependencies import get_current_user
+from app.auth.rate_limiter import rate_limit_export
+from app.collaboration.permission_service import PermissionService
 from app.db import get_session
 from app.errors import BackendError
 from app.models import (
@@ -32,12 +35,20 @@ from app.models import (
     ReportSection,
     ResearchReport,
     Source,
+    User,
 )
 
-router = APIRouter(prefix="/research/investigations/{investigation_id}/export", tags=["export"])
+router = APIRouter(
+    prefix="/research/investigations/{investigation_id}/export",
+    tags=["export"],
+    dependencies=[Depends(rate_limit_export())],
+)
 
 
-async def _load_investigation_bundle(session: AsyncSession, investigation_id: uuid.UUID):
+async def _load_investigation_bundle(session: AsyncSession, investigation_id: uuid.UUID, user: User):
+    perm = PermissionService(session)
+    await perm.check_investigation_access(user, investigation_id, "read")
+
     inv = await session.get(Investigation, investigation_id)
     if inv is None:
         raise BackendError("Investigation not found.", 404, "not_found")
@@ -93,9 +104,11 @@ async def _load_investigation_bundle(session: AsyncSession, investigation_id: uu
 
 @router.get("/manifest")
 async def get_export_manifest(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    bundle = await _load_investigation_bundle(session, investigation_id)
+    bundle = await _load_investigation_bundle(session, investigation_id, user)
     inv = bundle["investigation"]
     base_path = f"/api/v1/research/investigations/{investigation_id}/export"
     return {
@@ -172,9 +185,11 @@ async def get_export_manifest(
 
 @router.get("/markdown")
 async def export_markdown_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     md = generate_markdown_export(
         b["investigation"],
         b["job"],
@@ -196,9 +211,11 @@ async def export_markdown_endpoint(
 
 @router.get("/pdf")
 async def export_pdf_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     pdf_bytes = generate_pdf_export(
         b["investigation"],
         b["report"],
@@ -215,9 +232,11 @@ async def export_pdf_endpoint(
 
 @router.get("/json")
 async def export_json_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     data = generate_structured_json_export(
         b["investigation"],
         b["job"],
@@ -243,9 +262,11 @@ async def export_json_endpoint(
 
 @router.get("/html-graph")
 async def export_html_graph_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     html_str = generate_standalone_html_graph(
         b["investigation"],
         b["claims"],
@@ -263,9 +284,11 @@ async def export_html_graph_endpoint(
 
 @router.get("/svg")
 async def export_svg_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     svg_str = generate_svg_graph_export(
         b["investigation"],
         b["claims"],
@@ -282,9 +305,11 @@ async def export_svg_endpoint(
 
 @router.get("/json-ld")
 async def export_json_ld_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     ld_data = generate_json_ld_export(
         b["investigation"],
         b["report"],
@@ -303,9 +328,11 @@ async def export_json_ld_endpoint(
 
 @router.get("/evidence-csv")
 async def export_evidence_csv_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     csv_str = generate_evidence_csv(
         b["claims"],
         b["sources"],
@@ -321,9 +348,11 @@ async def export_evidence_csv_endpoint(
 
 @router.get("/sources-csv")
 async def export_sources_csv_endpoint(
-    investigation_id: uuid.UUID, session: AsyncSession = Depends(get_session)
+    investigation_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
 ):
-    b = await _load_investigation_bundle(session, investigation_id)
+    b = await _load_investigation_bundle(session, investigation_id, user)
     csv_str = generate_sources_csv(b["sources"])
     filename = f"neomon-sources-{investigation_id}.csv"
     return Response(

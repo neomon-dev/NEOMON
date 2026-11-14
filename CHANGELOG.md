@@ -66,3 +66,13 @@
   - 8G.4 & 8G.5: Calibrated 5-Dimension Evidence Strength Scoring and Provider Retrieval Failure Impact Penalties (enforces coverage thresholds and failure deductions; resolves NVIDIA and RAM shortages regression benchmarks).
   - 8G.6: Scientific Quality Audit Workspace (`/quality-audit`) with 5 KPI summary cards, 5D breakdown, lineage explorer, entailment matrix, and failure impact log.
   - 8G.7: Calibrated research quality integration across all 9 export formats (Markdown, PDF, JSON, HTML graph, SVG, JSON-LD, Evidence CSV, Sources CSV, Manifest).
+- Added Milestone 9 (Autonomous Research Workflow Engine):
+  - 9A: Persistent 15-state machine and orchestration engine (`AutonomousWorkflowService`) with background execution, pause/resume, and validated transitions.
+  - 9B: Intelligent deterministic-first research planning (`research_planner.py`) generating prioritized actions across unsupported claims, active contradictions, and critical gaps.
+  - 9C: Adaptive query refinement (`adaptive_query_service.py`) with token overlap / Jaccard similarity deduplication, provider-tailored syntax, and deliberate counter-evidence probes.
+  - 9D: Iterative multi-cycle research execution (`research_cycle_service.py`) routing newly acquired literature through canonical 8G validation and tracking mathematical information gain.
+  - 9E & 9F: Budget constraint management and scientific stopping criteria (`research_stopping_service.py`) distinguishing operational limits from evidence saturation and persistent uncertainty.
+  - 9G: Human oversight and autonomy modes (`assisted`, `supervised`, `bounded`) with human review queue and one-click action approval/rejection.
+  - 9H: Durable execution and startup crash recovery via Alembic migration `20261114_0012` and automated lifespan recovery checkpoints.
+  - 9I: Autonomous Research Workspace (`/autonomous`) with KPI overview, creation modal, live monitor, review queue, and synthesized final report viewer.
+  - 9J: Knowledge graph integration with `autonomous_workflow`, `research_cycle`, and `research_action` nodes and grounded edges.

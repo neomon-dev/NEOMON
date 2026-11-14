@@ -177,6 +177,9 @@ def test_csv_datasets_export():
     assert "10.1007/1" in src_csv
 
 
+from tests.conftest import authed_client
+
+
 def test_export_endpoints_via_test_client():
     inv_id = uuid.uuid4()
     job_id = uuid.uuid4()
@@ -195,7 +198,7 @@ def test_export_endpoints_via_test_client():
     asyncio.run(seed())
 
     try:
-        with TestClient(app) as client:
+        with authed_client() as client:
             base = f"/api/v1/research/investigations/{inv_id}/export"
 
             # 1. Manifest

@@ -93,6 +93,19 @@
 - [x] 8G.7: Calibrated research quality integration across all 9 export formats (Markdown, PDF, JSON, HTML graph, SVG, JSON-LD, Evidence CSV, Sources CSV, Manifest).
 - [x] Resolve Regression Benchmark A (NVIDIA) and Regression Benchmark B (RAM shortages).
 
+## Milestone 9 completed — Autonomous Research Workflow Engine
+
+- [x] 9A: Persistent 15-State Machine & Orchestration (`AutonomousWorkflowService`) with background execution and validated transitions.
+- [x] 9B: Intelligent Research Planning (`research_planner.py`) constructing deterministic, prioritized actions across unsupported claims, contradictions, and gaps.
+- [x] 9C: Adaptive Research & Query Refinement (`adaptive_query_service.py`) with token overlap / Jaccard similarity deduplication, provider syntax adaptation, and deliberate counter-evidence probes.
+- [x] 9D: Iterative Evidence & Claim Reevaluation (`research_cycle_service.py`) routing newly acquired literature through canonical 8G validation and tracking mathematical information gain.
+- [x] 9E: Research Value, Budget & Resource Management enforcing hard limits on cycles, searches, sources, documents, and duration.
+- [x] 9F: Scientific Stopping Criteria distinguishing operational budget limits from evidence sufficiency, diminishing returns, and unresolved uncertainty.
+- [x] 9G: Human Oversight & Autonomy Modes (`assisted`, `supervised`, `bounded`) with review queue and one-click action approval/rejection.
+- [x] 9H: Durable Execution & Startup Crash Recovery via Alembic migration `20261114_0012` and automated lifespan recovery checkpoints.
+- [x] 9I: Autonomous Research Workspace (`/autonomous`) with KPI overview, creation modal, live monitor, review queue, and synthesized final report viewer.
+- [x] 9J: Knowledge Graph & Unified Intelligence Integration with `autonomous_workflow`, `research_cycle`, and `research_action` nodes and grounded edges.
+
 ## Upcoming
 
 - [ ] Add deployment automation (Docker Compose / production containerization).

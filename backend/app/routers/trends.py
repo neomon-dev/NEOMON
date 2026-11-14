@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.trend_service import trend_service
+from app.auth.dependencies import get_current_user
 from app.db import get_session
 from app.errors import BackendError
+from app.models import User
 from app.schemas import (
     ResearchTrendAnalysisResponse,
     ResearchTrendAnalyzeRequest,
@@ -18,6 +20,7 @@ router = APIRouter(prefix="/research/trends", tags=["research_trends"])
 @router.post("/analyze", response_model=ResearchTrendAnalysisResponse)
 async def analyze_research_trends(
     payload: ResearchTrendAnalyzeRequest | None = None,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchTrendAnalysisResponse:
     """Execute longitudinal research trend analysis across all investigations and sources."""
@@ -32,6 +35,7 @@ async def analyze_research_trends(
 
 @router.get("/latest", response_model=ResearchTrendAnalysisResponse)
 async def get_latest_trend_analysis(
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchTrendAnalysisResponse:
     """Retrieve the latest research trend intelligence report (generates on-demand if none exists)."""
@@ -44,6 +48,7 @@ async def get_latest_trend_analysis(
 @router.get("", response_model=list[ResearchTrendAnalysisResponse])
 async def list_trend_analyses(
     limit: int = Query(10, ge=1, le=50),
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ResearchTrendAnalysisResponse]:
     """List historical research trend intelligence analyses."""
@@ -53,6 +58,7 @@ async def list_trend_analyses(
 @router.get("/{trend_id}", response_model=ResearchTrendAnalysisResponse)
 async def get_trend_analysis_by_id(
     trend_id: uuid.UUID,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchTrendAnalysisResponse:
     """Retrieve details of a specific trend analysis by ID."""

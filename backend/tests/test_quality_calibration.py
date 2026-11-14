@@ -309,7 +309,8 @@ async def test_quality_audit_api_integration():
         session.add_all([inv, c, src, ev, fail])
         await session.commit()
 
-    with TestClient(app) as client:
+    from tests.conftest import authed_client
+    with authed_client() as client:
         # 1. Trigger calibration
         cal_resp = client.post(f"/api/v1/research/investigations/{inv_id}/quality/calibrate")
         assert cal_resp.status_code == 200

@@ -88,6 +88,17 @@ Milestone 8G establishes scientific truthfulness, lineage tracking, and rigorous
 - **Export Integration Across All 9 Formats**:
   - Updates Markdown, PDF, JSON, HTML graph, SVG, JSON-LD, Evidence CSV, Sources CSV, and Manifest to reflect calibrated tiers, lineage clusters, and entailment classifications.
 
+- **Autonomous Research Workflow Engine (Milestone 9: 9A–9J)**:
+  - Persistent 15-state state machine orchestrating iterative multi-cycle research execution (`AutonomousWorkflowService`).
+  - Deterministic research planning (`research_planner.py`) constructing prioritized actions for unsupported claims, active contradictions, and critical gaps.
+  - Adaptive query refinement (`adaptive_query_service.py`) with token overlap / Jaccard deduplication, provider-tailored syntax, and deliberate counter-evidence probes.
+  - Iterative evidence routing through canonical 8G validation and mathematical information gain tracking (`research_cycle_service.py`).
+  - Strict resource budget accounting and scientific stopping criteria distinguishing operational exhaustion from evidence saturation and persistent uncertainty (`research_stopping_service.py`).
+  - Human oversight modes (`assisted`, `supervised`, `bounded`) with review queue and one-click action approval/rejection.
+  - Durable execution and startup crash recovery via Alembic migration `20261114_0012` and automated lifespan recovery checkpoints.
+  - Autonomous Research Workspace (`/autonomous`) with KPI overview, creation modal, live monitor, review queue, and synthesized final report viewer.
+  - Knowledge graph integration with `autonomous_workflow`, `research_cycle`, and `research_action` nodes and grounded edges.
+
 ## Milestone 2 contracts
 
 - API prefix: `/api/v1`.

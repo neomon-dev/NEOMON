@@ -7,12 +7,15 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.dependencies import get_current_user
+from app.collaboration.permission_service import PermissionService, DEFAULT_GLOBAL_WORKSPACE_ID
 from app.db import get_session
 from app.errors import BackendError
 from app.models import (
     AdjudicationDecision,
     AgentArgument,
     AnalysisJob,
+    AutonomousResearchWorkflow,
     Claim,
     ClaimEvidenceRelationship,
     Document,
@@ -20,12 +23,15 @@ from app.models import (
     Evidence,
     Investigation,
     OpenAccessLocation,
+    ResearchAction,
     ResearchContradiction,
     ResearchGap,
     ResearchGapAnalysis,
     ResearchHypothesis,
     ResearchQuery,
+    ResearchWorkflowCycle,
     Source,
+    User,
 )
 from app.schemas import (
     GraphEdgeView,
@@ -251,6 +257,40 @@ async def _build_investigation_graph(
         ).all()
     )
 
+    workflows = list(
+        (
+            await session.scalars(
+                select(AutonomousResearchWorkflow)
+                .where(AutonomousResearchWorkflow.investigation_id == investigation.id)
+                .order_by(desc(AutonomousResearchWorkflow.created_at), AutonomousResearchWorkflow.id)
+            )
+        ).all()
+    )
+    workflow_ids = [w.id for w in workflows]
+    workflow_cycles = []
+    actions = []
+    if workflow_ids:
+        workflow_cycles = list(
+            (
+                await session.scalars(
+                    select(ResearchWorkflowCycle)
+                    .where(ResearchWorkflowCycle.workflow_id.in_(workflow_ids))
+                    .order_by(ResearchWorkflowCycle.cycle_number, ResearchWorkflowCycle.id)
+                )
+            ).all()
+        )
+        cycle_ids = [c.id for c in workflow_cycles]
+        if cycle_ids:
+            actions = list(
+                (
+                    await session.scalars(
+                        select(ResearchAction)
+                        .where(ResearchAction.cycle_id.in_(cycle_ids))
+                        .order_by(ResearchAction.priority.desc(), ResearchAction.created_at)
+                    )
+                ).all()
+            )
+
     total_counts = GraphTotalCounts(
         claims=len(claims),
         evidence=len(all_evidence),
@@ -261,6 +301,9 @@ async def _build_investigation_graph(
         research_gaps=len(gaps),
         hypotheses=len(hypotheses),
         contradictions=len(contradictions),
+        workflows=len(workflows),
+        cycles=len(workflow_cycles),
+        actions=len(actions),
     )
 
     # Index investigation relationships strictly from persisted FKs & junction tables.
@@ -807,6 +850,97 @@ async def _build_investigation_graph(
             )
         )
 
+    for wf in workflows:
+        add_node(
+            GraphNodeView(
+                id=f"{GraphNodeType.autonomous_workflow.value}:{wf.id}",
+                entity_id=wf.id,
+                type=GraphNodeType.autonomous_workflow,
+                label=_truncate_label(f"Workflow: {wf.title}", 84),
+                description=f"{wf.autonomy_mode.title()} · Cycle {wf.current_cycle_number}/{wf.budget_max_cycles} · {wf.status}",
+                investigation_id=investigation.id,
+                status=wf.status,
+                missing_provenance=[],
+                has_hidden_neighbors=False,
+                metadata={
+                    "workflow_id": str(wf.id),
+                    "title": wf.title,
+                    "autonomy_mode": wf.autonomy_mode,
+                    "current_cycle_number": wf.current_cycle_number,
+                    "max_cycles": wf.budget_max_cycles,
+                    "status": wf.status,
+                    "research_objective": wf.research_objective,
+                    "stopping_reason": wf.stopping_reason,
+                    "total_sources_acquired": wf.spent_sources,
+                    "total_evidence_acquired": 0,
+                },
+            )
+        )
+
+    for cyc in workflow_cycles:
+        add_node(
+            GraphNodeView(
+                id=f"{GraphNodeType.research_cycle.value}:{cyc.id}",
+                entity_id=cyc.id,
+                type=GraphNodeType.research_cycle,
+                label=f"Cycle {cyc.cycle_number}: {cyc.status}",
+                description=f"Gain: {cyc.information_gain_score:.2f} · Sources: +{cyc.sources_acquired} · Ev: +{cyc.evidence_acquired}",
+                investigation_id=investigation.id,
+                status=cyc.status,
+                missing_provenance=[],
+                has_hidden_neighbors=False,
+                metadata={
+                    "cycle_id": str(cyc.id),
+                    "workflow_id": str(cyc.workflow_id),
+                    "cycle_number": cyc.cycle_number,
+                    "state": cyc.status,
+                    "information_gain_score": cyc.information_gain_score,
+                    "cycle_goal": cyc.cycle_goal,
+                },
+            )
+        )
+
+    for act in actions:
+        target_p = None
+        first_q = None
+        try:
+            p_list = _safe_json_loads(act.target_providers_json, [])
+            if p_list:
+                target_p = p_list[0]
+        except Exception:
+            pass
+        try:
+            q_list = _safe_json_loads(act.search_queries_json, [])
+            if q_list:
+                first_q = q_list[0]
+        except Exception:
+            pass
+
+        add_node(
+            GraphNodeView(
+                id=f"{GraphNodeType.research_action.value}:{act.id}",
+                entity_id=act.id,
+                type=GraphNodeType.research_action,
+                label=_truncate_label(f"Action: {act.action_type.replace('_', ' ')}", 84),
+                description=f"Priority {act.priority} · {act.status} · {target_p or 'internal'}",
+                investigation_id=investigation.id,
+                status=act.status,
+                missing_provenance=[],
+                has_hidden_neighbors=False,
+                metadata={
+                    "action_id": str(act.id),
+                    "cycle_id": str(act.cycle_id),
+                    "action_type": act.action_type,
+                    "priority": act.priority,
+                    "status": act.status,
+                    "target_entity_type": act.target_entity_type,
+                    "target_entity_id": str(act.target_entity_id) if act.target_entity_id else None,
+                    "target_provider": target_p,
+                    "planned_query": first_q,
+                },
+            )
+        )
+
     # Emit only persisted relationships whose source & target both exist in nodes_by_id; deduplicate safely.
     edges_by_key: dict[tuple[str, str, str], GraphEdgeView] = {}
 
@@ -1009,6 +1143,60 @@ async def _build_investigation_graph(
             except ValueError:
                 pass
 
+    for wf in workflows:
+        add_edge(
+            f"{GraphNodeType.autonomous_workflow.value}:{wf.id}",
+            inv_node_id,
+            "investigates",
+            "investigates",
+            classification=wf.status,
+        )
+
+    for cyc in workflow_cycles:
+        add_edge(
+            f"{GraphNodeType.autonomous_workflow.value}:{cyc.workflow_id}",
+            f"{GraphNodeType.research_cycle.value}:{cyc.id}",
+            "executes_cycle",
+            f"cycle {cyc.cycle_number}",
+            classification=cyc.status,
+        )
+
+    gap_ids_set = {g.id for g in gaps}
+    hyp_ids_set = {h.id for h in hypotheses}
+    for act in actions:
+        add_edge(
+            f"{GraphNodeType.research_cycle.value}:{act.cycle_id}",
+            f"{GraphNodeType.research_action.value}:{act.id}",
+            "performs_action",
+            act.action_type.replace("_", " "),
+            classification=act.status,
+        )
+        if act.target_entity_id is not None:
+            if act.target_entity_type == "claim" and act.target_entity_id in claim_map:
+                add_edge(
+                    f"{GraphNodeType.research_action.value}:{act.id}",
+                    f"{GraphNodeType.claim.value}:{act.target_entity_id}",
+                    "targets_claim",
+                    "targets claim",
+                    classification=act.status,
+                )
+            elif act.target_entity_type == "gap" and act.target_entity_id in gap_ids_set:
+                add_edge(
+                    f"{GraphNodeType.research_action.value}:{act.id}",
+                    f"{GraphNodeType.research_gap.value}:{act.target_entity_id}",
+                    "targets_gap",
+                    "targets gap",
+                    classification=act.status,
+                )
+            elif act.target_entity_type == "hypothesis" and act.target_entity_id in hyp_ids_set:
+                add_edge(
+                    f"{GraphNodeType.research_action.value}:{act.id}",
+                    f"{GraphNodeType.hypothesis.value}:{act.target_entity_id}",
+                    "targets_hypothesis",
+                    "targets hypothesis",
+                    classification=act.status,
+                )
+
     # Direct Investigation -> Claim fallback edge if ResearchQuestion is filtered out by node_types filter
     if allowed_node_types and GraphNodeType.research_question.value not in allowed_node_types:
         for cl in selected_claims:
@@ -1083,15 +1271,20 @@ async def read_workspace_graph(
     evidence_limit: int = Query(default=40, ge=1, le=300),
     max_nodes: int = Query(default=160, ge=10, le=600),
     expand_all: bool = False,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> InvestigationGraphResponse:
+    perm = PermissionService(session)
     if investigation_id is not None:
-        investigation = await session.get(Investigation, investigation_id)
-        if investigation is None:
-            raise BackendError("Investigation not found.", 404, "investigation_not_found")
+        investigation = await perm.check_investigation_access(user, investigation_id, "read")
     else:
+        user_workspaces = await perm.get_user_workspaces(user.id)
+        if not user_workspaces:
+            user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
         investigation = await session.scalar(
-            select(Investigation).order_by(desc(Investigation.created_at), Investigation.id)
+            select(Investigation)
+            .where(Investigation.workspace_id.in_(user_workspaces))
+            .order_by(desc(Investigation.created_at), Investigation.id)
         )
         if investigation is None:
             return InvestigationGraphResponse(
@@ -1129,11 +1322,11 @@ async def read_investigation_graph(
     evidence_limit: int = Query(default=40, ge=1, le=300),
     max_nodes: int = Query(default=160, ge=10, le=600),
     expand_all: bool = False,
+    user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> InvestigationGraphResponse:
-    investigation = await session.get(Investigation, investigation_id)
-    if investigation is None:
-        raise BackendError("Investigation not found.", 404, "investigation_not_found")
+    perm = PermissionService(session)
+    investigation = await perm.check_investigation_access(user, investigation_id, "read")
     return await _build_investigation_graph(
         session=session,
         investigation=investigation,

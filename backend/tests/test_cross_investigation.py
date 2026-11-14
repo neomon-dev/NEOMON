@@ -178,8 +178,8 @@ async def test_cross_synthesis_api_endpoints(db_session: AsyncSession):
     db_session.add_all([c1, c2])
     await db_session.commit()
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    from tests.conftest import authed_async_client
+    async with authed_async_client() as client:
         # POST /research/synthesis/generate
         res = await client.post(
             "/api/v1/research/synthesis/generate",

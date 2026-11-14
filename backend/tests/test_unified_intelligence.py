@@ -136,8 +136,8 @@ async def test_knowledge_graph_ingestion_of_hypotheses_and_contradictions(db_ses
     db_session.add_all([ev, hyp, contra])
     await db_session.commit()
 
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    from tests.conftest import authed_async_client
+    async with authed_async_client() as client:
         res = await client.get(f"/api/v1/research/investigations/{inv.id}/graph")
         assert res.status_code == 200
         graph_data = res.json()
@@ -161,8 +161,8 @@ async def test_knowledge_graph_ingestion_of_hypotheses_and_contradictions(db_ses
 @pytest.mark.asyncio
 async def test_intelligence_api_routes(db_session: AsyncSession):
     """Test REST API endpoints for unified overview and search."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    from tests.conftest import authed_async_client
+    async with authed_async_client() as client:
         # GET /research/intelligence/overview
         overview_res = await client.get("/api/v1/research/intelligence/overview")
         assert overview_res.status_code == 200

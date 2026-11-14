@@ -263,7 +263,8 @@ def test_report_endpoints_via_test_client():
     asyncio.run(seed())
 
     try:
-        with TestClient(app) as client:
+        from tests.conftest import authed_client
+        with authed_client() as client:
             # 1. Read active report
             report_resp = client.get(f"/api/v1/research/analysis/{job_id}/report")
             assert report_resp.status_code == 200

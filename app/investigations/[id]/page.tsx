@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useProviderSession } from "@/components/provider-context";
 import { ResearchGapWorkspace } from "@/components/research-gap-workspace";
+import { ScientificReliabilityWorkspace } from "@/components/scientific-reliability-workspace";
+import { CollaborationPanel } from "@/components/collaboration-panel";
 import { apiBaseUrl, requestJson } from "../../../lib/api";
 
 type Investigation = {
@@ -602,12 +604,19 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         <Link className="outline-button compact-button" href={`/graph?investigation_id=${investigation.id}`}>
           Open in Knowledge Graph →
         </Link>
+        <Link
+          className="outline-button compact-button"
+          href={`/autonomous?investigation_id=${investigation.id}`}
+          style={{ borderColor: "#f59e0b", color: "#fbbf24" }}
+        >
+          Autonomous Workflow ⚡
+        </Link>
         <a
           className="outline-button compact-button"
           href="#research-gap-workspace"
           style={{ borderColor: "#f97316", color: "#f97316" }}
         >
-          Research Gaps & Horizon ⚡
+          Research Gaps & Horizon 🎯
         </a>
         <Link
           className="outline-button compact-button"
@@ -644,6 +653,13 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         >
           Quality Audit 🛡️
         </Link>
+        <a
+          className="outline-button compact-button"
+          href="#scientific-reliability-workspace"
+          style={{ borderColor: "#38bdf8", color: "#38bdf8" }}
+        >
+          Reliability & Provenance 🛡️
+        </a>
         <button
           type="button"
           className="outline-button compact-button"
@@ -746,6 +762,8 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
         investigationId={investigation.id}
         investigationQuestion={investigation.question}
       />
+
+      <ScientificReliabilityWorkspace investigationId={investigation.id} />
 
       <section className="research-columns">
         <article className="panel">
@@ -1254,6 +1272,8 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
           <p className="muted">No multi-agent analysis has been run for this investigation.</p>
         )}
       </section>
+
+      <CollaborationPanel investigationId={investigation.id} />
     </main>
   );
 }
