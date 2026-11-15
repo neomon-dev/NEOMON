@@ -3,6 +3,7 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api
 type ErrorPayload = {
   error?: string;
   message?: string;
+  detail?: string | Array<{ loc?: Array<string | number>; msg?: string }>;
   details?: Array<{ loc?: Array<string | number>; msg?: string }>;
 };
 
@@ -67,10 +68,16 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
 
   if (!response.ok) {
     const errorPayload = payload as ErrorPayload | undefined;
-    const validationDetails = errorPayload?.details
+    const detailsArray = Array.isArray(errorPayload?.detail)
+      ? errorPayload.detail
+      : Array.isArray(errorPayload?.details)
+      ? errorPayload.details
+      : undefined;
+    const validationDetails = detailsArray
       ?.map((detail) => `${detail.loc?.join(".") ?? "request"}: ${detail.msg ?? "invalid value"}`)
       .join("; ");
-    const message = validationDetails || errorPayload?.message || `Backend request failed (${response.status}).`;
+    const detailString = typeof errorPayload?.detail === "string" ? errorPayload.detail : undefined;
+    const message = validationDetails || detailString || errorPayload?.message || `Backend request failed (${response.status}).`;
     throw new ApiError(message, response.status, errorPayload?.error);
   }
 
