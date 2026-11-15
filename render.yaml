@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: neomon-api
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    preDeployCommand: cd backend && python -m alembic upgrade head
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NEOMON_ENVIRONMENT
+        value: production
+      - key: NEOMON_DEMO_MODE
+        value: "false"
+      - key: NEOMON_LOG_FORMAT
+        value: json
+      - key: NEOMON_LOG_LEVEL
+        value: info
+      - key: NEOMON_WORKER_ENABLED
+        value: "true"
+      - key: NEOMON_WORKER_CONCURRENCY
+        value: "4"
+      - key: NEOMON_DATABASE_URL
+        fromDatabase:
+          name: neomon-postgres
+          property: connectionString
+      - key: NEOMON_ALLOWED_ORIGINS
+        sync: false
+      - key: NEOMON_SECRET_KEY
+        generateValue: true
+      - key: NEOMON_INITIAL_ADMIN_PASSWORD
+        sync: false
+
+databases:
+  - name: neomon-postgres
+    databaseName: neomon
+    user: neomon
+    plan: starter

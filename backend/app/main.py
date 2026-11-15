@@ -69,6 +69,17 @@ async def lifespan(app: FastAPI):
     autonomous_workflow_service.broker = app.state.event_broker
     await autonomous_workflow_service.recover_workflows()
 
+    if settings.initial_admin_password:
+        from app.auth.security import hash_password
+        from app.models import User
+        from sqlalchemy import select
+        async with SessionFactory() as session:
+            admin_user = await session.scalar(select(User).where(User.role == "admin").order_by(User.created_at).limit(1))
+            if admin_user:
+                admin_user.password_hash = hash_password(settings.initial_admin_password)
+                await session.commit()
+                logger.info("Configured production administrator password from NEOMON_INITIAL_ADMIN_PASSWORD.")
+
     if settings.worker_enabled:
         await worker_service.start()
 

@@ -91,6 +91,23 @@ class Settings(BaseSettings):
     unpaywall_api_key: str | None = None
     research_user_agent: str = "NEOMON/0.3 (+https://github.com/neomon-dev/NEOMON)"
     research_max_document_bytes: int = Field(default=5_000_000, ge=100_000, le=50_000_000)
+    initial_admin_password: str | None = None
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def resolve_and_normalize_database_url(cls, value: object) -> object:
+        if not value:
+            value = os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
+        if isinstance(value, str):
+            v_clean = value.strip()
+            if v_clean.startswith("postgres://"):
+                return "postgresql+asyncpg://" + v_clean[len("postgres://"):]
+            elif v_clean.startswith("postgresql://") and not v_clean.startswith("postgresql+"):
+                return "postgresql+asyncpg://" + v_clean[len("postgresql://"):]
+            elif v_clean.startswith("sqlite://") and not v_clean.startswith("sqlite+"):
+                return "sqlite+aiosqlite://" + v_clean[len("sqlite://"):]
+            return v_clean
+        return value
 
     @field_validator("tavily_api_key", mode="before")
     @classmethod
