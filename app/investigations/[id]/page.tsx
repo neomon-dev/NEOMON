@@ -444,7 +444,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
       let ticketParam = "";
       if (token) {
         try {
-          const tRes = await requestJson<{ ticket: string }>("/api/v1/auth/stream-ticket", {
+          const tRes = await requestJson<{ ticket: string }>("/auth/stream-ticket", {
             method: "POST",
           });
           if (tRes?.ticket) {

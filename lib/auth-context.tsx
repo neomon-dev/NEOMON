@@ -45,6 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         let selected = wsList.find((w) => w.id === savedWsId);
         if (!selected && wsList.length > 0) {
           selected = wsList[0];
+          if (typeof window !== "undefined") {
+            localStorage.setItem("neomon_active_workspace_id", selected.id);
+          }
         }
         setActiveWorkspace(selected || null);
 

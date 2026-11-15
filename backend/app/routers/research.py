@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db import get_session
 from app.errors import BackendError
-from app.models import Claim, Document, Evidence, Investigation, Source, User
+from app.models import Claim, Document, Evidence, Investigation, Source, User, WorkspaceMember
 from app.auth.dependencies import get_current_user
 from app.auth.rate_limiter import rate_limit_research
 from app.collaboration.permission_service import PermissionService, DEFAULT_GLOBAL_WORKSPACE_ID
@@ -88,7 +88,15 @@ async def create_investigation(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchStartResponse:
-    ws_id = payload.workspace_id or DEFAULT_GLOBAL_WORKSPACE_ID
+    ws_id = payload.workspace_id
+    if not ws_id:
+        user_ws = await session.scalar(
+            select(WorkspaceMember.workspace_id)
+            .where(WorkspaceMember.user_id == user.id)
+            .order_by(WorkspaceMember.created_at.asc())
+            .limit(1)
+        )
+        ws_id = user_ws or DEFAULT_GLOBAL_WORKSPACE_ID
     perm = PermissionService(session)
     await perm.require_workspace_membership(user.id, ws_id, min_role="researcher")
 

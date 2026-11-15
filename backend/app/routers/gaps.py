@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.gap_service import gap_engine
@@ -30,7 +30,7 @@ async def _verify_investigation_exists(
 @router.post("/analyze", response_model=ResearchGapAnalysisResponse)
 async def analyze_investigation_gaps(
     investigation_id: uuid.UUID,
-    payload: ResearchGapAnalyzeRequest | None = None,
+    payload: ResearchGapAnalyzeRequest | None = Body(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchGapAnalysisResponse:

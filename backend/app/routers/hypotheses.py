@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.hypothesis_service import hypothesis_service
@@ -31,7 +31,7 @@ async def _verify_investigation_exists(
 @router.post("/generate", response_model=HypothesisGenerationResponse)
 async def generate_hypotheses(
     investigation_id: uuid.UUID,
-    payload: HypothesisGenerateRequest | None = None,
+    payload: HypothesisGenerateRequest | None = Body(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> HypothesisGenerationResponse:

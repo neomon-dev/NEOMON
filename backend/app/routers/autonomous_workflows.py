@@ -4,7 +4,7 @@ import json
 from typing import Any
 import uuid
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -390,7 +390,7 @@ async def approve_action(
 async def reject_action(
     workflow_id: uuid.UUID,
     action_id: uuid.UUID,
-    payload: ActionApprovalRequest | None = None,
+    payload: ActionApprovalRequest | None = Body(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:
@@ -406,7 +406,7 @@ async def reject_action(
 @router.post("/workflows/{workflow_id}/continue")
 async def continue_workflow(
     workflow_id: uuid.UUID,
-    payload: WorkflowContinueRequest | None = None,
+    payload: WorkflowContinueRequest | None = Body(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict[str, Any]:

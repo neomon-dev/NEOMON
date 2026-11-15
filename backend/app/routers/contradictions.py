@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.contradiction_service import contradiction_service
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/research/contradictions", tags=["contradiction_intel
 
 @router.post("/detect", response_model=list[ResearchContradictionView])
 async def detect_contradictions(
-    payload: ContradictionDetectRequest | None = None,
+    payload: ContradictionDetectRequest | None = Body(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ResearchContradictionView]:

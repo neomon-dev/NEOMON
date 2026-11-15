@@ -17,6 +17,16 @@ export class ApiError extends Error {
   }
 }
 
+export function resolveApiUrl(path: string): string {
+  const base = apiBaseUrl.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  // Deduplicate redundant /api/v1 prefix if already present in base URL
+  if (base.endsWith("/api/v1") && normalizedPath.startsWith("/api/v1/")) {
+    return `${base}${normalizedPath.slice(7)}`;
+  }
+  return `${base}${normalizedPath}`;
+}
+
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (typeof window !== "undefined") {
@@ -26,15 +36,21 @@ export async function requestJson<T>(path: string, init?: RequestInit): Promise<
     }
   }
 
+  if (init?.body && typeof init.body === "string" && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
   const mergedInit: RequestInit = {
     ...init,
     headers,
     credentials: init?.credentials ?? "include",
   };
 
+  const targetUrl = resolveApiUrl(path);
+
   let response: Response;
   try {
-    response = await fetch(`${apiBaseUrl}${path}`, mergedInit);
+    response = await fetch(targetUrl, mergedInit);
   } catch {
     throw new Error(`Cannot reach the NEOMON backend at ${apiBaseUrl}. Start the FastAPI server and try again.`);
   }

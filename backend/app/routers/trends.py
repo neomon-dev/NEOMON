@@ -1,7 +1,7 @@
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.trend_service import trend_service
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/research/trends", tags=["research_trends"])
 
 @router.post("/analyze", response_model=ResearchTrendAnalysisResponse)
 async def analyze_research_trends(
-    payload: ResearchTrendAnalyzeRequest | None = None,
+    payload: ResearchTrendAnalyzeRequest | None = Body(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ResearchTrendAnalysisResponse:

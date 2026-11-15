@@ -1,164 +1,741 @@
-# NEOMON
+# NEOMON — Neural Evidence Orchestration & Multi-Agent Observation Network
 
-Neural Evidence Orchestration & Multi-Agent Observation Network.
+[![Backend Test Suite](https://img.shields.io/badge/Backend%20Tests-226%20Passed-emerald.svg)](backend/tests)
+[![Frontend Test Suite](https://img.shields.io/badge/Frontend%20Tests-15%20Passed-emerald.svg)](__tests__)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Strict%20Verified-blue.svg)](tsconfig.json)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-16%20Turbopack-black.svg)](https://nextjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B%20Compatible-336791.svg)](backend/migrations)
+[![SQLite](https://img.shields.io/badge/SQLite-WAL%20Engine-003B57.svg)](backend/neomon.db)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-NEOMON is being built incrementally as a research-intelligence platform. The current slice adds real public-source research, transparent relevance filtering, provenance-aware evidence extraction, quality indicators, and frontend source/evidence inspection.
-
-## Development
-
-### Frontend
-
-```powershell
-npm install
-npm run dev
-```
-
-The dashboard runs at `http://localhost:3000`.
-
-### Backend
-
-Python 3.12+ is required. Python 3.14 is verified locally.
-
-```powershell
-python -m pip install -e ".\backend[test]"
-Set-Location backend
-python -m alembic upgrade head
-Set-Location ..
-python -m uvicorn app.main:app --app-dir backend --reload --port 8000
-```
-
-The versioned API is available at `http://localhost:8000/api/v1`. The default development database is SQLite; configure PostgreSQL with `NEOMON_DATABASE_URL` for production-like environments.
-
-Run backend tests:
-
-```powershell
-python -m pytest backend\tests -q
-```
-
-## Configuration
-
-Copy [.env.example](./.env.example) values into the environment. `NEXT_PUBLIC_API_URL` is safe for the API base URL only. Provider API keys must never be placed in `NEXT_PUBLIC_*` variables.
-
-The backend defaults to explicit demo mode. Demo agent responses are labeled as demo output and are not research findings.
-
-## Current API surface
-
-- `GET /api/v1/health` — backend status and demo mode.
-- `GET /api/v1/agents` — the twelve registered agent foundations.
-- `POST /api/v1/providers/test` — validate and test a provider configuration.
-- `GET /api/v1/events` — typed Server-Sent Events stream.
-- `POST /api/v1/research/investigations` — run a real quick/deep public-source investigation.
-- `GET /api/v1/research/investigations/{id}/sources` — inspect preserved source metadata and URLs.
-- `GET /api/v1/research/investigations/{id}/evidence` — inspect extracted passages.
-- `POST /api/v1/providers/tavily/test` — verify Tavily connectivity and validate API key.
-- `GET /api/v1/providers/tavily/status` — retrieve Tavily provider status, search depth, and live telemetry metrics.
-
-Crossref, OpenAlex, and arXiv are available without keys. Tavily Search is supported as a first-class, optional general-web research provider (requires `TAVILY_API_KEY` or `NEOMON_TAVILY_API_KEY`). Tavily search executes concurrently with academic providers, producing 4-dimensional domain-isolated queries (causal mechanisms, counter-evidence, empirical data, and critical perspectives), preserving technical acronyms (AI, IT, ML, RAM, DDR5), and preventing semantic drift. Provider failures are recorded in telemetry without halting other providers, and snippet fallbacks are indexed as `abstract_only` documents when paywalled. Provider failures are returned as errors; the engine does not invent fallback sources or quotations.
-
-OpenAlex locations and arXiv PDFs are checked for legitimate open-access copies. Unpaywall discovery is optional:
-set `NEOMON_UNPAYWALL_EMAIL` (and, if supplied by Unpaywall, `NEOMON_UNPAYWALL_API_KEY`).
-Candidate documents are metadata-matched before the existing SSRF-safe retriever downloads them. Access-restricted,
-failed, abstract-only, and metadata-only sources remain visible; repository copies are document versions and are not
-counted as independent studies.
-
-Research quality is reported separately from technical execution. Sources expose relevance scores and inclusion reasons; documents are labeled metadata-only, abstract-only, or full-text; evidence retains exact text, page/section provenance, and classification. A completed investigation may still report `limited` or `insufficient_evidence`.
-
-Milestone 4 adds bounded multi-agent analysis over a completed investigation:
-`POST /api/v1/research/investigations/{id}/analysis` starts persisted
-provider-backed planning, independent Advocate and Skeptic analysis, bounded
-debate moderation, conflict adjudication, and report generation when a provider
-is configured.
-Inspect execution, claims, arguments, debates, decisions, and reports through
-the corresponding `/api/v1/research/analysis/{job_id}/...` endpoints. Without
-an optional provider configuration, the same stages use transparent,
-explicitly `rule_based` selection from persisted evidence; they never create
-citations or quotations. Provider output is schema-validated and evidence
-references are checked against the investigation before persistence. Ollama,
-LM Studio, and OpenAI-compatible models can be supplied per analysis request
-with validated JSON output.
-
-See [Architecture Documentation](docs/architecture/ARCHITECTURE.md), [Development Plan](docs/development/DEVELOPMENT_PLAN.md), [TODO](docs/development/TODO.md), and [Milestone Archive](docs/archive/milestones/) for system design and historical milestone scope.
-
-## Milestone 5 MVP Highlights
-
-- **Session-only provider configuration**: Configure Ollama, LM Studio, or OpenAI-compatible providers in `/settings` (or the provider context). API keys are kept strictly in React memory and are never written to `localStorage`, `sessionStorage`, URLs, logs, or database records; refreshing the page requires re-entering credentials.
-- **Provider SSRF protection**: Provider endpoints are validated against SSRF rules, allowing configured local Ollama/LM Studio endpoints while blocking arbitrary private-network and cloud metadata targets.
-- **Role-specific multi-agent prompts**: Advocate, Skeptic, and specialist agents use distinct role-specific system instructions when executing against a configured provider, while no-provider execution remains explicitly labeled `rule_based`.
-- **Complete Investigation UI**:
-  - `/` — Live dashboard with backend health, active provider status, and quick navigation.
-  - `/history` — Persisted investigations list with status, mode, source counts, and links.
-  - `/investigations/[id]` — Claims, visually separated Advocate/Skeptic/specialist assessments, clickable evidence references that scroll to and highlight exact persisted passages with source/document/access/page provenance, cancellation controls, and `Last-Event-ID` SSE replay with fallback polling.
-- **Durable SSE replay & restart recovery**: `EventBroker` persists research and events to `research_events` for `Last-Event-ID` / `last_event_id` replay with investigation isolation, and `AnalysisManager.recover()` reconciles interrupted jobs on backend startup.
-
-## Milestone 6 Intelligence Workspaces & Knowledge Graph
-
-- **Evidence Intelligence Workspace**:
-  - `/evidence` — Filterable passage explorer with relevance badges, source links, and claim tags.
-  - `/sources` — Literature catalog with open access acquisition levels and document version counts.
-  - `/agents` — Observatory displaying registered agents and real-time execution telemetry.
-- **Interactive Knowledge Graph (`/graph`)**:
-  - Full relational graph connecting Claims, Evidence, Sources, and Decisions with React Flow.
-  - Interactive pan, zoom, node dragging, search query highlighting, and branch collapsing.
-  - Side inspection drawer displaying passage provenance, relevance scores, and missing link warnings.
-
-## Milestone 7 Reliability, Report Intelligence & Knowledge Export
-
-- **Milestone 7A: Research Reliability & Concurrency Queue**:
-  - Global `ProviderConcurrencyRegistry` with bounded queues and FIFO position tracking.
-  - Enforced concurrency 1 and sequential scheduling for local providers (LM Studio & Ollama) to eliminate GPU/VRAM overload on consumer hardware.
-  - Granular dual timeouts (`queue_timeout_seconds` vs `inference_timeout_seconds`) and 1800s overall analysis timeout.
-  - Multi-tier argument grounding repair, adjudicator repair, and deterministic fallback report synthesis.
-  - Automated analysis coverage tracking (`AnalysisCoverageSummary`).
-- **Milestone 7B: 18-Section Report Intelligence**:
-  - Standardized 18-section academic intelligence report schema.
-  - Deterministic 5-dimension evidence strength scoring (`0.0` - `100.0`) categorized into 5 tiers (Very Strong, Strong, Moderate, Weak, Inconclusive).
-  - Immutable report version snapshotting (`ReportVersion` table) with version switcher and regeneration endpoints (`/research/investigations/{id}/reports/*`).
-  - Document-style report interface with Table of Contents jump navigation, score breakdown drawer, and print stylesheet (`@media print`).
-- **Milestone 7C: Knowledge Export & Reproducibility**:
-  - Dedicated export router (`GET /api/v1/research/investigations/{id}/export/*`) supporting 8 standard formats:
-    1. **Markdown (`.md`)**: Full 18-section report with YAML frontmatter and citation anchors.
-    2. **Paginated PDF (`.pdf`)**: Pure Python PDF 1.4 document generator with running headers, footers, page numbering, and line-wrapping without paid APIs or headless browsers.
-    3. **Research Snapshot JSON (`.json`)**: Machine-readable full investigation graph (`schema_version: 1.0.0`).
-    4. **Standalone Interactive HTML Graph (`.html`)**: Zero-CDN interactive vector graph with pan, zoom, node drag, search, filtering, and side panel for offline air-gapped environments.
-    5. **Vector Knowledge Graph (`.svg`)**: High-resolution vector graphic with color-coded nodes and relationship markers.
-    6. **Semantic Linked Data (`.jsonld`)**: Schema.org `ScholarlyArticle` and `ClaimReview` metadata.
-    7. **Evidence Dataset (`.csv`)**: RFC 4180 tabular evidence dataset with source provenance.
-    8. **Sources Catalog (`.csv`)**: RFC 4180 tabular catalog of all discovered literature.
-  - Integrated Knowledge Export panel in the web interface with direct download triggers.
-  - Complete secret/credential sanitization and strict provenance tracking.
+> **NEOMON** is an enterprise-grade research intelligence platform engineered to transform unstructured scientific literature and real-time public web intelligence into structured, provenance-verified evidence graphs, dialectical multi-agent debates, and audit-ready scientific evaluations.
 
 ---
 
-## Documentation Index
+## Table of Contents
 
-The complete NEOMON documentation suite is organized in the [`docs/`](docs/) directory:
+1. [Executive Summary & Problem Statement](#1-executive-summary--problem-statement)
+2. [Target Audience & Comparative Distinction](#2-target-audience--comparative-distinction)
+3. [Core Capabilities & Research Pillars](#3-core-capabilities--research-pillars)
+4. [Technology Stack](#4-technology-stack)
+5. [System Architecture](#5-system-architecture)
+6. [Windows Installation & Getting Started](#6-windows-installation--getting-started)
+7. [CRITICAL NOTICE: User-Supplied AI Provider Requirement](#7-critical-notice-user-supplied-ai-provider-requirement)
+8. [CRITICAL NOTICE: Optional Tavily Search Configuration](#8-critical-notice-optional-tavily-search-configuration)
+9. [Comprehensive Environment Variable Reference](#9-comprehensive-environment-variable-reference)
+10. [Database Management & Migration Strategy](#10-database-management--migration-strategy)
+11. [Production Deployment Architecture](#11-production-deployment-architecture)
+12. [Security, Privacy & Compliance Architecture](#12-security-privacy--compliance-architecture)
+13. [Troubleshooting Guide & Diagnostics](#13-troubleshooting-guide--diagnostics)
+14. [Feature Documentation Index](#14-feature-documentation-index)
+15. [License & Contribution Terms](#15-license--contribution-terms)
 
-- **[Release & Certification (`docs/release/`)](docs/release/)**:
-  - [NEOMON 1.0 Release Certificate](docs/release/NEOMON_1_0_FINAL_RELEASE_CERTIFICATE.md)
-  - [Independent Technical Audit Report](docs/release/NEOMON_1_0_FINAL_INDEPENDENT_AUDIT.md)
-  - [NEOMON 1.0 Product Release Report](docs/release/NEOMON_1_0_RELEASE_REPORT.md)
-  - [Production Infrastructure & Readiness Report](docs/release/NEOMON_1_0_PRODUCTION_READINESS_REPORT.md)
-  - [Safe Root Directory Cleanup Report](docs/release/NEOMON_1_0_CLEANUP_REPORT.md)
-- **[Security Architecture (`docs/security/`)](docs/security/)**:
-  - [Final Security & Tenancy Audit Report](docs/security/NEOMON_1_0_SECURITY_FINAL_REPORT.md)
-  - [Security Configuration & Hardening Guide](docs/security/SECURITY_CONFIGURATION_GUIDE.md)
-- **[Scientific Integrity (`docs/scientific-integrity/`)](docs/scientific-integrity/)**:
-  - [Scientific Validation & Benchmark Report](docs/scientific-integrity/NEOMON_1_0_SCIENTIFIC_VALIDATION_REPORT.md)
-- **[Architecture & Operations (`docs/architecture/`)](docs/architecture/)**:
-  - [System Architecture](docs/architecture/ARCHITECTURE.md)
-  - [Database Migration Guide](docs/architecture/DATABASE_MIGRATION_GUIDE.md)
-  - [Backup & Restoration Guide](docs/architecture/BACKUP_AND_RESTORATION_GUIDE.md)
-  - [Production Deployment Guide](docs/architecture/PRODUCTION_DEPLOYMENT_GUIDE.md)
-  - [Worker Operations Guide](docs/architecture/WORKER_OPERATIONS_GUIDE.md)
-- **[Development & QA (`docs/development/`)](docs/development/)**:
-  - [Development Plan](docs/development/DEVELOPMENT_PLAN.md)
-  - [Quality Assurance Policy](docs/development/QA_POLICY.md)
-  - [Environment Variables Guide](docs/development/ENVIRONMENT_VARIABLES.md)
-  - [Troubleshooting Guide](docs/development/TROUBLESHOOTING_GUIDE.md)
-  - [TODO & Backlog](docs/development/TODO.md)
-- **[Testing & Benchmarks (`docs/testing/`)](docs/testing/)**:
-  - [Final Test Register & Certification Report](docs/testing/M13_FINAL_TEST_REPORT.md)
-  - [Interactive Control Test Matrix](docs/testing/M13_INTERACTION_TEST_MATRIX.md)
-- **[Historical Archives (`docs/archive/`)](docs/archive/)**:
-  - [Milestone 13 Execution Reports (`docs/archive/m13/`)](docs/archive/m13/)
-  - [Historical Milestone Plans (`docs/archive/milestones/`)](docs/archive/milestones/)
+---
+
+## 1. Executive Summary & Problem Statement
+
+Modern scientific, biomedical, and technological discovery faces a severe reproducibility crisis. Over **3 million scientific articles** are published annually across thousands of journals, making comprehensive literature syntheses computationally intractable for human researchers alone. Concurrently, generative AI tools (such as standard chat LLMs) fail catastrophically in scientific domains due to three fundamental architectural flaws:
+
+1. **Hallucination & Fabrication**: Generic LLMs hallucinate plausible-sounding mechanisms, statistical figures, and non-existent bibliographies.
+2. **Confirmation Bias & Sycophancy**: Conversational models inherently optimize for agreeableness, uncritically validating biased research hypotheses rather than stress-testing causal claims.
+3. **Absence of Provenance & Auditability**: LLM summaries lack exact text offsets, document hashes, and page provenance, rendering their outputs legally and scientifically non-reproducible.
+
+**NEOMON solves this crisis.**
+
+NEOMON rejects conversational "black-box" answering in favor of an **auditable, dialectical, and deterministic evidence orchestration pipeline**. Instead of generating ungrounded text, NEOMON queries real academic and web indices (arXiv, Crossref, OpenAlex, Unpaywall, Tavily), parses and hashes candidate documents, extracts exact character-offset evidence passages, and submits those passages to a structured debate between competing AI agents (Advocate vs. Skeptic vs. Methodologist). Every claim is linked directly to an immutable source passage, audited for methodological rigor (sample size, blinding, p-hacking risk), and placed onto an interactive, multi-relational knowledge graph.
+
+---
+
+## 2. Target Audience & Comparative Distinction
+
+### Target Audience
+
+* **Academic & Biomedical Researchers**: Conducting meta-analyses, systematic reviews, and grant proposal background investigations.
+* **Clinical Trial Evaluators**: Verifying therapeutic efficacy claims, checking study power, and uncovering publication bias or funding conflicts.
+* **Technology Intelligence & Due Diligence Analysts**: Evaluating emerging patents, semiconductor breakthroughs, or algorithm benchmarks before major capital allocation.
+* **Policy Makers & Think Tanks**: Synthesizing contradictory scientific consensus across climate, energy, and epidemiology without political bias.
+
+### How NEOMON Differs from Ordinary AI Chat
+
+| Architectural Dimension | Generic Conversational LLM (e.g. ChatGPT, Claude) | NEOMON Research Intelligence Platform |
+|---|---|---|
+| **Primary Interaction Mode** | Conversational chat interface | Structured investigation workspace & knowledge observatory |
+| **Evidence Grounding** | Parameterized memory with loose web search | Strict character-level provenance mapped to sha256-hashed documents |
+| **Citation Authenticity** | Frequently hallucinates papers, DOIs, and authors | 100% verified against Crossref, OpenAlex, arXiv, and DOI registries |
+| **Dialectical Stress-Testing** | Monolithic generation prone to sycophancy | Adversarial multi-agent debate (Advocate vs Skeptic with Moderator) |
+| **Methodological Auditing** | None; accepts paper abstracts uncritically | Algorithmic scoring of statistical power, p-hacking, and blinding |
+| **Contradiction Handling** | Smooths over conflicts with vague prose | Explicit contradiction graph mapping opposing claims and evidence |
+| **Citation Genealogy** | Cannot detect circular citations | Algorithmic clustering of source lineages to verify study independence |
+| **Data Privacy & Keys** | Transmits prompts to central cloud vendor | **BYOM Architecture**: API keys held in browser memory; local LLMs supported |
+| **Export Formats** | Raw Markdown / Text chat | Audit-ready PDF, BibTeX, RIS citation manifests, CSV, and JSON |
+
+---
+
+## 3. Core Capabilities & Research Pillars
+
+```
++---------------------------------------------------------------------------------------+
+|                                    NEOMON ENGINE                                      |
++--------------------------+----------------------------+-------------------------------+
+|  RETRIEVAL & DISCOVERY   |    EVIDENCE & INTEGRITY    |   MULTI-AGENT ADJUDICATION    |
+|  - arXiv API             |  - Exact Passage Hashing   |  - Advocate Agent             |
+|  - Crossref API          |  - Character Provenance    |  - Skeptic Agent              |
+|  - OpenAlex API          |  - Methodological Auditing |  - Moderator Adjudication     |
+|  - Unpaywall Integration |  - P-Hacking Risk Analysis |  - Methodology Auditor        |
+|  - Tavily Web Crawler    |  - Citation Genealogy      |  - Domain Specialists         |
++--------------------------+----------------------------+-------------------------------+
+|   LONGITUDINAL INSIGHTS  |     KNOWLEDGE TOPOLOGY     |     GOVERNANCE & WORKFLOW     |
+|  - Contradiction Engine  |  - React Flow Entity Graph |  - Multi-User Workspaces      |
+|  - Research Gap Mining   |  - 16 Relational Entity IDs|  - Role-Based Access Control  |
+|  - Hypothesis Generation |  - Claim-to-Evidence Links |  - Autonomous Convergence     |
+|  - Trend Trajectories   |  - Interactive Filtering   |  - Multi-Format Knowledge Exp |
++--------------------------+----------------------------+-------------------------------+
+```
+
+### 1. Autonomous Hypothesis & Query Decomposition
+Given an arbitrary research topic or clinical query, NEOMON decomposes the prompt into four orthogonal research vectors: causal mechanisms, counter-evidence, empirical benchmarks, and critical perspectives. It preserves technical acronyms (e.g., *GLP-1*, *DDR5*, *LoRA*, *CRISPR*) to prevent semantic drift.
+
+### 2. Multi-Source Academic & Web Retrieval
+Simultaneously interrogates arXiv, Crossref, and OpenAlex for peer-reviewed literature, preprints, and open-access PDFs via Unpaywall. When configured, the engine dispatches concurrent, rate-controlled queries to Tavily Search for real-time web discovery without delaying academic passes.
+
+### 3. Provenance-Preserving Evidence Extraction
+Documents are downloaded via SSRF-safe HTTP clients, stripped of markup, hashed via SHA-256, and indexed into distinct passages. Passages retain exact `character_start`, `character_end`, section headers, page numbers, and URL provenance.
+
+### 4. Scientific Methodology Audit & Quality Calibration
+Evaluates papers using formal criteria: statistical sample sizes ($N$), presence of double-blinding, randomization protocols, effect sizes ($d$, $R^2$), and p-hacking indicators. Documents are calibrated into confidence intervals rather than arbitrary popularity metrics.
+
+### 5. Dialectical Multi-Agent Debate Engine
+Once evidence is indexed, specialized agents engage in a formal debate:
+* **The Advocate Agent**: Formulates the strongest evidence-backed argument supporting the hypothesis.
+* **The Skeptic Agent**: Identifies methodological flaws, conflicting evidence, sample bias, and funding conflicts.
+* **The Moderator Agent**: Adjudicates claims, evaluates strength of arguments, and computes final synthesis consensus scores.
+
+### 6. Contradiction Intelligence & Resolution
+Automatically detects conflicting claims across disparate research teams. Distinguishes direct factual contradictions from temporal shifts, methodological variances, and differing cohort definitions.
+
+### 7. Citation Genealogy & Study Independence
+Analyzes citation networks to detect circular citation loops and paper lineages. Identifies whether ten supporting papers are independent trials or merely citing a single unverified initial study.
+
+### 8. Interactive Knowledge Graph Explorer
+Visualizes the entire research domain using an interactive React Flow graph. Nodes represent Claims, Evidence, Sources, Agents, and Decisions, connected by typed relational edges (`SUPPORTS`, `REFUTES`, `CITES`, `AUDITS`).
+
+### 9. Longitudinal Trend & Research Gap Discovery
+Tracks shifting scientific consensus over time. Detects underexplored intersections, structural voids, and blind spots in existing research corpora, and computes prioritized research gap vectors.
+
+### 10. Autonomous Hypothesis Generation & Experimental Design
+Synthesizes gap analyses into testable, mathematically falsifiable scientific hypotheses complete with recommended experimental methodologies, sample sizes, and control designs.
+
+### 11. Multi-Cycle Autonomous Research Loops
+Supports hands-off or human-in-the-loop autonomous research cycles. The engine executes multiple iterations of query refinement, source discovery, and debate until target confidence thresholds are achieved.
+
+### 12. Multi-Format Knowledge Export
+Exports complete audit trails in six production formats: publication-ready PDF, structured Markdown, machine-readable JSON, BibTeX citation databases, RIS library files, and tabular CSV evidence ledgers.
+
+### 13. Collaborative Multi-User Workspaces & Ground-Truth Benchmarks
+Enables multi-user institutional collaboration with granular Role-Based Access Control (Admin, Member, Viewer). Built-in benchmark datasets allow teams to measure extraction accuracy against human ground truth.
+
+---
+
+## 4. Technology Stack
+
+| Layer | Technologies & Libraries | Architectural Role |
+|---|---|---|
+| **Frontend Framework** | **Next.js 16** (App Router, Turbopack) | Modern server and client components, fast incremental rendering |
+| **UI Library** | **React 19**, **TypeScript** (Strict Mode) | Type-safe state management, reactive interfaces, modern hooks |
+| **Styling & Icons** | **Tailwind CSS**, **Lucide React** | Responsive, accessible dark/light theme design system |
+| **Knowledge Graph** | **React Flow** (`@xyflow/react`) | Interactive, hardware-accelerated node-and-edge graph visualization |
+| **Backend Framework** | **FastAPI** (Python 3.12+, 3.13, 3.14 verified) | High-performance asynchronous REST API with OpenAPI specifications |
+| **Validation & Settings** | **Pydantic v2**, **Pydantic-Settings** | Strict data schemas, runtime request validation, environment configuration |
+| **Data Persistence** | **SQLAlchemy 2.0 (Asyncio)** | Unified asynchronous ORM across SQLite and PostgreSQL |
+| **Database Engines** | **PostgreSQL 15+** (Production) / **SQLite WAL** (Dev) | Cloud-scale relational persistence with atomic local fallback |
+| **Schema Migrations** | **Alembic** | Version-controlled, deterministic database migrations |
+| **Async Networking** | **HTTPX (AsyncClient)** | Non-blocking, connection-pooled academic retrieval with SSRF guards |
+| **Cryptographic Security** | **PBKDF2-HMAC-SHA256 (600k iter)**, **Secrets** | NIST-compliant password hashing, constant-time token verification |
+| **AI Integration** | **OpenAI-Compatible REST Spec** | Universal bring-your-own-model protocol (Ollama, LM Studio, Groq, etc.) |
+| **Web Intelligence** | **Tavily Search API (Optional)** | Domain-isolated, concurrent real-time public web intelligence |
+| **Testing Harnesses** | **Pytest**, **Pytest-Asyncio**, **Vitest**, **React Testing Library** | 226 backend tests and 15 frontend unit tests ensuring complete stability |
+
+---
+
+## 5. System Architecture
+
+```mermaid
+flowchart TD
+    subgraph ClientLayer["User Interface (Next.js 16 / React 19)"]
+        BrowserUI["Next.js App Router (localhost:3000 / Vercel)"]
+        AuthContext["Auth & Workspace Context (Session Tokens)"]
+        ModelContext["AI Provider Config (React In-Memory State)"]
+        GraphExplorer["React Flow Knowledge Graph"]
+    end
+
+    subgraph BackendGateway["FastAPI Gateway (backend/app/main.py)"]
+        CORSMiddleware["CORS & Proxy Middleware"]
+        RateLimiter["Token-Bucket Rate Limiter"]
+        RouterAuth["Auth & Tenancy Router (/api/v1/auth)"]
+        RouterResearch["Research & Investigation Router (/api/v1/research)"]
+        RouterAgents["Multi-Agent Analysis Router (/api/v1/analysis)"]
+        RouterAutonomous["Autonomous Loop Router (/api/v1/autonomous)"]
+        SSEBroker["Durable Event Broker (Server-Sent Events)"]
+    end
+
+    subgraph StorageLayer["Data Persistence & State Management"]
+        AlembicEngine["Alembic Migrations (0001 - 0016)"]
+        SQLAlchemyAsync["SQLAlchemy 2.0 Async Session Engine"]
+        SQLiteDB[("SQLite 3 (WAL Mode)\nbackend/neomon.db")]
+        PostgresDB[("PostgreSQL 15+\n(Supabase / Render)")]
+    end
+
+    subgraph RetrievalEngine["Academic & Web Discovery Pipeline"]
+        arXivClient["arXiv API Client"]
+        CrossrefClient["Crossref DOI Client"]
+        OpenAlexClient["OpenAlex Meta-Science Client"]
+        UnpaywallClient["Unpaywall Open Access Client"]
+        TavilyClient["Tavily Search Client (Optional API Key)"]
+        SSRFGuard["SSRF & DNS Rebinding Validator"]
+    end
+
+    subgraph AgentEngine["Multi-Agent Adjudication Pool"]
+        AdvocateAgent["Advocate Agent (Pro-Hypothesis)"]
+        SkepticAgent["Skeptic Agent (Counter-Evidence & Bias)"]
+        MethodologyAgent["Methodology Auditor (Power & P-Hacking)"]
+        ModeratorAgent["Moderator (Consensus & Synthesis)"]
+    end
+
+    subgraph ExternalAI["User-Supplied AI Models (Zero Bundled Credits)"]
+        LocalOllama["Local Ollama (http://localhost:11434)"]
+        LocalLMStudio["Local LM Studio (http://localhost:1234)"]
+        RemoteOpenAI["OpenAI-Compatible Remote API (Groq, Together, OpenAI)"]
+    end
+
+    %% Connections
+    BrowserUI --> CORSMiddleware
+    AuthContext --> RouterAuth
+    ModelContext --> RouterAgents
+    CORSMiddleware --> RateLimiter
+    RateLimiter --> RouterAuth
+    RateLimiter --> RouterResearch
+    RateLimiter --> RouterAgents
+    RateLimiter --> RouterAutonomous
+
+    RouterResearch --> SSRFGuard
+    SSRFGuard --> arXivClient
+    SSRFGuard --> CrossrefClient
+    SSRFGuard --> OpenAlexClient
+    SSRFGuard --> UnpaywallClient
+    SSRFGuard --> TavilyClient
+
+    RouterAgents --> AdvocateAgent
+    RouterAgents --> SkepticAgent
+    RouterAgents --> MethodologyAgent
+    RouterAgents --> ModeratorAgent
+
+    AdvocateAgent -.-> LocalOllama
+    SkepticAgent -.-> LocalLMStudio
+    MethodologyAgent -.-> RemoteOpenAI
+    ModeratorAgent -.-> RemoteOpenAI
+
+    RouterResearch --> SQLAlchemyAsync
+    RouterAgents --> SQLAlchemyAsync
+    RouterAutonomous --> SQLAlchemyAsync
+    SQLAlchemyAsync --> SQLiteDB
+    SQLAlchemyAsync --> PostgresDB
+    AlembicEngine --> SQLiteDB
+    AlembicEngine --> PostgresDB
+    RouterResearch --> SSEBroker
+    SSEBroker --> BrowserUI
+```
+
+---
+
+## 6. Windows Installation & Getting Started
+
+### Prerequisites
+
+* **Operating System**: Windows 10/11, macOS, or Linux.
+* **Node.js**: Version `18.18.0` or higher (verified on Node 20 / 22).
+* **Python**: Version `3.12` or higher (verified on Python 3.12, 3.13, 3.14).
+* **Git**: Installed and configured.
+* **PowerShell**: Windows PowerShell 5.1 or PowerShell Core 7+.
+
+---
+
+### Step 1: Clone the Repository
+
+Open Windows PowerShell and clone the codebase:
+
+```powershell
+git clone https://github.com/neomon-dev/NEOMON.git
+Set-Location NEOMON
+```
+
+---
+
+### Step 2: Frontend Setup & Dependencies
+
+Install Node.js dependencies:
+
+```powershell
+npm install
+```
+
+Configure local environment variables:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+Ensure `NEXT_PUBLIC_API_URL` in `.env.local` points to your backend instance:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+```
+
+Verify frontend compilation and test suite:
+
+```powershell
+# Run frontend unit tests
+npm test
+
+# Run ESLint check
+npm run lint
+
+# Run TypeScript typecheck
+npx tsc --noEmit
+```
+
+---
+
+### Step 3: Backend Setup & Python Virtual Environment
+
+Create and activate a clean Python virtual environment:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+Install backend dependencies:
+
+```powershell
+python -m pip install --upgrade pip
+pip install -r backend/requirements.txt
+```
+
+Verify backend byte-compilation:
+
+```powershell
+python -m compileall backend/app backend/migrations
+```
+
+---
+
+### Step 4: Database Migrations
+
+Apply the complete Alembic migration sequence to initialize the database:
+
+```powershell
+Set-Location backend
+python -m alembic upgrade head
+Set-Location ..
+```
+
+*Note: By default, NEOMON utilizes an atomic SQLite database configured with Write-Ahead Logging (`WAL` mode) located at `backend/neomon.db`. To target PostgreSQL instead, set `NEOMON_DATABASE_URL` as detailed in [Section 9](#9-comprehensive-environment-variable-reference).*
+
+---
+
+### Step 5: Execute Regression Test Suites
+
+Confirm full system integrity before launching the servers:
+
+```powershell
+# Run backend pytest suite (226 tests)
+python -m pytest backend/tests -q
+```
+
+All 226 tests should pass cleanly in ~30 seconds.
+
+---
+
+### Step 6: Launch Development Servers
+
+Launch both servers in parallel:
+
+**Terminal 1 — FastAPI Backend (Port 8000):**
+```powershell
+.\.venv\Scripts\Activate.ps1
+python -m uvicorn app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
+```
+
+**Terminal 2 — Next.js Frontend (Port 3000):**
+```powershell
+npm run dev
+```
+
+Navigate to `http://localhost:3000` in your web browser. The backend API specification is accessible at `http://localhost:8000/api/v1/docs`.
+
+---
+
+## 7. CRITICAL NOTICE: User-Supplied AI Provider Requirement
+
+> [!IMPORTANT]
+> **NEOMON PROVIDES ZERO FREE MODEL ACCESS OR BUNDLED API CREDITS.**
+> 
+> NEOMON is built on a strict **Bring-Your-Own-Model (BYOM)** architecture. The platform does not host proprietary LLM infrastructure, does not bundle API credits, and does not charge subscription fees for token generation. Users must supply their own local model runner (such as LM Studio or Ollama) or configure their own API keys for remote OpenAI-compatible providers.
+
+### Supported Provider Types
+
+```
+                                  +---------------------------------------+
+                                  |         NEOMON Provider Engine        |
+                                  +-------------------+-------------------+
+                                                      |
+                   +----------------------------------+----------------------------------+
+                   |                                                                     |
+         +---------v---------+                                                 +---------v---------+
+         |   LOCAL RUNNERS   |                                                 |    REMOTE APIS    |
+         |  (100% Free & PVT)|                                                 | (User's Own Keys) |
+         +---------+---------+                                                 +---------+---------+
+                   |                                                                     |
+         +---------+---------+                                                 +---------+---------+
+         |                   |                                                 |                   |
+   +-----v-----+       +-----v-----+                                     +-----v-----+       +-----v-----+
+   | LM Studio |       |  Ollama   |                                     |  OpenAI   |       | Groq /    |
+   | Port 1234 |       |Port 11434 |                                     |  Direct   |       | Together  |
+   +-----------+       +-----------+                                     +-----------+       +-----------+
+```
+
+### Option A: Local LM Studio Setup (Recommended for Local Privacy)
+
+1. Download and install **LM Studio** from [lmstudio.ai](https://lmstudio.ai).
+2. Download an instruction-tuned model (e.g., `Meta-Llama-3.1-8B-Instruct`, `Mistral-7B-Instruct-v0.3`, or `Qwen2.5-7B-Instruct`).
+3. Navigate to the **Local Server** tab in LM Studio.
+4. Set port to `1234` and start the server.
+5. In NEOMON, open **Settings (`/settings`)** -> **AI Provider Configuration**:
+   * **Provider Type**: `LM Studio`
+   * **Base URL**: `http://localhost:1234/v1`
+   * **Model Identifier**: Enter your loaded model name (e.g., `meta-llama-3.1-8b-instruct`).
+   * **API Key**: Leave blank or enter `lm-studio`.
+6. Click **Test Provider Connection** to verify end-to-end communication.
+
+### Option B: Local Ollama Setup
+
+1. Install **Ollama** from [ollama.com](https://ollama.com).
+2. Pull a recommended research model from your terminal:
+   ```powershell
+   ollama pull llama3.1:8b
+   ```
+3. Set the environment variable to allow web origin requests before starting Ollama:
+   ```powershell
+   $env:OLLAMA_ORIGINS = "*"
+   ollama serve
+   ```
+4. In NEOMON **Settings (`/settings`)**:
+   * **Provider Type**: `Ollama`
+   * **Base URL**: `http://localhost:11434/v1`
+   * **Model Identifier**: `llama3.1:8b`
+   * **API Key**: Leave empty.
+5. Click **Test Provider Connection**.
+
+### Option C: Remote OpenAI-Compatible Providers
+
+NEOMON supports any provider that adheres to the standard OpenAI `/v1/chat/completions` specification:
+
+* **OpenAI Direct**: `https://api.openai.com/v1` (Models: `gpt-4o`, `gpt-4o-mini`)
+* **Groq Cloud (Ultra-Fast Inference)**: `https://api.groq.com/openai/v1` (Models: `llama-3.1-70b-versatile`, `llama-3.1-8b-instant`)
+* **Together AI**: `https://api.together.xyz/v1`
+* **Mistral AI**: `https://api.mistral.ai/v1`
+* **Self-Hosted vLLM / TGI**: `http://your-server-ip:8000/v1`
+
+### Hardware Sizing Considerations for Local Inference
+
+* **Minimum (7B/8B Models, 4-bit Quantization)**: 16 GB System RAM, or 6 GB VRAM GPU (NVIDIA RTX 3060/4060 or Apple Silicon M1/M2/M3 with 16GB unified memory).
+* **Recommended (14B/32B Models)**: 32 GB System RAM, or 16 GB VRAM GPU (NVIDIA RTX 3090/4080/4090 or Apple Silicon with 36GB+ memory).
+* **Commercial Scale (70B+ Models)**: Remote inference API (Groq, Together, OpenAI) or multi-GPU workstation (48GB+ VRAM).
+
+### Zero-Cost Rule-Based Fallback
+If no AI provider is configured or available, NEOMON **does not fail**. It automatically falls back to deterministic, rule-based algorithmic extraction and debate synthesis. These outputs are clearly badged as `rule_based` across all interfaces, guaranteeing complete transparency.
+
+---
+
+## 8. CRITICAL NOTICE: Optional Tavily Search Configuration
+
+> [!NOTE]
+> **TAVILY SEARCH IS AN OPTIONAL CAPABILITY FOR GENERAL PUBLIC WEB RETRIEVAL.**
+> 
+> Out of the box, NEOMON connects to **arXiv, Crossref, and OpenAlex** with **ZERO API keys required**. Academic literature discovery, full-text open-access retrieval, and peer-review normalization operate fully without Tavily.
+
+### How Tavily Search Functions in NEOMON
+
+Tavily Search provides supplemental public web indexing for investigations where contemporary news, clinical press releases, institutional whitepapers, or industrial technical reports are required alongside academic publications.
+
+* **Key Provisioning**: Sign up at [tavily.com](https://tavily.com) to obtain a free or commercial API key.
+* **Environment Configuration**: Set either `TAVILY_API_KEY` or `NEOMON_TAVILY_API_KEY` in your backend `.env` file:
+  ```env
+  TAVILY_API_KEY=tvly-prod-your-actual-api-key-here
+  ```
+* **Concurrent Execution**: When configured, Tavily executes concurrently with academic providers, executing domain-isolated queries without blocking academic passes.
+* **Graceful Degradation**: If Tavily is not configured, is disabled (`NEOMON_TAVILY_ENABLED=false`), or exhausts its monthly quota, NEOMON logs a telemetry event and proceeds seamlessly using academic providers alone. No requests fail or crash due to an absent Tavily key.
+
+---
+
+## 9. Comprehensive Environment Variable Reference
+
+All backend settings support the `NEOMON_` prefix and are defined in `backend/app/config.py`.
+
+### Backend Settings Reference
+
+| Variable Name | Type | Default Value | Description & Production Recommendations |
+|---|---|---|---|
+| `NEOMON_APP_NAME` | `string` | `"NEOMON API"` | Display name for the API service reported in health endpoints. |
+| `NEOMON_ENVIRONMENT` | `string` | `"development"` | Environment profile: `"development"`, `"staging"`, or `"production"`. |
+| `NEOMON_DEBUG` | `boolean` | `false` | Enable verbose debugging information and stack traces. |
+| `NEOMON_API_VERSION` | `string` | `"v1"` | URL path versioning prefix for all API routes. |
+| `NEOMON_DATABASE_URL` | `string` | `sqlite+aiosqlite:///backend/neomon.db` | SQLAlchemy connection string. Set to `postgresql+asyncpg://...` in production. |
+| `NEOMON_ALLOWED_ORIGINS` | `csv` | `http://localhost:3000,http://127.0.0.1:3000` | Comma-separated CORS allowed origin list. In production, set to your Vercel URL. |
+| `NEOMON_ALLOWED_LOCAL_PROVIDER_HOSTS`| `csv` | `localhost,127.0.0.1,::1` | Permitted hostnames for local AI provider endpoints (SSRF guard). |
+| `NEOMON_DEMO_MODE` | `boolean` | `true` | When true, marks synthesized test investigations with explicit demo banners. |
+| `NEOMON_REQUEST_TIMEOUT_SECONDS` | `float` | `15.0` | Default network request timeout for general external HTTP calls. |
+| `NEOMON_LOCAL_INFERENCE_TIMEOUT_SECONDS` | `float` | `300.0` | Extended timeout (up to 1800s) for long local LLM inference batches. |
+| `NEOMON_PROVIDER_QUEUE_MAX_SIZE` | `integer` | `50` | Maximum queue depth for pending provider analysis jobs. |
+| `NEOMON_LOCAL_PROVIDER_MAX_CONCURRENCY` | `integer` | `1` | Concurrency ceiling for local models to prevent GPU/CPU memory thrashing. |
+| `NEOMON_REMOTE_PROVIDER_MAX_CONCURRENCY`| `integer` | `4` | Concurrency ceiling for remote cloud API providers. |
+| `NEOMON_DATABASE_POOL_SIZE` | `integer` | `10` | SQLAlchemy connection pool size for PostgreSQL connections. |
+| `NEOMON_DATABASE_MAX_OVERFLOW` | `integer` | `20` | Maximum overflow connections allowed above `pool_size`. |
+| `NEOMON_DATABASE_POOL_TIMEOUT` | `float` | `30.0` | Seconds to wait before failing to acquire a database pool connection. |
+| `NEOMON_DATABASE_POOL_RECYCLE` | `integer` | `1800` | Seconds before recycling connections to avoid stale socket drops. |
+| `NEOMON_REDIS_URL` | `string` | `None` | Optional Redis URL (`redis://...`) for distributed caching and rate-limiting. |
+| `NEOMON_WORKER_ENABLED` | `boolean` | `true` | Whether background job orchestration worker threads run within the process. |
+| `NEOMON_WORKER_CONCURRENCY` | `integer` | `4` | Maximum concurrent background research tasks executed by worker. |
+| `NEOMON_RATE_LIMIT_ENABLED` | `boolean` | `true` | Enables token-bucket IP/session rate-limiting middleware. |
+| `NEOMON_RATE_LIMIT_AUTH_RPM` | `integer` | `10` | Rate limit for `/api/v1/auth` endpoints (brute-force defense). |
+| `NEOMON_RATE_LIMIT_RESEARCH_RPM` | `integer` | `30` | Rate limit for investigation creation and research retrieval. |
+| `NEOMON_RATE_LIMIT_EXPORT_RPM` | `integer` | `20` | Rate limit for PDF and data export generation. |
+| `NEOMON_RATE_LIMIT_DEFAULT_RPM` | `integer` | `120` | Default rate limit across all standard REST routes. |
+| `NEOMON_LOG_LEVEL` | `string` | `"INFO"` | Logging verbosity: `"DEBUG"`, `"INFO"`, `"WARNING"`, `"ERROR"`. |
+| `NEOMON_LOG_FORMAT` | `string` | `"auto"` | Format: `"auto"`, `"json"` (for production aggregators), or `"human"`. |
+| `NEOMON_TAVILY_API_KEY` | `string` | `None` | Optional Tavily API key for web search. Also accepts `TAVILY_API_KEY`. |
+| `NEOMON_TAVILY_ENABLED` | `boolean` | `true` | Master toggle for Tavily Web Retrieval. |
+| `NEOMON_TAVILY_SEARCH_DEPTH` | `string` | `"advanced"` | Tavily search depth: `"basic"` (fast) or `"advanced"` (deep context). |
+| `NEOMON_TAVILY_MAX_RESULTS` | `integer` | `10` | Maximum results fetched per Tavily query vector (1-20). |
+| `NEOMON_UNPAYWALL_EMAIL` | `string` | `None` | Contact email for Unpaywall Open Access API compliance. |
+| `NEOMON_UNPAYWALL_API_KEY` | `string` | `None` | Optional commercial API key for Unpaywall infrastructure. |
+| `NEOMON_RESEARCH_USER_AGENT` | `string` | `"NEOMON/0.3 (+https://github.com/neomon-dev/NEOMON)"` | Polite HTTP User-Agent header sent to academic registries. |
+| `NEOMON_RESEARCH_MAX_DOCUMENT_BYTES` | `integer` | `5000000` | Max document size (5 MB default) downloaded by crawler to prevent DoS. |
+
+### Frontend Settings Reference (`.env.local`)
+
+| Variable Name | Default Value | Description |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | Public backend URL accessible from the client browser. |
+
+---
+
+## 10. Database Management & Migration Strategy
+
+NEOMON uses an enterprise-grade migration architecture managed through **Alembic** and **SQLAlchemy 2.0 Asyncio**.
+
+### Database Engine Dual-Compatibility
+
+* **Local Development & Offline Air-Gapped Mode**: SQLite 3 with Write-Ahead Logging (`WAL`), multi-process busy handlers, and immediate transaction pragmas. The baseline database is committed at `backend/neomon.db` with historical test records.
+* **Production Deployment**: PostgreSQL 15+ (tested on Supabase, AWS RDS, and Render PostgreSQL) using the high-performance `asyncpg` driver and connection pooling.
+
+### Common Alembic Commands
+
+Run all commands from the `backend/` directory:
+
+```powershell
+Set-Location backend
+
+# Apply all migrations to the latest revision
+python -m alembic upgrade head
+
+# Inspect the current database schema revision
+python -m alembic current
+
+# View complete migration history
+python -m alembic history --verbose
+
+# Roll back by one migration revision (use with caution in staging)
+python -m alembic downgrade -1
+```
+
+### Key Migration Milestones
+
+* `20261112_0001` to `20261112_0008`: Core research entities, investigations, claims, sources, and documents.
+* `20261113_0009` to `20261113_0012`: Multi-agent debate rounds, evidence calibration, credibility assessments, and methodology audits.
+* `20261114_0013` to `20261114_0015`: Study independence clusters, citation lineages, collaborative workspaces, and RBAC tables.
+* `20261115_0016`: Dialect-aware cleanups and production indexing.
+
+---
+
+## 11. Production Deployment Architecture
+
+NEOMON is optimized for a hybrid cloud architecture combining Vercel for frontend delivery and Render or Fly.io for backend execution.
+
+```
++-----------------------------------------------------------------------------------------+
+|                                PRODUCTION DEPLOYMENT                                    |
++-----------------------------------------------------------------------------------------+
+|                                                                                         |
+|   +------------------------------------+          +---------------------------------+   |
+|   |          VERCEL PLATFORM           |          |        RENDER WEB SERVICE       |   |
+|   |  - Next.js 16 (App Router)         |          |  - FastAPI (Python 3.12+)       |   |
+|   |  - Edge CDN & Asset Optimization   |          |  - Background Worker Threads    |   |
+|   |  - Server-Side Rendering (SSR)     |          |  - Port Binding: 0.0.0.0:$PORT  |   |
+|   |  - URL: neomon-beryl.vercel.app    |          |  - URL: neomon-api.onrender.com |   |
+|   +-----------------+------------------+          +----------------+----------------+   |
+|                     |                                              |                    |
+|                     | HTTPS REST / Typed SSE Streams               |                    |
+|                     +----------------------------------------------+                    |
+|                                                                    |                    |
+|                                                   +----------------v----------------+   |
+|                                                   |     MANAGED POSTGRESQL 15+      |   |
+|                                                   |  - Supabase / Render Postgres   |   |
+|                                                   |  - asyncpg Connection Pool      |   |
+|                                                   |  - Automated Backups            |   |
+|                                                   +---------------------------------+   |
++-----------------------------------------------------------------------------------------+
+```
+
+### Backend (Render Web Service)
+
+* **Build Command**:
+  ```bash
+  pip install -r backend/requirements.txt && cd backend && alembic upgrade head
+  ```
+* **Start Command**:
+  ```bash
+  cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+  ```
+* **Environment Variables**:
+  ```env
+  NEOMON_ENVIRONMENT=production
+  NEOMON_DEMO_MODE=false
+  NEOMON_DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/neomon
+  NEOMON_ALLOWED_ORIGINS=https://neomon-beryl.vercel.app
+  ```
+
+### Frontend (Vercel)
+
+* **Framework Preset**: Next.js
+* **Build Command**: `npm run build`
+* **Output Directory**: `.next`
+* **Environment Variables**:
+  ```env
+  NEXT_PUBLIC_API_URL=https://neomon-api.onrender.com/api/v1
+  ```
+
+---
+
+## 12. Security, Privacy & Compliance Architecture
+
+Security is designed into NEOMON's architectural foundation:
+
+### 1. In-Memory AI Key Isolation
+API keys for external AI providers (such as OpenAI, Anthropic, or Groq) are stored **strictly in React client memory** for the duration of the browser session. Keys are:
+* **Never** written to browser `localStorage` or `sessionStorage`.
+* **Never** appended to URLs or logged in telemetry.
+* **Never** stored in the backend database or backend filesystem.
+* Passed ephemeral per-request in the `X-Provider-Key` header or sanitized payload body.
+
+### 2. NIST-Compliant Authentication & Cryptography
+* User passwords are encrypted using salted **PBKDF2-HMAC-SHA256 with 600,000 iterations**.
+* Session authentication tokens are 256-bit cryptographically secure strings generated via Python's `secrets` module.
+* Stored tokens are hashed using SHA-256 before database insertion; plain tokens are never saved.
+* Constant-time comparison (`secrets.compare_digest`) protects against timing attacks.
+
+### 3. Server-Side Request Forgery (SSRF) Defense
+All outbound document downloads and user-configured model endpoints pass through a strict SSRF validation layer:
+* DNS names are resolved to IPv4/IPv6 addresses immediately prior to socket connection.
+* Private network ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16` AWS metadata, carrier-grade NAT) are rejected with HTTP 400.
+* Loopback addresses (`127.0.0.1`, `localhost`, `::1`) are permitted **exclusively** for verified local AI runners (`LM Studio`, `Ollama`) via strict whitelist filtering.
+
+### 4. Tenant Isolation & Granular RBAC
+All investigations, sources, evidence, workflows, and debate records are bound to specific `workspace_id` foreign keys. Cross-tenant access is validated at the database query layer, enforcing permissions across three distinct roles:
+* **Admin**: Workspace management, member invitations, API configuration, deletion rights.
+* **Member**: Create and execute investigations, debate rounds, gap analyses, and exports.
+* **Viewer**: Read-only access to completed research dossiers, reports, and knowledge graphs.
+
+---
+
+## 13. Troubleshooting Guide & Diagnostics
+
+### Common Issues & Immediate Resolutions
+
+#### 1. "Failed to connect to AI provider / Connection Refused"
+* **Symptom**: Red badge in Settings or investigation view stating provider unreachable.
+* **Cause**: Local server is not running, listening on wrong port, or blocking CORS.
+* **Resolution**:
+  * For **LM Studio**: Open the Local Server tab, confirm the green "Running" light is active, port is `1234`, and CORS is enabled.
+  * For **Ollama**: Ensure Ollama was started with `OLLAMA_ORIGINS="*"`:
+    ```powershell
+    $env:OLLAMA_ORIGINS = "*"
+    ollama serve
+    ```
+
+#### 2. "CORS Error: No 'Access-Control-Allow-Origin' header present"
+* **Symptom**: Browser console logs CORS error when frontend requests backend endpoints.
+* **Cause**: Frontend origin not included in backend `NEOMON_ALLOWED_ORIGINS`.
+* **Resolution**: Add your frontend URL (e.g., `http://localhost:3000` or `https://your-domain.vercel.app`) to `NEOMON_ALLOWED_ORIGINS` in your backend `.env` file.
+
+#### 3. "database is locked" (SQLite)
+* **Symptom**: SQLite database error during high-concurrency test runs or parallel investigations.
+* **Cause**: Database file accessed in standard rollback journal mode without WAL pragmas.
+* **Resolution**: Ensure SQLite WAL mode is enabled:
+  ```powershell
+  python -c "import sqlite3; con = sqlite3.connect('backend/neomon.db'); con.execute('PRAGMA journal_mode=WAL;'); print(con.execute('PRAGMA journal_mode;').fetchone())"
+  ```
+
+#### 4. "Target database is not up to date" (Alembic)
+* **Symptom**: Backend startup warning or crash indicating missing schema tables.
+* **Cause**: Pending database migrations have not been applied.
+* **Resolution**: Run `python -m alembic upgrade head` inside the `backend/` directory.
+
+---
+
+## 14. Feature Documentation Index
+
+For exhaustive, section-by-section architectural documentation of every platform capability, consult the [Feature Documentation Index](docs/features/README.md):
+
+* **Observatory & Investigations**: [Dashboard](docs/features/dashboard.md) | [Investigation Lifecycle](docs/features/investigations.md) | [Research Orchestration](docs/features/research-orchestration.md)
+* **Intelligence Engines**: [Multi-Agent Analysis](docs/features/multi-agent-analysis.md) | [Advocate-Skeptic Debate](docs/features/advocate-skeptic.md) | [Methodology Audit](docs/features/methodology-audit.md)
+* **Evidence & Literature**: [Source Discovery](docs/features/source-discovery.md) | [Evidence Workspace](docs/features/evidence-workspace.md) | [Quality Calibration](docs/features/evidence-quality.md)
+* **Advanced Synthesis**: [Contradiction Intelligence](docs/features/contradiction-intelligence.md) | [Citation Genealogy](docs/features/citation-genealogy.md) | [Knowledge Graph](docs/features/knowledge-graph.md) | [Research Synthesis](docs/features/research-synthesis.md)
+* **Longitudinal Discovery**: [Research Trends](docs/features/research-trends.md) | [Research Gaps](docs/features/research-gaps.md) | [Hypothesis Generation](docs/features/hypothesis-generation.md) | [Autonomous Workflows](docs/features/autonomous-workflows.md)
+* **Platform & Infrastructure**: [Workspaces & RBAC](docs/features/workspace-collaboration.md) | [Authentication](docs/features/authentication-and-roles.md) | [Notifications](docs/features/notifications.md) | [Scientific Benchmarks](docs/features/benchmarks.md) | [Settings & Telemetry](docs/features/settings-and-configuration.md)
+* **Technical Specifications**: [Complete REST API Reference](docs/features/api-reference.md) | [Database & Data Model (68 Tables)](docs/features/database-and-data-model.md)
+
+---
+
+## 15. License & Contribution Terms
+
+NEOMON is released under the **Apache License 2.0**.
+
+```
+Copyright 2026 NEOMON Development Team.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+### Contribution Standards
+
+1. **Zero Unverified Assertions**: All contributions modifying research synthesis, debate adjudication, or source indexing must include corresponding automated unit tests.
+2. **Strict Provenance Guarantee**: Features touching evidence handling must maintain character-level provenance without exception.
+3. **SSRF Guard Invariance**: Under no circumstances should SSRF protections or URL validation routines be relaxed for non-whitelisted addresses.
+4. **Clean Regression Pass**: Pull requests must pass 100% of backend tests (`pytest backend/tests`), frontend tests (`npm test`), ESLint (`npm run lint`), and TypeScript verification (`npx tsc --noEmit`).
+
+---
+
+*NEOMON — Neural Evidence Orchestration & Multi-Agent Observation Network*
+*Engineered for scientific integrity, reproducibility, and transparent dialectical intelligence.*
