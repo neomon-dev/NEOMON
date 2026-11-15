@@ -349,9 +349,9 @@ async def _run_investigation_impl(
     investigation.relevant_source_count = relevant_source_count
     investigation.full_text_count = full_text_count
     investigation.quality_status = (
-        "very_strong"
+        "strong"
         if relevant_source_count >= 5 and evidence_count >= 5 and full_text_count >= 2 and cluster_count >= 3
-        else "strong"
+        else "moderate"
         if relevant_source_count >= 3 and evidence_count >= 3 and full_text_count >= 1 and cluster_count >= 2
         else "limited"
         if relevant_source_count and evidence_count

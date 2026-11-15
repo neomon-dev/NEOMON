@@ -10,6 +10,7 @@ import {
   updateNotificationPreferences,
   NotificationItem,
 } from "@/lib/collaboration";
+import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 
 export default function NotificationsPage() {
@@ -18,6 +19,7 @@ export default function NotificationsPage() {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
   // Preferences
   const [inAppEnabled, setInAppEnabled] = useState(true);
@@ -28,6 +30,7 @@ export default function NotificationsPage() {
     try {
       setLoading(true);
       setError(null);
+      setIsUnauthenticated(false);
       const [notifs, prefs] = await Promise.all([
         listNotifications(50, unreadOnly),
         getNotificationPreferences().catch(() => ({ email_notifications_enabled: true, in_app_notifications_enabled: true })),
@@ -36,7 +39,13 @@ export default function NotificationsPage() {
       setInAppEnabled(prefs.in_app_notifications_enabled);
       setEmailEnabled(prefs.email_notifications_enabled);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load notifications.");
+      if (err instanceof ApiError && err.status === 401) {
+        setIsUnauthenticated(true);
+        setNotifications([]);
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to load notifications.");
+      }
     } finally {
       setLoading(false);
     }
@@ -170,6 +179,43 @@ export default function NotificationsPage() {
           Unread Only {unreadCount > 0 && `(${unreadCount})`}
         </button>
       </div>
+
+      {isUnauthenticated && (
+        <div
+          style={{
+            background: "rgba(14, 165, 233, 0.1)",
+            border: "1px solid rgba(56, 189, 248, 0.3)",
+            borderRadius: "8px",
+            padding: "16px 20px",
+            marginBottom: "20px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+            <div>
+              <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 600, color: "#f0f9ff" }}>
+                Guest Session — Authentication Required
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", color: "#93c5fd" }}>
+                Sign in to view your research notifications, review requests, and workspace activity alerts.
+              </p>
+            </div>
+            <Link
+              href="/login"
+              style={{
+                padding: "8px 16px",
+                background: "#0284c7",
+                color: "#fff",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div style={{ background: "#450a0a", border: "1px solid #991b1b", color: "#fca5a5", padding: "12px 16px", borderRadius: "8px", marginBottom: "20px", fontSize: "13px" }}>

@@ -123,6 +123,14 @@ async def logout(
     return {"message": "Logged out successfully."}
 
 
+@router.post("/stream-ticket")
+async def issue_stream_ticket(user: User = Depends(get_current_user)):
+    """Issue a single-use, 60-second SSE ticket to prevent exposing session tokens in URLs."""
+    from app.auth.auth_service import create_stream_ticket
+    ticket = create_stream_ticket(user.id)
+    return {"ticket": ticket, "expires_in": 60}
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_me(user: User = Depends(get_current_user)):
     """Fetch profile of current authenticated user."""

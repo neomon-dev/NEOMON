@@ -8,7 +8,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
-from app.collaboration.permission_service import PermissionService, DEFAULT_GLOBAL_WORKSPACE_ID
+from app.collaboration.permission_service import PermissionService
 from app.db import get_session
 from app.errors import BackendError
 from app.models import (
@@ -1280,7 +1280,13 @@ async def read_workspace_graph(
     else:
         user_workspaces = await perm.get_user_workspaces(user.id)
         if not user_workspaces:
-            user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+            return InvestigationGraphResponse(
+                nodes=[],
+                edges=[],
+                truncated=False,
+                total_counts=GraphTotalCounts(),
+                empty_reason="No workspace memberships are available.",
+            )
         investigation = await session.scalar(
             select(Investigation)
             .where(Investigation.workspace_id.in_(user_workspaces))

@@ -100,7 +100,7 @@ async def list_workspace_evidence(
     perm = PermissionService(session)
     user_workspaces = await perm.get_user_workspaces(user.id)
     if not user_workspaces:
-        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+        return WorkspaceEvidencePageResponse(items=[], total=0, limit=limit, offset=offset)
 
     inv_scope = Investigation.workspace_id.in_(user_workspaces)
     if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:
@@ -298,7 +298,7 @@ async def list_workspace_sources(
     perm = PermissionService(session)
     user_workspaces = await perm.get_user_workspaces(user.id)
     if not user_workspaces:
-        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+        return WorkspaceSourcePageResponse(items=[], total=0, limit=limit, offset=offset)
 
     inv_scope = Investigation.workspace_id.in_(user_workspaces)
     if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:
@@ -506,7 +506,27 @@ async def read_agent_observatory(
     perm = PermissionService(session)
     user_workspaces = await perm.get_user_workspaces(user.id)
     if not user_workspaces:
-        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+        settings = get_settings()
+        return AgentObservatoryResponse(
+            summary=ObservatorySummary(
+                total_jobs=0,
+                active_jobs=0,
+                total_executions=0,
+                waiting_in_queue=0,
+                generating=0,
+                completed=0,
+                failed=0,
+                cancelled=0,
+                provider_queue_wait_timeout_seconds=settings.provider_queue_wait_timeout_seconds,
+                local_inference_timeout_seconds=settings.local_inference_timeout_seconds,
+                local_provider_max_concurrency=settings.local_provider_max_concurrency,
+            ),
+            agents=[],
+            executions=[],
+            executions_total=0,
+            limit=limit,
+            offset=offset,
+        )
 
     inv_scope = Investigation.workspace_id.in_(user_workspaces)
     if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:

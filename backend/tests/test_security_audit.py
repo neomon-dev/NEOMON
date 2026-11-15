@@ -20,7 +20,7 @@ from unittest.mock import patch
 import uuid
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.auth.auth_service import AuthService
 from app.auth.security import hash_token
@@ -228,6 +228,46 @@ def test_horizontal_privilege_escalation_across_workspaces(raw_client: TestClien
 
     # Bob attempts cross-workspace SSE connection:
     assert raw_client.get(f"/api/v1/events?investigation_id={inv_a_id}", headers=headers_b).status_code == 403
+
+
+def test_users_without_global_membership_cannot_read_legacy_global_data(raw_client: TestClient):
+    """Legacy unassigned investigations are visible only to explicit global members."""
+    email = f"global_scope_{uuid.uuid4().hex[:8]}@neomon.ai"
+    registration = raw_client.post(
+        "/api/v1/auth/register",
+        json={"email": email, "password": "Password123!", "display_name": "Global Scope User"},
+    )
+    assert registration.status_code == 201
+    headers = {"Authorization": f"Bearer {registration.json()['session_token']}"}
+    user_id = uuid.UUID(registration.json()["user"]["id"])
+
+    async def remove_membership_and_create_legacy_investigation():
+        legacy_id = uuid.uuid4()
+        async with SessionFactory() as session:
+            await session.execute(delete(WorkspaceMember).where(WorkspaceMember.user_id == user_id))
+            session.add(
+                Investigation(
+                    id=legacy_id,
+                    question="Legacy global investigation that must remain isolated.",
+                    status="completed",
+                    workspace_id=None,
+                    owner_id=user_id,
+                )
+            )
+            await session.commit()
+        return legacy_id
+
+    legacy_id = asyncio.run(remove_membership_and_create_legacy_investigation())
+
+    assert raw_client.get(f"/api/v1/research/investigations/{legacy_id}", headers=headers).status_code == 403
+    assert raw_client.get("/api/v1/research/autonomous/workflows", headers=headers).json() == []
+    assert raw_client.get("/api/v1/research/quality/audits", headers=headers).json() == []
+    assert raw_client.get("/api/v1/research/evidence", headers=headers).json()["total"] == 0
+    assert raw_client.get("/api/v1/research/sources", headers=headers).json()["total"] == 0
+    assert raw_client.get("/api/v1/agents/observatory", headers=headers).json()["executions_total"] == 0
+    graph = raw_client.get("/api/v1/research/graph", headers=headers)
+    assert graph.status_code == 200
+    assert graph.json()["nodes"] == []
 
 
 # =========================================================================
@@ -481,3 +521,94 @@ def test_concurrent_interactions_no_deadlock(raw_client: TestClient):
     assert th_res.status_code == 200
     # 1 initial thread message + 10 comments = 11
     assert len(th_res.json()["comments"]) == 11
+
+
+def test_stream_ticket_lifecycle_single_use_and_replay_protection(raw_client: TestClient):
+    """Test that stream tickets are single-use, cannot be replayed, and unauthenticated callers are rejected."""
+    # 1. Unauthenticated request to /stream-ticket returns 401
+    assert raw_client.post("/api/v1/auth/stream-ticket").status_code == 401
+
+    # 2. Register user & create workspace + investigation
+    email = f"stream_{uuid.uuid4().hex[:8]}@neomon.ai"
+    reg = raw_client.post("/api/v1/auth/register", json={"email": email, "password": "Password123!", "display_name": "Stream Tester"})
+    token = reg.json()["session_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    ws = raw_client.post("/api/v1/workspaces", json={"name": "Stream Lab"}, headers=headers).json()
+    ws_id = ws["id"]
+
+    with patch("app.routers.research.run_investigation", return_value=([], [])):
+        inv = raw_client.post(
+            "/api/v1/research/investigations",
+            json={"question": "Stream ticket verification question?", "workspace_id": ws_id},
+            headers=headers,
+        ).json()["investigation"]
+    inv_id = inv["id"]
+
+    # 3. Issue stream ticket
+    ticket_resp = raw_client.post("/api/v1/auth/stream-ticket", headers=headers)
+    assert ticket_resp.status_code == 200
+    ticket = ticket_resp.json()["ticket"]
+    assert ticket.startswith("st_")
+    assert ticket_resp.json()["expires_in"] == 60
+
+    # 4. Authenticate using single-use stream ticket -> valid
+    raw_client.cookies.clear()
+    me_resp = raw_client.get(f"/api/v1/auth/me?ticket={ticket}")
+    assert me_resp.status_code == 200
+    assert me_resp.json()["email"] == email
+
+    # 5. Replay attempt with same consumed ticket MUST return 401 (single-use enforced)
+    raw_client.cookies.clear()
+    replay_resp = raw_client.get(f"/api/v1/auth/me?ticket={ticket}")
+    assert replay_resp.status_code == 401
+    assert "already consumed" in replay_resp.json()["detail"].lower()
+
+    # 6. Forged or random ticket MUST return 401
+    forged_resp = raw_client.get(f"/api/v1/events?investigation_id={inv_id}&ticket=st_forged_random_ticket")
+    assert forged_resp.status_code == 401
+
+
+def test_events_without_investigation_id_rejected_for_non_admin(raw_client: TestClient):
+    """Test that non-admin users cannot subscribe to global event broker without investigation_id."""
+    email = f"regular_{uuid.uuid4().hex[:8]}@neomon.ai"
+    reg = raw_client.post("/api/v1/auth/register", json={"email": email, "password": "Password123!", "display_name": "Regular User"})
+    token = reg.json()["session_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Non-admin attempting to subscribe to all events without investigation_id -> 400
+    res = raw_client.get("/api/v1/events", headers=headers)
+    assert res.status_code == 400
+    assert "investigation_id is required" in res.json()["message"]
+
+
+def test_export_security_unauthenticated_and_cross_workspace_rejected(raw_client: TestClient):
+    """Test that all export endpoints reject unauthenticated and cross-workspace access."""
+    email_a = f"exp_a_{uuid.uuid4().hex[:8]}@neomon.ai"
+    token_a = raw_client.post("/api/v1/auth/register", json={"email": email_a, "password": "Password123!", "display_name": "User A"}).json()["session_token"]
+    headers_a = {"Authorization": f"Bearer {token_a}"}
+
+    email_b = f"exp_b_{uuid.uuid4().hex[:8]}@neomon.ai"
+    token_b = raw_client.post("/api/v1/auth/register", json={"email": email_b, "password": "Password123!", "display_name": "User B"}).json()["session_token"]
+    headers_b = {"Authorization": f"Bearer {token_b}"}
+
+    ws_a = raw_client.post("/api/v1/workspaces", json={"name": "Workspace A"}, headers=headers_a).json()["id"]
+
+    with patch("app.routers.research.run_investigation", return_value=([], [])):
+        inv_a = raw_client.post(
+            "/api/v1/research/investigations",
+            json={"question": "Export security test question?", "workspace_id": ws_a},
+            headers=headers_a,
+        ).json()["investigation"]["id"]
+
+    export_formats = ["markdown", "json", "html-graph", "svg", "json-ld", "evidence-csv", "sources-csv"]
+    for fmt in export_formats:
+        url = f"/api/v1/research/investigations/{inv_a}/export/{fmt}"
+        # 1. Unauthenticated -> 401
+        raw_client.cookies.clear()
+        assert raw_client.get(url).status_code == 401
+        # 2. Cross-workspace User B -> 403
+        assert raw_client.get(url, headers=headers_b).status_code == 403
+        # 3. Authorized User A -> 200
+        assert raw_client.get(url, headers=headers_a).status_code == 200
+

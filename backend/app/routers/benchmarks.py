@@ -102,6 +102,38 @@ async def get_benchmark(
     return _to_dataset_response(ds)
 
 
+@router.get("/{benchmark_id_or_slug}/runs", response_model=List[BenchmarkRunResponse])
+async def list_benchmark_runs(
+    benchmark_id_or_slug: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_session),
+):
+    """List historical evaluation runs for a benchmark dataset."""
+    from sqlalchemy import select, desc
+    service = BenchmarkService(db)
+    await service.seed_default_benchmarks()
+
+    try:
+        b_id = uuid.UUID(benchmark_id_or_slug)
+        ds = await db.get(BenchmarkDataset, b_id)
+    except ValueError:
+        ds = await service.get_benchmark_by_slug(benchmark_id_or_slug)
+
+    if not ds:
+        raise HTTPException(status_code=404, detail="Benchmark dataset not found")
+
+    runs = list(
+        (
+            await db.scalars(
+                select(BenchmarkRun)
+                .where(BenchmarkRun.benchmark_dataset_id == ds.id)
+                .order_by(desc(BenchmarkRun.created_at))
+            )
+        ).all()
+    )
+    return [_to_run_response(r) for r in runs]
+
+
 @router.post("/{benchmark_id_or_slug}/evaluate/{investigation_id}", response_model=BenchmarkRunResponse)
 async def evaluate_investigation_benchmark(
     benchmark_id_or_slug: str,

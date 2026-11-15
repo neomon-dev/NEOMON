@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestJson } from "@/lib/api";
 
 export type HypothesisEvaluationView = {
@@ -101,7 +101,7 @@ export function HypothesisWorkspace({ investigationId, investigationQuestion }: 
   const [evalComments, setEvalComments] = useState<string>("");
   const [evalSubmitting, setEvalSubmitting] = useState<boolean>(false);
 
-  const loadHypotheses = async () => {
+  const loadHypotheses = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -114,13 +114,13 @@ export function HypothesisWorkspace({ investigationId, investigationQuestion }: 
     } finally {
       setLoading(false);
     }
-  };
+  }, [investigationId]);
 
   useEffect(() => {
     if (investigationId) {
       loadHypotheses();
     }
-  }, [investigationId]);
+  }, [investigationId, loadHypotheses]);
 
   const handleGenerate = async (force: boolean = false) => {
     setGenerating(true);

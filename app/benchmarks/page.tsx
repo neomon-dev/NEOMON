@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { requestJson } from "@/lib/api";
+import { ApiError, requestJson } from "@/lib/api";
 
 interface BenchmarkDataset {
   id: string;
@@ -61,6 +61,7 @@ export default function BenchmarksPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isUnauthenticated, setIsUnauthenticated] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Custom evaluation input
@@ -72,11 +73,18 @@ export default function BenchmarksPage() {
     try {
       const data = await requestJson<BenchmarkDataset[]>("/benchmarks");
       setDatasets(data);
+      setIsUnauthenticated(false);
       if (data.length > 0 && !selectedDataset) {
         setSelectedDataset(data[0]);
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load benchmarks");
+      if (err instanceof ApiError && err.status === 401) {
+        setIsUnauthenticated(true);
+        setDatasets([]);
+        setError(null);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to load benchmarks");
+      }
     } finally {
       setLoading(false);
     }
@@ -159,6 +167,42 @@ export default function BenchmarksPage() {
           Systematic, versioned benchmark datasets verifying retrieval precision, passage entailment, study independence deduplication, and historical regression stability under peer-review standards.
         </p>
       </header>
+
+      {isUnauthenticated && (
+        <div
+          style={{
+            background: "rgba(30, 41, 59, 0.5)",
+            border: "1px solid #334155",
+            borderRadius: "8px",
+            padding: "16px 20px",
+            marginBottom: "20px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            <strong style={{ color: "#f8fafc", fontSize: "14px" }}>Guest Session</strong>
+            <p style={{ color: "#94a3b8", fontSize: "12px", margin: "2px 0 0" }}>
+              Sign in with an authorized research account to evaluate benchmark datasets and execute regression comparisons.
+            </p>
+          </div>
+          <Link
+            href="/login"
+            style={{
+              background: "#2563eb",
+              color: "#fff",
+              padding: "6px 14px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Sign in →
+          </Link>
+        </div>
+      )}
 
       {/* Historical Regression Quick-Actions */}
       <div

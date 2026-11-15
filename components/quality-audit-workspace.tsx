@@ -120,27 +120,33 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
 
   // Load all investigation audit items
   useEffect(() => {
+    let active = true;
     async function loadAudits() {
       try {
         const data = await requestJson<InvestigationQualityAuditItem[]>(
           `/research/quality/audits`
         );
+        if (!active) return;
         setInvestigations(data || []);
-        if (!selectedId && data && data.length > 0) {
-          setSelectedId(data[0].investigation_id);
+        if (data && data.length > 0) {
+          setSelectedId((prev) => prev || initialInvestigationId || data[0].investigation_id);
         }
       } catch (err) {
-        console.error("Failed to load quality audits:", err);
+        if (active) console.error("Failed to load quality audits:", err);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     loadAudits();
-  }, [selectedId]);
+    return () => {
+      active = false;
+    };
+  }, [initialInvestigationId]);
 
   // Load details for selected investigation
   useEffect(() => {
     if (!selectedId) return;
+    let active = true;
 
     async function loadDetails() {
       setLoading(true);
@@ -159,17 +165,21 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
             `/research/investigations/${selectedId}/quality/failures`
           ),
         ]);
+        if (!active) return;
         setAudit(auditRes);
         setLineage(lineageRes);
         setValidations(valRes || []);
         setFailures(failRes || []);
       } catch (err) {
-        console.error("Failed to load audit details:", err);
+        if (active) console.error("Failed to load audit details:", err);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     loadDetails();
+    return () => {
+      active = false;
+    };
   }, [selectedId]);
 
   async function handleTriggerCalibration() {

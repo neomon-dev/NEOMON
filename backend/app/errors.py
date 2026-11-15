@@ -26,6 +26,11 @@ async def backend_error_handler(request: Request, exc: BackendError) -> JSONResp
 async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
     logger.exception("Unhandled backend error", extra={"request_id": request_id})
+    origin = request.headers.get("origin")
+    headers: dict[str, str] = {}
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
     return JSONResponse(
         status_code=500,
         content={
@@ -33,6 +38,7 @@ async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResp
             "message": "The server could not complete the request.",
             "request_id": request_id,
         },
+        headers=headers if headers else None,
     )
 
 

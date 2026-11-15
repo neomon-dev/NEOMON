@@ -21,15 +21,20 @@ export function BackendStatus() {
     let active = true;
     async function loadStatus() {
       try {
-        const [health, agents] = await Promise.all([
-          requestJson<{ demo_mode: boolean }>("/health", { cache: "no-store" }),
-          requestJson<unknown[]>("/agents", { cache: "no-store" }),
-        ]);
+        const health = await requestJson<{ demo_mode: boolean }>("/health", { cache: "no-store" });
+        let agentCount = 0;
+        try {
+          const agents = await requestJson<unknown[]>("/agents", { cache: "no-store" });
+          agentCount = agents.length;
+        } catch {
+          // Unauthenticated or restricted access to /agents does not mean backend is offline
+        }
+
         if (active) {
           setState({
             status: "online",
             demoMode: health.demo_mode,
-            agentCount: agents.length,
+            agentCount,
           });
         }
       } catch {
@@ -53,9 +58,13 @@ export function BackendStatus() {
     state.status === "loading"
       ? "Connecting to backend..."
       : state.status === "online"
-        ? state.demoMode
-          ? `Demo mode · ${state.agentCount} agents ready`
-          : `Backend online · ${state.agentCount} agents ready`
+        ? state.agentCount > 0
+          ? state.demoMode
+            ? `Demo mode · ${state.agentCount} agents ready`
+            : `Backend online · ${state.agentCount} agents ready`
+          : state.demoMode
+            ? "Backend online (Demo mode)"
+            : "Backend online"
         : state.message;
 
   return (

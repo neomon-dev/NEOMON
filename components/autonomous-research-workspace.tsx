@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { requestJson } from "@/lib/api";
 
@@ -154,9 +154,7 @@ export function AutonomousResearchWorkspace({
     requestJson<InvestigationOption[]>("/research/investigations")
       .then((rows) => {
         setInvestigations(rows);
-        if (!selectedInvId && rows.length > 0) {
-          setSelectedInvId(rows[0].id);
-        }
+        setSelectedInvId((prev) => prev || (rows.length > 0 ? rows[0].id : ""));
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load investigations");
@@ -165,7 +163,7 @@ export function AutonomousResearchWorkspace({
   }, []);
 
   // Load workflows for selected investigation
-  const loadWorkflows = async (invId: string) => {
+  const loadWorkflows = useCallback(async (invId: string) => {
     try {
       const url = invId
         ? `/research/autonomous/workflows?investigation_id=${invId}`
@@ -173,9 +171,7 @@ export function AutonomousResearchWorkspace({
       const rows = await requestJson<AutonomousWorkflowView[]>(url);
       setWorkflows(rows);
       if (rows.length > 0) {
-        if (!selectedWorkflowId || !rows.some((r) => r.id === selectedWorkflowId)) {
-          setSelectedWorkflowId(rows[0].id);
-        }
+        setSelectedWorkflowId((prev) => (prev && rows.some((r) => r.id === prev) ? prev : rows[0].id));
       } else {
         setSelectedWorkflowId("");
         setCycles([]);
@@ -185,16 +181,16 @@ export function AutonomousResearchWorkspace({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load workflows");
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (selectedInvId) {
       loadWorkflows(selectedInvId);
     }
-  }, [selectedInvId]);
+  }, [selectedInvId, loadWorkflows]);
 
   // Load selected workflow details, cycles, actions, report
-  const loadWorkflowDetails = async (wfId: string) => {
+  const loadWorkflowDetails = useCallback(async (wfId: string) => {
     if (!wfId) return;
     try {
       const [cycList, actList] = await Promise.all([
@@ -203,8 +199,8 @@ export function AutonomousResearchWorkspace({
       ]);
       setCycles(cycList);
       setActions(actList);
-      if (cycList.length > 0 && !selectedCycleId) {
-        setSelectedCycleId(cycList[cycList.length - 1].id);
+      if (cycList.length > 0) {
+        setSelectedCycleId((prev) => prev || cycList[cycList.length - 1].id);
       }
 
       // Try load report if completed
@@ -219,13 +215,13 @@ export function AutonomousResearchWorkspace({
     } catch (err) {
       console.error("Error loading workflow details:", err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (selectedWorkflowId) {
       loadWorkflowDetails(selectedWorkflowId);
     }
-  }, [selectedWorkflowId]);
+  }, [selectedWorkflowId, loadWorkflowDetails]);
 
   // Periodic polling for active workflows
   useEffect(() => {
@@ -246,7 +242,7 @@ export function AutonomousResearchWorkspace({
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [selectedWorkflowId, workflows, selectedInvId]);
+  }, [selectedWorkflowId, workflows, selectedInvId, loadWorkflows, loadWorkflowDetails]);
 
   const activeWorkflow = useMemo(
     () => workflows.find((w) => w.id === selectedWorkflowId),

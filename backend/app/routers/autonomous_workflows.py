@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.autonomous_workflow_service import autonomous_workflow_service
 from app.auth.dependencies import get_current_user
-from app.collaboration.permission_service import PermissionService, DEFAULT_GLOBAL_WORKSPACE_ID
+from app.collaboration.permission_service import PermissionService
 from app.db import get_session
 from app.errors import BackendError
 from app.models import (
@@ -151,7 +151,7 @@ async def list_workflows(
     perm = PermissionService(session)
     user_workspaces = await perm.get_user_workspaces(user.id)
     if not user_workspaces:
-        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+        return []
 
     if investigation_id is not None:
         await perm.check_investigation_access(user, investigation_id, "read")

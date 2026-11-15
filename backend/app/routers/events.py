@@ -27,6 +27,8 @@ async def events(
     perm = PermissionService(session)
     if investigation_id is not None:
         await perm.check_investigation_access(user, investigation_id, "read")
+    elif user.role != "admin":
+        raise BackendError("investigation_id is required to subscribe to events.", 400, "investigation_id_required")
 
     broker = request.app.state.event_broker
     cursor_uuid: uuid.UUID | None = last_event_id_query
@@ -41,6 +43,7 @@ async def events(
         queue = broker.create_queue()
         seen_ids: set[uuid.UUID] = set()
         try:
+            yield ": connected\n\n"
             if cursor_uuid is not None:
                 replayed = await broker.replay_after(investigation_id, cursor_uuid)
                 for event in replayed:

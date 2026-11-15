@@ -1,12 +1,90 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Next.js build and cache
 .next/
 out/
-.env
-.env.local
-*.log
-coverage/
+build/
+dist/
+.turbo/
+
+# TypeScript build info cache
 *.tsbuildinfo
+
+# Python caches and bytecode
 __pycache__/
-.pytest_cache/
+*.py[cod]
+*$py.class
+*.so
+.Python
 *.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Environment configurations (preserve .env.example)
+.env
+.env*.local
+*.env
+!.env.example
+
+# SQLite databases, WAL, and SHM files
 *.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Local backups and dumps
+backups/
+backend/backups/
+*.bak
+*.dump
+
+# Local scratch scripts and recovery experiments (preserved locally)
+scratch/
+
+# Local machine learning and model files
+models/*.bin
+models/*.pt
+models/*.onnx
+models/*.safetensors
+*.bin
+*.safetensors
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Test coverage and reports
+coverage/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+test-results/
+playwright-report/
+.playwright/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

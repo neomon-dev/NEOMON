@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestJson } from "@/lib/api";
 
 export type CrossRelationshipView = {
@@ -88,11 +88,7 @@ export function CrossInvestigationWorkspace() {
   const [claimSearchQuery, setClaimSearchQuery] = useState("");
   const [relTypeFilter, setRelTypeFilter] = useState("all");
 
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  const loadInitialData = async () => {
+  const loadInitialData = useCallback(async () => {
     setLoading(true);
     try {
       const [invs, reps, rels, shared] = await Promise.all([
@@ -109,15 +105,19 @@ export function CrossInvestigationWorkspace() {
       setRelationships(rels || []);
       setSharedEvidence(shared || []);
 
-      if (invs && invs.length >= 2 && selectedInvIds.length === 0) {
-        setSelectedInvIds([invs[0].id, invs[1].id]);
+      if (invs && invs.length >= 2) {
+        setSelectedInvIds((prev) => (prev.length === 0 ? [invs[0].id, invs[1].id] : prev));
       }
     } catch (err: any) {
       setError(err?.message || "Failed to load synthesis workspace data.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
 
   const handleSynthesize = async () => {
     if (selectedInvIds.length < 2) {

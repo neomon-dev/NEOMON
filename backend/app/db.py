@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator
 import time
 from typing import Any, Dict, Optional, Tuple
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -41,14 +41,24 @@ def build_async_engine(
     }
 
     if is_sqlite:
-        kwargs["connect_args"] = {"timeout": 30}
+        kwargs["connect_args"] = {"timeout": 30, "check_same_thread": False}
     elif is_postgres:
         kwargs["pool_size"] = cfg.database_pool_size
         kwargs["max_overflow"] = cfg.database_max_overflow
         kwargs["pool_timeout"] = cfg.database_pool_timeout
         kwargs["pool_recycle"] = cfg.database_pool_recycle
 
-    return create_async_engine(url, **kwargs)
+    created_engine = create_async_engine(url, **kwargs)
+
+    if is_sqlite:
+        @event.listens_for(created_engine.sync_engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA busy_timeout=30000;")
+            cursor.close()
+
+    return created_engine
 
 
 settings = get_settings()

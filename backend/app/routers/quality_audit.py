@@ -49,7 +49,7 @@ async def list_quality_audits(
     perm = PermissionService(session)
     user_workspaces = await perm.get_user_workspaces(user.id)
     if not user_workspaces:
-        user_workspaces = [DEFAULT_GLOBAL_WORKSPACE_ID]
+        return []
 
     scope_cond = Investigation.workspace_id.in_(user_workspaces)
     if DEFAULT_GLOBAL_WORKSPACE_ID in user_workspaces:

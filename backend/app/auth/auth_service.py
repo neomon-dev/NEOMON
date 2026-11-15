@@ -32,6 +32,32 @@ def _is_expired(dt: Optional[datetime]) -> bool:
     return target < now
 
 
+_sse_tickets: dict[str, tuple[uuid.UUID, datetime]] = {}
+
+
+def create_stream_ticket(user_id: uuid.UUID) -> str:
+    """Issue a single-use stream ticket valid for 60 seconds."""
+    now = datetime.now(timezone.utc)
+    expired = [k for k, (_, exp) in _sse_tickets.items() if exp < now]
+    for k in expired:
+        _sse_tickets.pop(k, None)
+    ticket = f"st_{uuid.uuid4().hex}"
+    _sse_tickets[ticket] = (user_id, now + timedelta(seconds=60))
+    return ticket
+
+
+def consume_stream_ticket(ticket: str) -> Optional[uuid.UUID]:
+    """Validate and immediately consume (delete) a single-use stream ticket."""
+    now = datetime.now(timezone.utc)
+    entry = _sse_tickets.pop(ticket, None)
+    if not entry:
+        return None
+    user_id, expires_at = entry
+    if expires_at < now:
+        return None
+    return user_id
+
+
 class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db

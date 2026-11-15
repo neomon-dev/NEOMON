@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { requestJson } from "@/lib/api";
+import { ApiError, requestJson } from "@/lib/api";
 
 type InvestigationItem = {
   id: string;
@@ -30,6 +30,7 @@ export default function Home() {
   const [agents, setAgents] = useState<AgentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isUnauthenticated, setIsUnauthenticated] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -43,10 +44,18 @@ export default function Home() {
           setInvestigations(loadedInvestigations);
           setAgents(loadedAgents);
           setError("");
+          setIsUnauthenticated(false);
         }
       } catch (reason) {
         if (active) {
-          setError(reason instanceof Error ? reason.message : "Could not load dashboard data.");
+          if (reason instanceof ApiError && reason.status === 401) {
+            setIsUnauthenticated(true);
+            setInvestigations([]);
+            setAgents([]);
+            setError("");
+          } else {
+            setError(reason instanceof Error ? reason.message : "Could not load dashboard data.");
+          }
         }
       } finally {
         if (active) {
@@ -121,7 +130,21 @@ export default function Home() {
           </div>
         </section>
 
-        {error && <p className="connection-result error dashboard-error">{error}</p>}
+        {isUnauthenticated ? (
+          <section className="panel" style={{ marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px" }}>
+            <div>
+              <h4 style={{ margin: "0 0 4px", color: "#f8fafc" }}>Guest Session</h4>
+              <p style={{ margin: 0, color: "#94a3b8", fontSize: "13px" }}>
+                Sign in with an authorized research account to view workspaces, run multi-agent debates, and persist investigations.
+              </p>
+            </div>
+            <Link className="primary-button" href="/login" style={{ padding: "8px 16px", fontSize: "12px", whiteSpace: "nowrap" }}>
+              Sign in →
+            </Link>
+          </section>
+        ) : error ? (
+          <p className="connection-result error dashboard-error">{error}</p>
+        ) : null}
 
         <section className="metric-grid" aria-label="Research metrics">
           {metrics.map(([label, value, detail]) => (

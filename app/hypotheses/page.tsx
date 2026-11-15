@@ -24,9 +24,7 @@ function HypothesesContent() {
     requestJson<InvestigationOption[]>("/research/investigations")
       .then((rows) => {
         setInvestigations(rows);
-        if (!selectedId && rows.length > 0) {
-          setSelectedId(rows[0].id);
-        }
+        setSelectedId((prev) => prev || (rows.length > 0 ? rows[0].id : ""));
       })
       .catch(() => {})
       .finally(() => setLoading(false));

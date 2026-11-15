@@ -7,27 +7,63 @@ import { BackendStatus } from "@/components/backend-status";
 import { ProviderSessionProvider } from "@/components/provider-context";
 import { useAuth } from "@/lib/auth-context";
 
-const navigation = [
-  { label: "Dashboard", icon: "⌂", href: "/" },
-  { label: "New investigation", icon: "+", href: "/investigations/new" },
-  { label: "Autonomous research", icon: "⚡", href: "/autonomous" },
-  { label: "Workspaces", icon: "👥", href: "/workspaces" },
-  { label: "Peer reviews", icon: "📋", href: "/reviews" },
-  { label: "Notifications", icon: "🔔", href: "/notifications" },
-  { label: "Research history", icon: "↺", href: "/history" },
-  { label: "Intelligence hub", icon: "❖", href: "/intelligence" },
-  { label: "Knowledge graph", icon: "⌘", href: "/graph" },
-  { label: "Research gaps", icon: "🎯", href: "/gaps" },
-  { label: "Hypotheses", icon: "🔬", href: "/hypotheses" },
-  { label: "Cross-synthesis", icon: "🔗", href: "/synthesis" },
-  { label: "Contradictions", icon: "⚖", href: "/contradictions" },
-  { label: "Research trends", icon: "📈", href: "/trends" },
-  { label: "Quality audit", icon: "🛡", href: "/quality-audit" },
-  { label: "Scientific benchmarks", icon: "📊", href: "/benchmarks" },
-  { label: "Evidence library", icon: "◇", href: "/evidence" },
-  { label: "Agent laboratory", icon: "◎", href: "/agents" },
-  { label: "Source intelligence", icon: "◈", href: "/sources" },
-  { label: "Settings", icon: "⚙", href: "/settings" },
+interface NavItem {
+  label: string;
+  icon: string;
+  href: string;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    title: "Core Research",
+    items: [
+      { label: "Dashboard", icon: "⌂", href: "/" },
+      { label: "New investigation", icon: "+", href: "/investigations/new" },
+      { label: "Autonomous research", icon: "⚡", href: "/autonomous" },
+      { label: "Research history", icon: "↺", href: "/history" },
+    ],
+  },
+  {
+    title: "Evidence & Knowledge",
+    items: [
+      { label: "Intelligence hub", icon: "❖", href: "/intelligence" },
+      { label: "Evidence library", icon: "◇", href: "/evidence" },
+      { label: "Source intelligence", icon: "◈", href: "/sources" },
+      { label: "Knowledge graph", icon: "⌘", href: "/graph" },
+    ],
+  },
+  {
+    title: "Analysis & Synthesis",
+    items: [
+      { label: "Research gaps", icon: "🎯", href: "/gaps" },
+      { label: "Hypotheses", icon: "🔬", href: "/hypotheses" },
+      { label: "Cross-synthesis", icon: "🔗", href: "/synthesis" },
+      { label: "Contradictions", icon: "⚖", href: "/contradictions" },
+      { label: "Research trends", icon: "📈", href: "/trends" },
+    ],
+  },
+  {
+    title: "Verification & Benchmarks",
+    items: [
+      { label: "Quality audit", icon: "🛡", href: "/quality-audit" },
+      { label: "Scientific benchmarks", icon: "📊", href: "/benchmarks" },
+      { label: "Agent laboratory", icon: "◎", href: "/agents" },
+    ],
+  },
+  {
+    title: "Collaboration & System",
+    items: [
+      { label: "Workspaces", icon: "👥", href: "/workspaces" },
+      { label: "Peer reviews", icon: "📋", href: "/reviews" },
+      { label: "Notifications", icon: "🔔", href: "/notifications" },
+      { label: "Settings", icon: "⚙", href: "/settings" },
+    ],
+  },
 ];
 
 export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
@@ -48,38 +84,43 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
               <span>Research intelligence</span>
             </div>
           </Link>
-          <nav aria-label="Primary navigation">
-            {navigation.map((item) => {
-              const isActive =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Link
-                  className={isActive ? "nav-item active" : "nav-item"}
-                  href={item.href}
-                  key={item.href}
-                >
-                  <span className="nav-icon">{item.icon}</span>
-                  {item.label}
-                  {item.href === "/notifications" && unreadCount > 0 && (
-                    <span
-                      style={{
-                        marginLeft: "auto",
-                        background: "#3b82f6",
-                        color: "#fff",
-                        borderRadius: "10px",
-                        padding: "1px 6px",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                      }}
+          <nav aria-label="Primary navigation" style={{ overflowY: "auto", paddingRight: "4px" }}>
+            {navSections.map((section) => (
+              <div key={section.title} className="nav-section" style={{ marginBottom: "8px" }}>
+                <div className="nav-section-title">{section.title}</div>
+                {section.items.map((item) => {
+                  const isActive =
+                    item.href === "/"
+                      ? pathname === "/"
+                      : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                  return (
+                    <Link
+                      className={isActive ? "nav-item active" : "nav-item"}
+                      href={item.href}
+                      key={item.href}
                     >
-                      {unreadCount}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+                      <span className="nav-icon">{item.icon}</span>
+                      {item.label}
+                      {item.href === "/notifications" && unreadCount > 0 && (
+                        <span
+                          style={{
+                            marginLeft: "auto",
+                            background: "#3b82f6",
+                            color: "#fff",
+                            borderRadius: "10px",
+                            padding: "1px 6px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {unreadCount}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
           <div className="sidebar-footer">
             <BackendStatus />

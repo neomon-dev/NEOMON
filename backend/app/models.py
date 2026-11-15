@@ -394,7 +394,7 @@ class ReportVersion(Base):
     evidence_strength_json: Mapped[str] = mapped_column(Text, default="{}")
     sections_json: Mapped[str] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 
@@ -479,7 +479,7 @@ class ResearchGapAnalysis(Base):
     coverage_score: Mapped[float] = mapped_column(Float, default=0.0)
     coverage_summary_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     investigation: Mapped[Investigation] = relationship(back_populates="gap_analyses")
@@ -513,7 +513,7 @@ class ResearchGap(Base):
     is_observed: Mapped[bool] = mapped_column(default=True)
     recommended_action_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
     analysis: Mapped[ResearchGapAnalysis] = relationship(back_populates="gaps")
@@ -1319,7 +1319,7 @@ class ReviewRequest(Base):
     requester_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     title: Mapped[str] = mapped_column(String(255))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(32), default="submitted")
+    status: Mapped[str] = mapped_column(String(32), default="submitted", index=True)
     requires_independent_review: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime | None] = mapped_column(

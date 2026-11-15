@@ -2,7 +2,7 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.protocol import (

@@ -6,7 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import { createWorkspace, Workspace } from "@/lib/collaboration";
 
 export default function WorkspacesPage() {
-  const { workspaces, activeWorkspace, switchWorkspace, refreshAuth } = useAuth();
+  const { workspaces, activeWorkspace, switchWorkspace, refreshAuth, user, isLoading } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -68,6 +68,43 @@ export default function WorkspacesPage() {
           <span>+</span> Create Workspace
         </button>
       </div>
+
+      {!user && !isLoading && (
+        <div
+          style={{
+            background: "rgba(14, 165, 233, 0.1)",
+            border: "1px solid rgba(56, 189, 248, 0.3)",
+            borderRadius: "8px",
+            padding: "16px 20px",
+            marginBottom: "24px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+            <div>
+              <p style={{ margin: "0 0 4px", fontSize: "14px", fontWeight: 600, color: "#f0f9ff" }}>
+                Guest Session — Sign In to Access Workspaces
+              </p>
+              <p style={{ margin: 0, fontSize: "12px", color: "#93c5fd" }}>
+                Workspaces are private collaborative environments. Sign in to manage investigations, invite collaborators, and access reviews.
+              </p>
+            </div>
+            <Link
+              href="/login"
+              style={{
+                padding: "8px 16px",
+                background: "#0284c7",
+                color: "#fff",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Workspaces Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(350px, 1fr))", gap: "20px" }}>

@@ -6,7 +6,9 @@ from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-DEFAULT_DATABASE_PATH = Path(__file__).resolve().parents[1] / "neomon.db"
+_BACKEND_DIR = Path(__file__).resolve().parents[1]
+_RECOVERED_DB = _BACKEND_DIR / "backups" / "recovery_experiments" / "neomon_recovered.db"
+DEFAULT_DATABASE_PATH = _RECOVERED_DB if _RECOVERED_DB.exists() else _BACKEND_DIR / "neomon.db"
 DEFAULT_DATABASE_URL = f"sqlite+aiosqlite:///{DEFAULT_DATABASE_PATH.as_posix()}"
 
 

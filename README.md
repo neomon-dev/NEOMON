@@ -77,7 +77,7 @@ references are checked against the investigation before persistence. Ollama,
 LM Studio, and OpenAI-compatible models can be supplied per analysis request
 with validated JSON output.
 
-See [MILESTONE_3_1_PLAN.md](./MILESTONE_3_1_PLAN.md), [MILESTONE_2_PLAN.md](./MILESTONE_2_PLAN.md), [ARCHITECTURE.md](./ARCHITECTURE.md), and [TODO.md](./TODO.md) for scope and next steps.
+See [Architecture Documentation](docs/architecture/ARCHITECTURE.md), [Development Plan](docs/development/DEVELOPMENT_PLAN.md), [TODO](docs/development/TODO.md), and [Milestone Archive](docs/archive/milestones/) for system design and historical milestone scope.
 
 ## Milestone 5 MVP Highlights
 
@@ -126,3 +126,39 @@ See [MILESTONE_3_1_PLAN.md](./MILESTONE_3_1_PLAN.md), [MILESTONE_2_PLAN.md](./MI
     8. **Sources Catalog (`.csv`)**: RFC 4180 tabular catalog of all discovered literature.
   - Integrated Knowledge Export panel in the web interface with direct download triggers.
   - Complete secret/credential sanitization and strict provenance tracking.
+
+---
+
+## Documentation Index
+
+The complete NEOMON documentation suite is organized in the [`docs/`](docs/) directory:
+
+- **[Release & Certification (`docs/release/`)](docs/release/)**:
+  - [NEOMON 1.0 Release Certificate](docs/release/NEOMON_1_0_FINAL_RELEASE_CERTIFICATE.md)
+  - [Independent Technical Audit Report](docs/release/NEOMON_1_0_FINAL_INDEPENDENT_AUDIT.md)
+  - [NEOMON 1.0 Product Release Report](docs/release/NEOMON_1_0_RELEASE_REPORT.md)
+  - [Production Infrastructure & Readiness Report](docs/release/NEOMON_1_0_PRODUCTION_READINESS_REPORT.md)
+  - [Safe Root Directory Cleanup Report](docs/release/NEOMON_1_0_CLEANUP_REPORT.md)
+- **[Security Architecture (`docs/security/`)](docs/security/)**:
+  - [Final Security & Tenancy Audit Report](docs/security/NEOMON_1_0_SECURITY_FINAL_REPORT.md)
+  - [Security Configuration & Hardening Guide](docs/security/SECURITY_CONFIGURATION_GUIDE.md)
+- **[Scientific Integrity (`docs/scientific-integrity/`)](docs/scientific-integrity/)**:
+  - [Scientific Validation & Benchmark Report](docs/scientific-integrity/NEOMON_1_0_SCIENTIFIC_VALIDATION_REPORT.md)
+- **[Architecture & Operations (`docs/architecture/`)](docs/architecture/)**:
+  - [System Architecture](docs/architecture/ARCHITECTURE.md)
+  - [Database Migration Guide](docs/architecture/DATABASE_MIGRATION_GUIDE.md)
+  - [Backup & Restoration Guide](docs/architecture/BACKUP_AND_RESTORATION_GUIDE.md)
+  - [Production Deployment Guide](docs/architecture/PRODUCTION_DEPLOYMENT_GUIDE.md)
+  - [Worker Operations Guide](docs/architecture/WORKER_OPERATIONS_GUIDE.md)
+- **[Development & QA (`docs/development/`)](docs/development/)**:
+  - [Development Plan](docs/development/DEVELOPMENT_PLAN.md)
+  - [Quality Assurance Policy](docs/development/QA_POLICY.md)
+  - [Environment Variables Guide](docs/development/ENVIRONMENT_VARIABLES.md)
+  - [Troubleshooting Guide](docs/development/TROUBLESHOOTING_GUIDE.md)
+  - [TODO & Backlog](docs/development/TODO.md)
+- **[Testing & Benchmarks (`docs/testing/`)](docs/testing/)**:
+  - [Final Test Register & Certification Report](docs/testing/M13_FINAL_TEST_REPORT.md)
+  - [Interactive Control Test Matrix](docs/testing/M13_INTERACTION_TEST_MATRIX.md)
+- **[Historical Archives (`docs/archive/`)](docs/archive/)**:
+  - [Milestone 13 Execution Reports (`docs/archive/m13/`)](docs/archive/m13/)
+  - [Historical Milestone Plans (`docs/archive/milestones/`)](docs/archive/milestones/)

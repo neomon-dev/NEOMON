@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiBaseUrl, requestJson } from "@/lib/api";
 
 export type RecommendedAction = {
@@ -94,7 +94,7 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
   const [copiedQuery, setCopiedQuery] = useState<string | null>(null);
 
   // Load versions
-  const loadVersions = async () => {
+  const loadVersions = useCallback(async () => {
     try {
       const data = await requestJson<ResearchGapVersionView[]>(
         `/research/investigations/${investigationId}/gaps/versions`
@@ -103,10 +103,10 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
     } catch {
       // Version list is non-critical metadata
     }
-  };
+  }, [investigationId]);
 
   // Load analysis data
-  const loadAnalysis = async (versionOrId?: string) => {
+  const loadAnalysis = useCallback(async (versionOrId?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -121,8 +121,8 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
         );
       }
       setAnalysis(data);
-      if (data.gaps.length > 0 && !expandedGapId) {
-        setExpandedGapId(data.gaps[0].id);
+      if (data.gaps.length > 0) {
+        setExpandedGapId((prev) => prev || data.gaps[0].id);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load research gap analysis";
@@ -130,14 +130,14 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
     } finally {
       setLoading(false);
     }
-  };
+  }, [investigationId]);
 
   useEffect(() => {
     if (investigationId) {
       loadAnalysis();
       loadVersions();
     }
-  }, [investigationId]);
+  }, [investigationId, loadAnalysis, loadVersions]);
 
   // Trigger re-analysis
   const handleAnalyze = async () => {
