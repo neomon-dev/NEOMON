@@ -358,7 +358,7 @@ async def execute_research_cycle(
                                 source_id=src_row.id,
                                 claim_id=cid,
                                 exact_text=ev_item.text,
-                                evidence_type=ev_item.evidence_type,
+                                evidence_type=(ev_item.evidence_type or "contextual")[:64],
                                 relevance_score=ev_item.relevance_score,
                                 extraction_method="autonomous_extractor",
                                 document_id=doc_row.id,
