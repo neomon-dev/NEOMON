@@ -46,9 +46,9 @@ jobs:
       - name: Run Automated Pytest Suite
         env:
           NEOMON_ENVIRONMENT: test
-          PYTHONPATH: backend
         run: |
-          python -m pytest backend/tests -v --durations=10
+          cd backend
+          python -m pytest tests -v --durations=10
 
   frontend-test:
     name: Frontend Lint, Typecheck & Build

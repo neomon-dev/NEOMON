@@ -11,8 +11,11 @@ Verifies the scientific correctness and decoupling of NEOMON's research quality 
 8. Calibrated benchmark validation for NVIDIA (Moderate) and Nokia (Strong).
 """
 
+import json
+from pathlib import Path
 import uuid
 import pytest
+from sqlalchemy import text
 from app.analysis.entailment_service import (
     EntailmentClassification,
     validate_evidence_claim_entailment_heuristic,
@@ -291,6 +294,26 @@ def test_stopping_criteria_requires_peer_review():
     assert stop_eval_with_peer.stopping_reason == StoppingReason.SUFFICIENT_EVIDENCE
 
 
+async def _ensure_benchmark_fixture_seeded(session) -> None:
+    """Seed NVIDIA and Nokia historical benchmark dataset from JSON fixture if absent."""
+    fixture_path = Path(__file__).parent / "fixtures" / "benchmark_calibration_fixture.json"
+    if not fixture_path.exists():
+        return
+    with open(fixture_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    for tbl in ["investigations", "claims", "sources", "evidence"]:
+        rows = data.get(tbl, [])
+        if not rows:
+            continue
+        cols = list(rows[0].keys())
+        col_names = ", ".join(cols)
+        named_placeholders = ", ".join([f":{c}" for c in cols])
+        stmt = text(f"INSERT INTO {tbl} ({col_names}) VALUES ({named_placeholders})")
+        for r in rows:
+            await session.execute(stmt, r)
+    await session.commit()
+
+
 @pytest.mark.asyncio
 async def test_nvidia_and_nokia_benchmark_calibration():
     """Verify calibration integrity on historical NVIDIA and Nokia benchmark datasets."""
@@ -298,6 +321,10 @@ async def test_nvidia_and_nokia_benchmark_calibration():
     nokia_id = uuid.UUID("9ab9477a-33b8-4535-b578-eda03a64e254")
 
     async with SessionFactory() as session:
+        inv_check = await session.get(Investigation, nvidia_id)
+        if not inv_check:
+            await _ensure_benchmark_fixture_seeded(session)
+
         # 1. NVIDIA Benchmark
         res_nv = await calibrate_investigation_quality(session, nvidia_id)
         # In NVIDIA, 0 direct proof passages -> capped at Moderate

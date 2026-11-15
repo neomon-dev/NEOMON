@@ -68,6 +68,7 @@ def test_knowledge_graph_endpoints_nodes_edges_filters_and_isolation():
         async with SessionFactory() as session:
             inv1 = Investigation(
                 id=inv1_id,
+                workspace_id=uuid.UUID("00000000-0000-0000-0000-000000000002"),
                 question="How does asynchronous code review affect bug escape rates?",
                 mode="deep",
                 status="completed",

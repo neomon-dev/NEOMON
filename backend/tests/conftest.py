@@ -14,6 +14,7 @@ _SESSION_TEMP_DB: Path | None = None
 _BASELINE_CANDIDATES = [
     Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "test_database.db",
     Path(__file__).resolve().parents[1] / "backups" / "recovery_experiments" / "neomon_recovered.db",
+    Path(__file__).resolve().parents[1] / "neomon.db",
 ]
 
 # If NEOMON_DATABASE_URL is not explicitly set, create an isolated disposable test copy
