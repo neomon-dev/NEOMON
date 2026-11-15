@@ -180,10 +180,10 @@ flowchart TD
     end
 
     subgraph StorageLayer["Data Persistence & State Management"]
-        AlembicEngine["Alembic Migrations (0001 - 0016)"]
+        AlembicEngine["Alembic Migrations (0001 - 0017)"]
         SQLAlchemyAsync["SQLAlchemy 2.0 Async Session Engine"]
         SQLiteDB[("SQLite 3 (WAL Mode)\nbackend/neomon.db")]
-        PostgresDB[("PostgreSQL 15+\n(Supabase / Render)")]
+        PostgresDB[("Render PostgreSQL 15+\n(Production Database)")]
     end
 
     subgraph RetrievalEngine["Academic & Web Discovery Pipeline"]
@@ -538,7 +538,7 @@ NEOMON uses an enterprise-grade migration architecture managed through **Alembic
 ### Database Engine Dual-Compatibility
 
 * **Local Development & Offline Air-Gapped Mode**: SQLite 3 with Write-Ahead Logging (`WAL`), multi-process busy handlers, and immediate transaction pragmas. The baseline database is committed at `backend/neomon.db` with historical test records.
-* **Production Deployment**: PostgreSQL 15+ (tested on Supabase, AWS RDS, and Render PostgreSQL) using the high-performance `asyncpg` driver and connection pooling.
+* **Production Deployment**: PostgreSQL 15+ on **Render PostgreSQL** using the high-performance `asyncpg` driver, connection pooling, and strict UTF-8 text sanitization (NUL-character stripping).
 
 ### Common Alembic Commands
 
@@ -566,12 +566,16 @@ python -m alembic downgrade -1
 * `20261113_0009` to `20261113_0012`: Multi-agent debate rounds, evidence calibration, credibility assessments, and methodology audits.
 * `20261114_0013` to `20261114_0015`: Study independence clusters, citation lineages, collaborative workspaces, and RBAC tables.
 * `20261115_0016`: Dialect-aware cleanups and production indexing.
+* `20261115_0017`: Widen `evidence_type` and `extraction_method` column lengths for Render PostgreSQL compatibility.
 
 ---
 
 ## 11. Production Deployment Architecture
 
-NEOMON is optimized for a hybrid cloud architecture combining Vercel for frontend delivery and Render or Fly.io for backend execution.
+NEOMON is deployed on a dedicated cloud architecture:
+* **Frontend**: Vercel (Next.js 16 App Router)
+* **Backend API**: Render Web Service (FastAPI Python 3.12+)
+* **Production Database**: Render PostgreSQL (Managed PostgreSQL 15+)
 
 ```
 +-----------------------------------------------------------------------------------------+
@@ -590,8 +594,8 @@ NEOMON is optimized for a hybrid cloud architecture combining Vercel for fronten
 |                     +----------------------------------------------+                    |
 |                                                                    |                    |
 |                                                   +----------------v----------------+   |
-|                                                   |     MANAGED POSTGRESQL 15+      |   |
-|                                                   |  - Supabase / Render Postgres   |   |
+|                                                   |     RENDER POSTGRESQL 15+       |   |
+|                                                   |  - Managed PostgreSQL Service   |   |
 |                                                   |  - asyncpg Connection Pool      |   |
 |                                                   |  - Automated Backups            |   |
 |                                                   +---------------------------------+   |

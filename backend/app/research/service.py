@@ -123,7 +123,7 @@ async def _run_investigation_impl(
         await asyncio.gather(*(provider.close() for provider in providers))
         await unpaywall.close()
 
-    claim = Claim(investigation_id=investigation.id, text=investigation.question)
+    claim = Claim(investigation_id=investigation.id, text=(investigation.question or "").replace("\x00", ""))
     session.add(claim)
     await session.flush()
     relevant_source_count = 0
@@ -137,25 +137,28 @@ async def _run_investigation_impl(
         match_status: str = "unknown",
     ) -> None:
         nonlocal full_text_count, evidence_count
-        source.content_hash = content_hash(document.content)
+        clean_content = (document.content or "").replace("\x00", "")
+        clean_title = (document.title or "").replace("\x00", "") if document.title else None
+        clean_headings = [(h or "").replace("\x00", "") for h in (document.headings or [])]
+        source.content_hash = content_hash(clean_content)
         stored_document = Document(
             source_id=source.id,
             content_type=document.content_type,
-            title=document.title,
-            content=document.content,
-            headings_json=json.dumps(document.headings),
+            title=clean_title,
+            content=clean_content,
+            headings_json=json.dumps(clean_headings),
             page_count=document.page_count,
             retrieved_at=datetime.now(UTC),
             access_level=document.access_level,
             extraction_quality=document.extraction_quality,
-            document_url=document.final_url,
+            document_url=document.final_url.replace("\x00", ""),
             version_type=location.version_type if location else "unknown",
             access_route="open_access" if location else "original",
             metadata_match_status=match_status,
         )
         session.add(stored_document)
         await session.flush()
-        source.selected_document_url = document.final_url
+        source.selected_document_url = document.final_url.replace("\x00", "")
         source.open_access_status = "full_text_available" if document.access_level == "full_text" else "abstract_only"
         if document.access_level == "full_text":
             full_text_count += 1
@@ -186,20 +189,27 @@ async def _run_investigation_impl(
             if is_tavily and is_traceable:
                 tavily_telemetry.evidence_passages_extracted += 1
 
+            clean_exact_text = (item.exact_text or "").replace("\x00", "")
+            clean_surrounding_context = (item.surrounding_context or "").replace("\x00", "") if item.surrounding_context else None
+            clean_section_name = (item.section_name or "").replace("\x00", "")[:300] if item.section_name else None
+            clean_rel_reason = (rel_reason or "").replace("\x00", "")
+            clean_extraction_method = (item.extraction_method or "unknown").replace("\x00", "")[:120]
+            clean_evidence_type = (item.evidence_type or "contextual").replace("\x00", "")[:64]
+
             session.add(
                 Evidence(
                     source_id=source.id,
                     claim_id=claim.id,
                     document_id=stored_document.id,
-                    exact_text=item.exact_text,
-                    surrounding_context=item.surrounding_context,
-                    evidence_type=(item.evidence_type or "contextual")[:64],
+                    exact_text=clean_exact_text,
+                    surrounding_context=clean_surrounding_context,
+                    evidence_type=clean_evidence_type,
                     relevance_score=item.relevance_score,
-                    extraction_method=(item.extraction_method or "unknown")[:120],
+                    extraction_method=clean_extraction_method,
                     page_number=item.page_number,
-                    section_name=item.section_name,
+                    section_name=clean_section_name,
                     retrieval_timestamp=datetime.now(UTC),
-                    relevance_reason=rel_reason,
+                    relevance_reason=clean_rel_reason,
                     traceable=is_traceable,
                 )
             )
@@ -244,23 +254,29 @@ async def _run_investigation_impl(
         combined_reasons.append(f"Credibility tier: {cred_eval.credibility_tier.upper()} ({cred_eval.credibility_score:.2f})")
         combined_reasons.extend(cred_eval.reasons)
 
+        clean_title = (result.title or "").replace("\x00", "")
+        clean_url = (result.url or "").replace("\x00", "")
+        clean_publisher = (result.publisher or "").replace("\x00", "") if result.publisher else None
+        clean_authors = [(a or "").replace("\x00", "") for a in (result.authors or []) if isinstance(a, str)]
+        clean_reasons = [(r or "").replace("\x00", "") for r in combined_reasons if isinstance(r, str)]
+
         source = Source(
             investigation_id=investigation.id,
-            title=result.title,
-            canonical_url=result.url,
-            original_url=result.url,
+            title=clean_title,
+            canonical_url=clean_url,
+            original_url=clean_url,
             source_type=cred_eval.source_type.value,
-            publisher=result.publisher,
-            authors_json=json.dumps(result.authors),
+            publisher=clean_publisher,
+            authors_json=json.dumps(clean_authors),
             publication_date=result.publication_date,
             doi=result.doi,
             retrieval_timestamp=datetime.now(UTC),
             relevance_score=result.relevance_score,
-            relevance_reasons_json=json.dumps(combined_reasons),
+            relevance_reasons_json=json.dumps(clean_reasons),
             inclusion_status="included" if included else "filtered",
-            rejection_reason=None if included else "; ".join(result.relevance_reasons),
+            rejection_reason=None if included else "; ".join(result.relevance_reasons).replace("\x00", ""),
             open_access_status="not_checked" if included else "not_applicable",
-            study_identity_key=result.doi or result.title.casefold(),
+            study_identity_key=(result.doi or result.title.casefold()).replace("\x00", ""),
         )
         session.add(source)
         await session.flush()

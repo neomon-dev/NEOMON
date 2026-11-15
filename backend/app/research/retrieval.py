@@ -97,15 +97,17 @@ class _HTMLTextParser(HTMLParser):
                 break
 
     def handle_data(self, data: str) -> None:
-        text = " ".join(data.split())
+        clean_data = data.replace("\x00", "")
+        text = " ".join(clean_data.split())
         if not text or self.is_excluded:
             return
         tag = self._stack[-1][0] if self._stack else None
         if tag == "title":
-            self.title = text[:500]
+            self.title = text[:500].replace("\x00", "")
         if tag in {"h1", "h2", "h3"}:
-            self.headings.append(text[:300])
-            self._section = text[:300]
+            clean_heading = text[:300].replace("\x00", "")
+            self.headings.append(clean_heading)
+            self._section = clean_heading
         if self.content_depth or tag in {"body", "p", "h1", "h2", "h3", "h4", "li", "blockquote", "div", "section"}:
             self.parts.append((self._section, text))
 
@@ -187,15 +189,18 @@ async def retrieve_document(url: str) -> RetrievedDocument:
         if content_type == "application/pdf":
             try:
                 reader = PdfReader(BytesIO(response.content))
-                page_passages = [(index + 1, page.extract_text() or "", None) for index, page in enumerate(reader.pages)]
-                content = "\n".join(text for _, text, _ in page_passages)
+                page_passages = [
+                    (index + 1, (page.extract_text() or "").replace("\x00", ""), None)
+                    for index, page in enumerate(reader.pages)
+                ]
+                content = "\n".join(text for _, text, _ in page_passages).replace("\x00", "")
             except Exception as exc:
                 raise RetrievalError("PDF text extraction failed.") from exc
             if not content.strip():
                 raise RetrievalError("PDF did not contain extractable text.")
             return RetrievedDocument(
                 url,
-                str(response.url),
+                str(response.url).replace("\x00", ""),
                 content_type,
                 None,
                 content[: settings.research_max_document_bytes],
@@ -205,7 +210,7 @@ async def retrieve_document(url: str) -> RetrievedDocument:
                 "high" if len(content) >= 1200 else "medium",
                 len(reader.pages),
             )
-        content = response.text[: settings.research_max_document_bytes]
+        content = response.text[: settings.research_max_document_bytes].replace("\x00", "")
         if not content.strip():
             raise RetrievalError("Document did not contain extractable text.")
         return RetrievedDocument(

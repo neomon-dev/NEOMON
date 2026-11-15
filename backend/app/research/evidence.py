@@ -17,7 +17,8 @@ class ExtractedEvidence:
 
 
 def _sentences(content: str) -> list[str]:
-    return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", content) if len(sentence.strip()) >= 40]
+    clean_content = (content or "").replace("\x00", "")
+    return [sentence.strip() for sentence in re.split(r"(?<=[.!?])\s+", clean_content) if len(sentence.strip()) >= 40]
 
 
 def _looks_like_boilerplate(sentence: str) -> bool:
@@ -91,15 +92,18 @@ def extract_evidence(
             ):
                 continue
             context = " ".join(sentences[max(0, index - 1): min(len(sentences), index + 2)])
+            clean_sentence = sentence.replace("\x00", "")
+            clean_context = context.replace("\x00", "")
+            clean_section = section_name.replace("\x00", "") if section_name else None
             evidence.append(
                 ExtractedEvidence(
-                    exact_text=sentence,
-                    surrounding_context=context,
+                    exact_text=clean_sentence,
+                    surrounding_context=clean_context,
                     evidence_type=evidence_type,
                     relevance_score=assessment.score,
-                    relevance_reason=f"{classification_reason} {'; '.join(assessment.reasons)}",
+                    relevance_reason=f"{classification_reason} {'; '.join(assessment.reasons)}".replace("\x00", ""),
                     page_number=page_number,
-                    section_name=section_name,
+                    section_name=clean_section,
                 )
             )
     unique: dict[str, ExtractedEvidence] = {}

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from enum import StrEnum
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, Uuid, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db import Base
 
@@ -190,6 +190,12 @@ class Source(Base):
         foreign_keys="[SourceLineageRelationship.related_source_id]", back_populates="related_source", cascade="all, delete-orphan"
     )
 
+    @validates("title", "publisher", "rejection_reason", "study_identity_key")
+    def _sanitize_source_nul(self, key: str, value: Any) -> Any:
+        if isinstance(value, str) and "\x00" in value:
+            return value.replace("\x00", "")
+        return value
+
 
 class Document(Base):
     __tablename__ = "documents"
@@ -209,6 +215,12 @@ class Document(Base):
     access_route: Mapped[str] = mapped_column(String(32), default="original")
     metadata_match_status: Mapped[str] = mapped_column(String(24), default="unknown")
     source: Mapped[Source] = relationship(back_populates="documents")
+
+    @validates("content", "title", "document_url", "headings_json")
+    def _sanitize_document_nul(self, key: str, value: Any) -> Any:
+        if isinstance(value, str) and "\x00" in value:
+            return value.replace("\x00", "")
+        return value
 
 
 class OpenAccessLocation(Base):
@@ -254,6 +266,12 @@ class Claim(Base):
     validations: Mapped[list["EvidenceClaimValidation"]] = relationship(
         back_populates="claim", cascade="all, delete-orphan"
     )
+
+    @validates("text", "explanation")
+    def _sanitize_claim_nul(self, key: str, value: Any) -> Any:
+        if isinstance(value, str) and "\x00" in value:
+            return value.replace("\x00", "")
+        return value
 
 
 class AnalysisJob(Base):
@@ -426,6 +444,12 @@ class Evidence(Base):
     annotations: Mapped[list["EvidenceAnnotation"]] = relationship(
         back_populates="evidence", cascade="all, delete-orphan"
     )
+
+    @validates("exact_text", "surrounding_context", "section_name", "relevance_reason", "extraction_method", "evidence_type")
+    def _sanitize_evidence_nul(self, key: str, value: Any) -> Any:
+        if isinstance(value, str) and "\x00" in value:
+            return value.replace("\x00", "")
+        return value
 
     @property
     def passage(self) -> str:

@@ -357,7 +357,7 @@ async def execute_research_cycle(
                             ev_row = Evidence(
                                 source_id=src_row.id,
                                 claim_id=cid,
-                                exact_text=ev_item.text,
+                                exact_text=(ev_item.text or "").replace("\x00", ""),
                                 evidence_type=(ev_item.evidence_type or "contextual")[:64],
                                 relevance_score=ev_item.relevance_score,
                                 extraction_method="autonomous_extractor",
