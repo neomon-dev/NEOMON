@@ -8,6 +8,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
 
+from typing import Any
+
 
 class ExecutionStatus(StrEnum):
     queued = "queued"
