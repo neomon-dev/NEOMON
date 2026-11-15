@@ -96,7 +96,10 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def resolve_and_normalize_database_url(cls, value: object) -> object:
-        if not value:
+        # Honor standard DATABASE_URL environment variable if NEOMON_DATABASE_URL was not set
+        if not os.environ.get("NEOMON_DATABASE_URL") and os.environ.get("DATABASE_URL"):
+            value = os.environ.get("DATABASE_URL")
+        elif not value:
             value = os.environ.get("DATABASE_URL") or DEFAULT_DATABASE_URL
         if isinstance(value, str):
             v_clean = value.strip()

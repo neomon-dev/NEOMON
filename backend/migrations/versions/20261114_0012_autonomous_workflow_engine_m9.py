@@ -91,7 +91,7 @@ def upgrade() -> None:
         sa.Column("estimated_cost", sa.Float(), nullable=False, server_default="1.0"),
         sa.Column("dependencies_json", sa.Text(), nullable=False, server_default="[]"),
         sa.Column("status", sa.String(40), nullable=False, server_default="pending"),
-        sa.Column("requires_approval", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("requires_approval", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("approval_notes", sa.Text(), nullable=False, server_default=""),
         sa.Column("execution_result_json", sa.Text(), nullable=False, server_default="{}"),
         sa.Column("error_message", sa.Text(), nullable=True),
@@ -128,7 +128,7 @@ def upgrade() -> None:
         sa.Column("results_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("relevant_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("effectiveness_score", sa.Float(), nullable=False, server_default="0.0"),
-        sa.Column("is_counter_evidence_query", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+        sa.Column("is_counter_evidence_query", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=True),
     )
     op.create_index("ix_research_query_histories_workflow_id", "research_query_histories", ["workflow_id"])

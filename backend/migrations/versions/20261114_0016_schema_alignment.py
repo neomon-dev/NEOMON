@@ -16,13 +16,21 @@ depends_on = None
 
 
 def _rename_index(table: str, old_name: str, new_name: str, columns: list[str], unique: bool = False) -> None:
-    op.drop_index(old_name, table_name=table)
-    op.create_index(new_name, table, columns, unique=unique)
+    op.drop_index(old_name, table_name=table, if_exists=True)
+    op.create_index(new_name, table, columns, unique=unique, if_not_exists=True)
 
 
 def upgrade() -> None:
-    inspector = sa.inspect(op.get_bind())
-    if not inspector.has_table("report_versions"):
+    bind = op.get_bind()
+    is_sqlite = bind.dialect.name == "sqlite"
+    has_report_versions = False
+    try:
+        inspector = sa.inspect(bind)
+        has_report_versions = inspector.has_table("report_versions")
+    except Exception:
+        has_report_versions = False
+
+    if not has_report_versions:
         op.create_table(
             "report_versions",
             sa.Column("id", sa.Uuid(), primary_key=True),
@@ -48,33 +56,59 @@ def upgrade() -> None:
             sa.Column("sections_json", sa.Text(), nullable=False, default="[]"),
             sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         )
-        op.create_index("ix_report_versions_investigation_id", "report_versions", ["investigation_id"])
-        op.create_index("ix_report_versions_job_id", "report_versions", ["job_id"])
+        op.create_index("ix_report_versions_investigation_id", "report_versions", ["investigation_id"], if_not_exists=True)
+        op.create_index("ix_report_versions_job_id", "report_versions", ["job_id"], if_not_exists=True)
     else:
-        with op.batch_alter_table("report_versions", recreate="always") as batch_op:
-            batch_op.alter_column(
+        if is_sqlite:
+            with op.batch_alter_table("report_versions", recreate="always") as batch_op:
+                batch_op.alter_column(
+                    "created_at",
+                    existing_type=sa.DateTime(),
+                    nullable=False,
+                )
+        else:
+            op.alter_column(
+                "report_versions",
                 "created_at",
                 existing_type=sa.DateTime(),
                 nullable=False,
             )
 
-    with op.batch_alter_table("investigations", recreate="always") as batch_op:
-        batch_op.create_foreign_key(
+    if is_sqlite:
+        with op.batch_alter_table("investigations", recreate="always") as batch_op:
+            batch_op.create_foreign_key(
+                "fk_investigations_workspace_id_workspaces",
+                "workspaces",
+                ["workspace_id"],
+                ["id"],
+                ondelete="SET NULL",
+            )
+            batch_op.create_foreign_key(
+                "fk_investigations_owner_id_users",
+                "users",
+                ["owner_id"],
+                ["id"],
+                ondelete="SET NULL",
+            )
+    else:
+        op.create_foreign_key(
             "fk_investigations_workspace_id_workspaces",
+            "investigations",
             "workspaces",
             ["workspace_id"],
             ["id"],
             ondelete="SET NULL",
         )
-        batch_op.create_foreign_key(
+        op.create_foreign_key(
             "fk_investigations_owner_id_users",
+            "investigations",
             "users",
             ["owner_id"],
             ["id"],
             ondelete="SET NULL",
         )
 
-    op.drop_index("ix_comment_threads_target", table_name="comment_threads")
+    op.drop_index("ix_comment_threads_target", table_name="comment_threads", if_exists=True)
     index_renames = [
         ("autonomous_research_workflows", "ix_autonomous_workflows_investigation_id", "ix_autonomous_research_workflows_investigation_id", ["investigation_id"]),
         ("autonomous_research_workflows", "ix_autonomous_workflows_status", "ix_autonomous_research_workflows_status", ["status"]),
@@ -103,24 +137,27 @@ def upgrade() -> None:
     for table, old_name, new_name, columns, *unique in index_renames:
         _rename_index(table, old_name, new_name, columns, bool(unique and unique[0]))
 
-    op.create_index("ix_comment_threads_created_by_id", "comment_threads", ["created_by_id"])
-    op.create_index("ix_comment_threads_target_entity_type", "comment_threads", ["target_entity_type"])
-    op.create_index("ix_comment_threads_target_entity_id", "comment_threads", ["target_entity_id"])
-    op.create_index("ix_evidence_annotations_author_id", "evidence_annotations", ["author_id"])
-    op.create_index("ix_notifications_created_at", "notifications", ["created_at"])
-    op.create_index("ix_notifications_workspace_id", "notifications", ["workspace_id"])
-    op.create_index("ix_research_gaps_gap_type", "research_gaps", ["gap_type"])
-    op.create_index("ix_research_query_histories_action_id", "research_query_histories", ["action_id"])
-    op.create_index("ix_research_query_histories_cycle_id", "research_query_histories", ["cycle_id"])
-    op.create_index("ix_review_requests_requester_id", "review_requests", ["requester_id"])
-    op.create_index("ix_review_requests_target_type", "review_requests", ["target_type"])
-    op.create_index("ix_review_requests_target_id", "review_requests", ["target_id"])
-    op.create_index("ix_workspace_activities_actor_id", "workspace_activities", ["actor_id"])
-    op.create_index("ix_workspace_activities_created_at", "workspace_activities", ["created_at"])
-    op.create_index("ix_workspace_invitations_inviter_id", "workspace_invitations", ["inviter_id"])
+    op.create_index("ix_comment_threads_created_by_id", "comment_threads", ["created_by_id"], if_not_exists=True)
+    op.create_index("ix_comment_threads_target_entity_type", "comment_threads", ["target_entity_type"], if_not_exists=True)
+    op.create_index("ix_comment_threads_target_entity_id", "comment_threads", ["target_entity_id"], if_not_exists=True)
+    op.create_index("ix_evidence_annotations_author_id", "evidence_annotations", ["author_id"], if_not_exists=True)
+    op.create_index("ix_notifications_created_at", "notifications", ["created_at"], if_not_exists=True)
+    op.create_index("ix_notifications_workspace_id", "notifications", ["workspace_id"], if_not_exists=True)
+    op.create_index("ix_research_gaps_gap_type", "research_gaps", ["gap_type"], if_not_exists=True)
+    op.create_index("ix_research_query_histories_action_id", "research_query_histories", ["action_id"], if_not_exists=True)
+    op.create_index("ix_research_query_histories_cycle_id", "research_query_histories", ["cycle_id"], if_not_exists=True)
+    op.create_index("ix_review_requests_requester_id", "review_requests", ["requester_id"], if_not_exists=True)
+    op.create_index("ix_review_requests_target_type", "review_requests", ["target_type"], if_not_exists=True)
+    op.create_index("ix_review_requests_target_id", "review_requests", ["target_id"], if_not_exists=True)
+    op.create_index("ix_workspace_activities_actor_id", "workspace_activities", ["actor_id"], if_not_exists=True)
+    op.create_index("ix_workspace_activities_created_at", "workspace_activities", ["created_at"], if_not_exists=True)
+    op.create_index("ix_workspace_invitations_inviter_id", "workspace_invitations", ["inviter_id"], if_not_exists=True)
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    is_sqlite = bind.dialect.name == "sqlite"
+
     for table, name in [
         ("workspace_invitations", "ix_workspace_invitations_inviter_id"),
         ("workspace_activities", "ix_workspace_activities_created_at"),
@@ -138,11 +175,12 @@ def downgrade() -> None:
         ("comment_threads", "ix_comment_threads_target_entity_id"),
         ("comment_threads", "ix_comment_threads_target_entity_type"),
     ]:
-        op.drop_index(name, table_name=table)
+        op.drop_index(name, table_name=table, if_exists=True)
     op.create_index(
         "ix_comment_threads_target",
         "comment_threads",
         ["target_entity_type", "target_entity_id"],
+        if_not_exists=True,
     )
 
     for table, old_name, new_name, columns, *unique in reversed(
@@ -174,8 +212,12 @@ def downgrade() -> None:
     ):
         _rename_index(table, new_name, old_name, columns, bool(unique and unique[0]))
 
-    with op.batch_alter_table("investigations", recreate="always") as batch_op:
-        batch_op.drop_constraint("fk_investigations_owner_id_users", type_="foreignkey")
-        batch_op.drop_constraint("fk_investigations_workspace_id_workspaces", type_="foreignkey")
+    if is_sqlite:
+        with op.batch_alter_table("investigations", recreate="always") as batch_op:
+            batch_op.drop_constraint("fk_investigations_owner_id_users", type_="foreignkey")
+            batch_op.drop_constraint("fk_investigations_workspace_id_workspaces", type_="foreignkey")
+    else:
+        op.drop_constraint("fk_investigations_owner_id_users", "investigations", type_="foreignkey")
+        op.drop_constraint("fk_investigations_workspace_id_workspaces", "investigations", type_="foreignkey")
     # report_versions may have been created by create_all() before this
     # corrective migration. Keep the table and its records on downgrade.
