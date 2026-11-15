@@ -8,3 +8,4 @@ pypdf>=7,<8
 sqlalchemy[asyncio]>=2.0.36,<3
 uvicorn[standard]>=0.34,<1
 redis>=5.0,<6
+psycopg[binary]>=3.2,<4
