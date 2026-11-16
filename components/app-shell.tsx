@@ -84,7 +84,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
               <span>Research intelligence</span>
             </div>
           </Link>
-          <nav aria-label="Primary navigation" style={{ overflowY: "auto", paddingRight: "4px" }}>
+          <nav aria-label="Primary navigation">
             {navSections.map((section) => (
               <div key={section.title} className="nav-section" style={{ marginBottom: "8px" }}>
                 <div className="nav-section-title">{section.title}</div>

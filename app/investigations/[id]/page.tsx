@@ -963,9 +963,11 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             </button>
           </div>
         </div>
+      </header>
 
-        {/* Sticky Tab Navigation Bar */}
-        <nav className="inv-tab-nav" aria-label="Investigation Workspace Sections">
+      {/* Sticky Tab Navigation Bar */}
+      <nav className="inv-tab-nav-bar" aria-label="Investigation Workspace Sections">
+        <div className="inv-tab-nav-inner">
           <button
             type="button"
             className={`inv-tab-button ${activeTab === "overview" ? "active" : ""}`}
@@ -1037,8 +1039,8 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
           >
             <span>Collaboration & Review</span>
           </button>
-        </nav>
-      </header>
+        </div>
+      </nav>
 
       {/* Main Workspace Body */}
       <main className="inv-workspace-body">

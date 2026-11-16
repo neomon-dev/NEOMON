@@ -91,6 +91,13 @@ a {
   flex-direction: column;
   background: #070b14;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100dvh;
+  align-self: flex-start;
+  z-index: 40;
+  overflow: hidden;
 }
 
 .brand {
@@ -144,6 +151,33 @@ nav {
   display: flex;
   flex-direction: column;
   gap: 3px;
+}
+
+.sidebar nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b transparent;
+}
+
+.sidebar nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar nav::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: var(--radius-full);
+}
+
+.sidebar nav::-webkit-scrollbar-thumb:hover {
+  background: #334155;
 }
 
 .nav-item {
@@ -656,6 +690,7 @@ h1 {
   border-radius: var(--radius-md);
   background: var(--surface-raised);
   transition: border-color 0.15s ease;
+  scroll-margin-top: 116px;
 }
 
 .source-row:hover {
@@ -1361,7 +1396,7 @@ blockquote p {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: #0c1220;
-  scroll-margin-top: 90px;
+  scroll-margin-top: 116px;
 }
 
 .report-section-card h4 {
@@ -2112,15 +2147,10 @@ blockquote p {
 }
 
 .inv-workspace-header {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  background: rgba(8, 12, 21, 0.94);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 32px 0;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  position: relative;
+  background: var(--background);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 20px 32px 18px;
 }
 
 .inv-header-top {
@@ -2184,6 +2214,29 @@ blockquote p {
   gap: 10px;
   flex-shrink: 0;
   flex-wrap: wrap;
+}
+
+.inv-tab-nav-bar {
+  position: sticky;
+  top: 56px;
+  z-index: 25;
+  background: #080c15;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
+  padding: 0 32px;
+}
+
+.inv-tab-nav-inner {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.inv-tab-nav-inner::-webkit-scrollbar {
+  display: none;
 }
 
 .inv-tab-nav {
@@ -2289,6 +2342,7 @@ blockquote p {
   padding: 14px 18px;
   transition: all 0.15s ease;
   position: relative;
+  scroll-margin-top: 116px;
 }
 
 .evidence-workspace-card:hover {
@@ -2435,7 +2489,8 @@ blockquote p {
 }
 
 @media (max-width: 800px) {
-  .inv-workspace-header { padding: 14px 18px 0; }
+  .inv-workspace-header { padding: 14px 18px 12px; }
+  .inv-tab-nav-bar { padding: 0 18px; }
   .inv-workspace-body { padding: 18px 18px 40px; }
   .inv-header-main { flex-direction: column; gap: 12px; }
   .inv-header-actions { width: 100%; justify-content: flex-start; }
