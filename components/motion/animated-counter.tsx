@@ -19,7 +19,7 @@ export function AnimatedCounter({
   const isNaNValue = typeof value === "string" && isNaN(parseFloat(value));
   const [displayValue, setDisplayValue] = useState<number>(0);
   const startTimestampRef = useRef<number | null>(null);
-  const startValueRef = useRef<number>(0);
+  const currentValueRef = useRef<number>(0);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -31,11 +31,12 @@ export function AnimatedCounter({
     }
 
     if (prefersReducedMotion) {
+      currentValueRef.current = numericValue;
       setDisplayValue(numericValue);
       return;
     }
 
-    startValueRef.current = displayValue;
+    const startVal = currentValueRef.current;
     startTimestampRef.current = null;
 
     const step = (timestamp: number) => {
@@ -43,8 +44,9 @@ export function AnimatedCounter({
       const progress = Math.min((timestamp - startTimestampRef.current) / duration, 1);
       // Ease out cubic
       const easeProgress = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(startValueRef.current + (numericValue - startValueRef.current) * easeProgress);
+      const current = Math.round(startVal + (numericValue - startVal) * easeProgress);
 
+      currentValueRef.current = current;
       setDisplayValue(current);
 
       if (progress < 1) {

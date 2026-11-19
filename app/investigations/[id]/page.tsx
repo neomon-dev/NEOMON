@@ -909,7 +909,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
           <div className="inv-title-group">
             <p className="eyebrow blue" style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: "8px" }}>
               <span>RESEARCH WORKSPACE</span>
-              <span>//</span>
+              <span>{"//"}</span>
               <span style={{ color: "var(--muted)", fontFamily: "monospace" }}>{investigation.mode?.toUpperCase() || "AUTONOMOUS"}</span>
             </p>
             <h1 className="inv-question-title">{investigation.question}</h1>

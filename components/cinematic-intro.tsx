@@ -66,8 +66,22 @@ export function CinematicIntro() {
     };
     window.addEventListener("keydown", handleKeyDown);
 
+    // Ensure audio is immediately unmuted on the very first user interaction
+    const handleFirstGesture = () => {
+      if (videoRef.current && videoRef.current.muted) {
+        videoRef.current.muted = false;
+        videoRef.current.volume = 1.0;
+        setIsMuted(false);
+        setAutoplayBlocked(false);
+      }
+    };
+    window.addEventListener("pointerdown", handleFirstGesture, { passive: true });
+    window.addEventListener("touchstart", handleFirstGesture, { passive: true });
+
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("pointerdown", handleFirstGesture);
+      window.removeEventListener("touchstart", handleFirstGesture);
       if (completeTimerRef.current) {
         clearTimeout(completeTimerRef.current);
       }
