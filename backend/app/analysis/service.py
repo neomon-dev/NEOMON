@@ -126,6 +126,7 @@ def _rule_based_claims(question: str) -> list[ClaimPayload]:
 
 logger = logging.getLogger(__name__)
 _JSON_FENCE_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
+_THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
 
 class _ArgumentsListPayload(BaseModel):
@@ -147,8 +148,9 @@ class _ReportSectionsListPayload(BaseModel):
 
 
 def _extract_json_object(raw_content: str) -> dict[str, Any]:
-    """Decode a JSON object from raw model text, stripping optional markdown fences."""
-    stripped = raw_content.strip()
+    """Decode a JSON object from raw model text, stripping thinking tags and optional markdown fences."""
+    cleaned = _THINK_TAG_RE.sub("", raw_content).strip()
+    stripped = cleaned if cleaned else raw_content.strip()
     try:
         parsed = json.loads(stripped)
         if not isinstance(parsed, dict):

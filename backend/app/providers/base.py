@@ -92,6 +92,63 @@ LOCAL_RUNTIME_PORTS: dict[ProviderKind, set[int]] = {
     ProviderKind.lm_studio: {1234},
 }
 
+BLOCKED_SSRF_PORTS: set[int] = {
+    21,   # FTP
+    22,   # SSH
+    23,   # Telnet
+    25,   # SMTP
+    53,   # DNS
+    110,  # POP3
+    111,  # RPC
+    135,  # RPC
+    137,  # NetBIOS
+    138,  # NetBIOS
+    139,  # NetBIOS
+    445,  # SMB
+}
+
+PRIVATE_LAN_NETWORKS = (
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+)
+
+
+def _is_private_lan(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    """Return True if the IP address belongs to standard RFC 1918 private IPv4 networks."""
+    if isinstance(ip, ipaddress.IPv4Address):
+        return any(ip in net for net in PRIVATE_LAN_NETWORKS)
+    return False
+
+
+def _format_network_error(exc: Exception, endpoint: str, timeout: float) -> str:
+    """Format network and timeout exceptions into actionable diagnostic messages."""
+    ep_netloc = urlsplit(endpoint).netloc or endpoint
+    if isinstance(exc, httpx.ConnectError):
+        return (
+            f"Connection refused or unreachable at {ep_netloc}. "
+            f"Verify the local model server (LM Studio, Ollama, etc.) is running and listening on the configured address and port (e.g., host bound to 0.0.0.0 for LAN access)."
+        )
+    if isinstance(exc, httpx.ConnectTimeout):
+        return (
+            f"Connection timed out attempting to reach {ep_netloc}. "
+            f"Check host reachability, LAN IP/firewall configuration, and server responsiveness."
+        )
+    if isinstance(exc, httpx.ReadTimeout):
+        return (
+            f"Inference request to {ep_netloc} timed out after {timeout:.0f}s. "
+            f"The local model may still be loading weights into VRAM/RAM or requires more generation time. Consider increasing inference timeout."
+        )
+    if isinstance(exc, httpx.WriteTimeout):
+        return f"Sending request payload to {ep_netloc} timed out."
+    if isinstance(exc, httpx.PoolTimeout):
+        return f"Connection pool exhausted waiting to connect to {ep_netloc}."
+    if isinstance(exc, httpx.TimeoutException):
+        return f"Request to {ep_netloc} timed out after {timeout:.0f}s."
+    if isinstance(exc, httpx.NetworkError):
+        return f"Network error connecting to {ep_netloc}: {exc}"
+    return f"Request to {ep_netloc} failed: {exc}"
+
 
 def _get_local_interface_ips() -> set[str]:
     """Return non-link-local IP addresses bound to the local host."""
@@ -132,6 +189,11 @@ async def validate_provider_endpoint(
         raise ProviderRequestError("Provider endpoint port is invalid.") from exc
     resolved_port = explicit_port if explicit_port is not None else (443 if parts.scheme == "https" else 80)
 
+    if not (1 <= resolved_port <= 65535):
+        raise ProviderRequestError("Provider endpoint port is invalid.")
+    if resolved_port in BLOCKED_SSRF_PORTS:
+        raise ProviderRequestError(f"Port {resolved_port} is restricted for security reasons.")
+
     settings = get_settings()
     configured_local_hosts = {
         host.strip().lower().rstrip(".")
@@ -139,13 +201,6 @@ async def validate_provider_endpoint(
         if host.strip()
     }
     allowed_local_hosts = configured_local_hosts | _get_local_interface_ips()
-    supported_ports = LOCAL_RUNTIME_PORTS.get(kind, set())
-    is_authorized_local_runtime = (
-        allow_local_runtime
-        and kind in LOCAL_RUNTIME_PORTS
-        and hostname in allowed_local_hosts
-        and resolved_port in supported_ports
-    )
 
     try:
         addresses = await asyncio.to_thread(socket.getaddrinfo, hostname, resolved_port, type=socket.SOCK_STREAM)
@@ -161,7 +216,7 @@ async def validate_provider_endpoint(
         if ip.is_link_local or ip.is_multicast or ip.is_unspecified:
             raise ProviderRequestError("Link-local, metadata, and multicast provider addresses are not allowed.")
         if ip.is_loopback or ip.is_private:
-            if not is_authorized_local_runtime:
+            if not allow_local_runtime:
                 raise ProviderRequestError(
                     "Private and loopback provider addresses are blocked unless explicitly configured for a local runtime."
                 )
@@ -169,7 +224,7 @@ async def validate_provider_endpoint(
                 raise ProviderRequestError(
                     "Localhost provider endpoint resolved to a non-loopback address."
                 )
-            if hostname != "localhost" and not (ip.is_loopback or str(ip).lower() in allowed_local_hosts):
+            if not (ip.is_loopback or _is_private_lan(ip) or str(ip).lower() in allowed_local_hosts):
                 raise ProviderRequestError(
                     "Local runtime hostname resolved to an unauthorized private address."
                 )
@@ -188,6 +243,18 @@ def effective_inference_timeout(config: ProviderConfigRequest) -> float:
     return settings.request_timeout_seconds
 
 
+class GenerationResult:
+    def __init__(self, content: str, raw: dict[str, Any]) -> None:
+        self.content = content
+        self.raw = raw
+
+    def __getitem__(self, item: str) -> Any:
+        return self.raw[item]
+
+    def get(self, item: str, default: Any = None) -> Any:
+        return self.raw.get(item, default)
+
+
 class AIProvider(ABC):
     def __init__(self, config: ProviderConfigRequest) -> None:
         self.config = config
@@ -196,7 +263,7 @@ class AIProvider(ABC):
         self._client = httpx.AsyncClient(
             base_url=config.endpoint,
             timeout=httpx.Timeout(
-                connect=min(15.0, inference_timeout),
+                connect=min(30.0, inference_timeout),
                 read=inference_timeout,
                 write=min(30.0, inference_timeout),
                 pool=min(15.0, inference_timeout),
@@ -204,6 +271,22 @@ class AIProvider(ABC):
             headers=self._headers(),
             follow_redirects=False,
         )
+
+    def _normalize_path(self, path: str) -> str:
+        """Strip duplicate /v1 or /api path prefix if the client base_url already contains it."""
+        ep_parts = urlsplit(self.config.endpoint)
+        base_path = ep_parts.path.rstrip("/")
+        norm_path = path if path.startswith("/") else "/" + path
+
+        if base_path.endswith("/v1") and (norm_path == "/v1" or norm_path.startswith("/v1/")):
+            sub = norm_path[3:]
+            return sub if sub.startswith("/") else "/" + sub
+
+        if base_path.endswith("/api") and (norm_path == "/api" or norm_path.startswith("/api/")):
+            sub = norm_path[4:]
+            return sub if sub.startswith("/") else "/" + sub
+
+        return norm_path
 
     @asynccontextmanager
     async def _inference_slot(self, model: str | None = None) -> AsyncIterator[QueueLease]:
@@ -235,9 +318,10 @@ class AIProvider(ABC):
             self.config.kind,
             allow_local_runtime=self.config.allow_local_runtime,
         )
+        target_path = self._normalize_path(path)
         for attempt in range(self.config.retry_count + 1):
             try:
-                response = await self._client.request(method, path, **kwargs)
+                response = await self._client.request(method, target_path, **kwargs)
                 if 300 <= response.status_code < 400:
                     location = response.headers.get("location")
                     if location:
@@ -255,7 +339,8 @@ class AIProvider(ABC):
                 return response
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 if attempt >= self.config.retry_count:
-                    raise ProviderRequestError("Provider request timed out or failed.") from exc
+                    err_msg = _format_network_error(exc, self.config.endpoint, self.inference_timeout_seconds)
+                    raise ProviderRequestError(err_msg) from exc
                 await asyncio.sleep(min(0.25 * (2**attempt), 2))
             except httpx.HTTPStatusError as exc:
                 status = exc.response.status_code
@@ -314,5 +399,19 @@ class AIProvider(ABC):
                 api_key_configured=self.config.api_key is not None,
             )
 
-    async def complete(self, messages: list[dict[str, str]], model: str | None = None) -> dict[str, Any]:
+    async def complete(self, messages: list[dict[str, str]], model: str | None = None, **kwargs: Any) -> dict[str, Any]:
         raise ProviderRequestError("Text completion is not enabled in the foundation milestone.")
+
+    async def generate(
+        self,
+        prompt: str,
+        system_instruction: str | None = None,
+        model: str | None = None,
+    ) -> GenerationResult:
+        messages: list[dict[str, str]] = []
+        if system_instruction:
+            messages.append({"role": "system", "content": system_instruction})
+        messages.append({"role": "user", "content": prompt})
+        res = await self.complete(messages, model=model)
+        content = res.get("content", "") if isinstance(res, dict) else str(res)
+        return GenerationResult(content=content, raw=res if isinstance(res, dict) else {"content": content})

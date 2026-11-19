@@ -35,6 +35,21 @@ interface TavilyStatus {
   };
 }
 
+function isLocalOrLanEndpoint(urlStr: string): boolean {
+  try {
+    const trimmed = urlStr.trim();
+    if (!trimmed) return false;
+    const parsed = new URL(trimmed.startsWith("http") ? trimmed : `http://${trimmed}`);
+    const host = parsed.hostname.toLowerCase();
+    if (host === "localhost" || host === "127.0.0.1" || host === "::1") return true;
+    if (host.startsWith("192.168.") || host.startsWith("10.")) return true;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export default function SettingsPage() {
   const { config, setConfig, clearConfig } = useProviderSession();
   const [provider, setProvider] = useState<ProviderKind>(config?.kind ?? "ollama");
@@ -83,7 +98,10 @@ export default function SettingsPage() {
     setLoading(true);
     setResult(null);
     const trimmedKey = apiKey.trim();
-    if (provider === "openai_compatible" && !trimmedKey) {
+    const isEndpointLocal = isLocalOrLanEndpoint(endpoint);
+    const isLocalRuntime = provider === "ollama" || provider === "lm_studio" || isEndpointLocal;
+
+    if (provider === "openai_compatible" && !isLocalRuntime && !trimmedKey) {
       setLoading(false);
       setResult({
         ok: false,
@@ -91,8 +109,6 @@ export default function SettingsPage() {
       });
       return;
     }
-
-    const isLocalRuntime = provider === "ollama" || provider === "lm_studio";
 
     try {
       const payload = await requestJson<{
@@ -248,6 +264,11 @@ export default function SettingsPage() {
         <label>
           Endpoint
           <input value={endpoint} onChange={(event) => setEndpoint(event.target.value)} required />
+          {isLocalOrLanEndpoint(endpoint) && (
+            <span style={{ fontSize: "11px", color: "var(--color-intelligence-cyan, #36c5de)", display: "block", marginTop: "4px" }}>
+              ⚡ Local / Private LAN endpoint detected (SSRF authorized for this session)
+            </span>
+          )}
         </label>
         <label>
           Model (optional)
@@ -269,7 +290,7 @@ export default function SettingsPage() {
           )}
         </label>
         <label>
-          API key {provider === "openai_compatible" ? "(required for remote endpoints)" : "(optional)"}
+          API key {provider === "openai_compatible" && !isLocalOrLanEndpoint(endpoint) ? "(required for remote endpoints)" : "(optional)"}
           <input
             type="password"
             value={apiKey}

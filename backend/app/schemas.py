@@ -28,8 +28,8 @@ class ProviderKind(StrEnum):
 
 
 class ProviderConfigRequest(BaseModel):
-    kind: ProviderKind
-    endpoint: str = Field(min_length=1, max_length=500)
+    kind: ProviderKind = Field(default=ProviderKind.ollama)
+    endpoint: str = Field(default="", min_length=0, max_length=500)
     model: str | None = Field(default=None, min_length=1, max_length=200)
     api_key: SecretStr | None = None
     allow_local_runtime: bool = False
@@ -38,12 +38,33 @@ class ProviderConfigRequest(BaseModel):
     inference_timeout_seconds: float | None = Field(default=None, gt=0, le=1800)
     retry_count: int = Field(default=2, ge=0, le=5)
 
+    @model_validator(mode="before")
+    @classmethod
+    def pre_validate(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "provider" in data and "kind" not in data:
+                data["kind"] = data["provider"]
+            kind = data.get("kind")
+            endpoint = data.get("endpoint")
+            if not endpoint:
+                if kind in ("ollama", ProviderKind.ollama):
+                    data["endpoint"] = "http://127.0.0.1:11434"
+                    data.setdefault("allow_local_runtime", True)
+                elif kind in ("lm_studio", ProviderKind.lm_studio):
+                    data["endpoint"] = "http://127.0.0.1:1234"
+                    data.setdefault("allow_local_runtime", True)
+                elif kind in ("openai_compatible", ProviderKind.openai_compatible):
+                    data["endpoint"] = "http://127.0.0.1:1234"
+                    data.setdefault("allow_local_runtime", True)
+        return data
+
     @field_validator("endpoint")
     @classmethod
     def validate_endpoint(cls, value: str) -> str:
-        if not value.startswith(("http://", "https://")):
+        trimmed = value.strip()
+        if not trimmed.startswith(("http://", "https://")):
             raise ValueError("endpoint must use http:// or https://")
-        return value.rstrip("/")
+        return trimmed.rstrip("/")
 
 
 class ProviderStatus(BaseModel):

@@ -44,11 +44,47 @@ class OpenAICompatibleProvider(AIProvider):
         super().__init__(config)
         self._supports_json_schema: bool | None = None
         self._supports_json_object: bool | None = None
+        self._cached_models: list[str] = []
 
     async def discover_models(self) -> list[str]:
-        response = await self._request("GET", "/v1/models")
-        data = response.json()
-        return [model["id"] for model in data.get("data", []) if isinstance(model, dict)]
+        data = None
+        try:
+            response = await self._request("GET", "/v1/models")
+            data = response.json()
+        except ProviderRequestError as exc:
+            if exc.status_code == 404:
+                try:
+                    response = await self._request("GET", "/models")
+                    data = response.json()
+                except ProviderRequestError:
+                    if self.config.model:
+                        return [self.config.model]
+                    raise
+            else:
+                raise
+
+        models: list[str] = []
+        if isinstance(data, dict):
+            raw_items = data.get("data") or data.get("models") or []
+        elif isinstance(data, list):
+            raw_items = data
+        else:
+            raw_items = []
+
+        if isinstance(raw_items, list):
+            for item in raw_items:
+                if isinstance(item, dict):
+                    mid = item.get("id") or item.get("name")
+                    if isinstance(mid, str) and mid.strip():
+                        models.append(mid.strip())
+                elif isinstance(item, str) and item.strip():
+                    models.append(item.strip())
+
+        unique_models = list(dict.fromkeys(models))
+        if self.config.model and self.config.model not in unique_models:
+            unique_models.insert(0, self.config.model)
+        self._cached_models = unique_models
+        return unique_models
 
     def _response_format_candidates(
         self,
@@ -84,15 +120,29 @@ class OpenAICompatibleProvider(AIProvider):
         *,
         response_schema: dict[str, Any] | None = None,
         schema_name: str = "structured_output",
+        **kwargs: Any,
     ) -> dict[str, object]:
         effective_model = model or self.config.model
+        if not effective_model:
+            if self._cached_models:
+                effective_model = self._cached_models[0]
+            else:
+                try:
+                    discovered = await self.discover_models()
+                    if discovered:
+                        effective_model = discovered[0]
+                except Exception:
+                    pass
+        if not effective_model:
+            raise ProviderRequestError("No model specified and could not discover models from OpenAI-compatible provider.")
+
         candidates = self._response_format_candidates(
             response_schema=response_schema,
             schema_name=schema_name,
         )
         response = None
         used_mode = "prompt_only"
-        async with self._inference_slot(model) as lease:
+        async with self._inference_slot(effective_model) as lease:
             for idx, (mode, response_format) in enumerate(candidates):
                 body: dict[str, Any] = {
                     "model": effective_model,
@@ -123,7 +173,21 @@ class OpenAICompatibleProvider(AIProvider):
         assert response is not None
         data = response.json()
         choices = data.get("choices") or []
-        content = ((choices[0].get("message") or {}).get("content") if choices else None)
+        content = None
+        if choices and isinstance(choices[0], dict):
+            first_choice = choices[0]
+            msg = first_choice.get("message")
+            if isinstance(msg, dict):
+                content = msg.get("content")
+                if content is None and "reasoning_content" in msg:
+                    content = msg.get("reasoning_content")
+            elif isinstance(first_choice.get("text"), str):
+                content = first_choice.get("text")
+        elif isinstance(data.get("content"), str):
+            content = data.get("content")
+        elif isinstance(data.get("response"), str):
+            content = data.get("response")
+
         if not isinstance(content, str):
             raise ProviderRequestError("OpenAI-compatible provider returned no structured message content.")
         usage = data.get("usage") or {}

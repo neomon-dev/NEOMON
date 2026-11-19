@@ -77,44 +77,78 @@ async def test_ollama_invalid_message_raises_provider_request_error():
 
 @pytest.mark.asyncio
 async def test_provider_ssrf_blocks_metadata_and_private_ips_but_allows_local_runtimes():
-    # Local Ollama and LM Studio on localhost are explicitly allowed when allow_local_runtime=True
+    # Local Ollama, LM Studio, and OpenAI-compatible on loopback and private LANs are explicitly allowed when allow_local_runtime=True
     await validate_provider_endpoint("http://localhost:11434", ProviderKind.ollama, allow_local_runtime=True)
     await validate_provider_endpoint("http://127.0.0.1:11434", ProviderKind.ollama, allow_local_runtime=True)
     await validate_provider_endpoint("http://127.0.0.1:1234", ProviderKind.lm_studio, allow_local_runtime=True)
+    await validate_provider_endpoint("http://localhost:1345/v1", ProviderKind.openai_compatible, allow_local_runtime=True)
+    await validate_provider_endpoint("http://127.0.0.1:1345/v1", ProviderKind.openai_compatible, allow_local_runtime=True)
+    await validate_provider_endpoint("http://192.168.1.7:1345/v1", ProviderKind.openai_compatible, allow_local_runtime=True)
+    await validate_provider_endpoint("http://10.0.0.5:11434", ProviderKind.ollama, allow_local_runtime=True)
+    await validate_provider_endpoint("http://172.16.0.5:1234", ProviderKind.lm_studio, allow_local_runtime=True)
+    await validate_provider_endpoint("http://127.0.0.1:1234/v1", ProviderKind.openai_compatible, allow_local_runtime=True)
 
-    # Localhost/loopback is rejected without explicit local-runtime authorization
+    # Localhost, loopback, and private LAN IPs are rejected without explicit local-runtime authorization (SSRF protection)
     with pytest.raises(ProviderRequestError):
         await validate_provider_endpoint("http://127.0.0.1:11434", ProviderKind.ollama, allow_local_runtime=False)
     with pytest.raises(ProviderRequestError):
         await validate_provider_endpoint("http://127.0.0.1:1234", ProviderKind.lm_studio, allow_local_runtime=False)
-
-    # Unsupported ports on loopback are rejected even with allow_local_runtime=True
     with pytest.raises(ProviderRequestError):
-        await validate_provider_endpoint("http://127.0.0.1:8000", ProviderKind.ollama, allow_local_runtime=True)
+        await validate_provider_endpoint("http://192.168.1.7:1345/v1", ProviderKind.openai_compatible, allow_local_runtime=False)
+    with pytest.raises(ProviderRequestError):
+        await validate_provider_endpoint("http://10.0.0.5:11434", ProviderKind.ollama, allow_local_runtime=False)
 
-    # Cloud metadata link-local IP is blocked for all provider kinds
+    # Restricted dangerous system ports (e.g. SSH port 22) are blocked even with allow_local_runtime=True
+    with pytest.raises(ProviderRequestError):
+        await validate_provider_endpoint("http://127.0.0.1:22", ProviderKind.ollama, allow_local_runtime=True)
+
+    # Cloud metadata link-local IP is blocked for all provider kinds even with allow_local_runtime=True
     for kind in (ProviderKind.ollama, ProviderKind.lm_studio, ProviderKind.openai_compatible):
         with pytest.raises(ProviderRequestError):
             await validate_provider_endpoint("http://169.254.169.254/latest/meta-data", kind, allow_local_runtime=True)
 
-    # Arbitrary private network IPs are blocked even with allow_local_runtime=True
-    with patch("app.providers.base._get_local_interface_ips", return_value={"192.168.1.10"}):
-        await validate_provider_endpoint(
-            "http://192.168.1.10:1234/v1",
-            ProviderKind.lm_studio,
-            allow_local_runtime=True,
-        )
-        with pytest.raises(ProviderRequestError):
-            await validate_provider_endpoint("http://10.0.0.5:11434", ProviderKind.ollama, allow_local_runtime=True)
-        with pytest.raises(ProviderRequestError):
-            await validate_provider_endpoint("http://192.168.1.50:1234", ProviderKind.lm_studio, allow_local_runtime=True)
-        # Ordinary OpenAI-compatible provider never bypasses SSRF checks even if allow_local_runtime=True
-        with pytest.raises(ProviderRequestError):
-            await validate_provider_endpoint(
-                "http://127.0.0.1:1234/v1",
-                ProviderKind.openai_compatible,
-                allow_local_runtime=True,
-            )
+
+@pytest.mark.asyncio
+async def test_duplicate_v1_path_prevention_for_local_and_lan_providers():
+    # Test OpenAICompatibleProvider normalizes endpoint with /v1
+    config_with_v1 = ProviderConfigRequest(
+        kind=ProviderKind.openai_compatible,
+        endpoint="http://192.168.1.7:1345/v1",
+        model="local-model",
+        allow_local_runtime=True,
+    )
+    provider_v1 = OpenAICompatibleProvider(config_with_v1)
+    assert provider_v1._normalize_path("/v1/chat/completions") == "/chat/completions"
+    assert provider_v1._normalize_path("/v1/models") == "/models"
+    # When httpx joins base_url with /chat/completions, it resolves to http://192.168.1.7:1345/v1/chat/completions
+    req = provider_v1._client.build_request("POST", provider_v1._normalize_path("/v1/chat/completions"))
+    assert str(req.url) == "http://192.168.1.7:1345/v1/chat/completions"
+    await provider_v1.close()
+
+    # Test endpoint without /v1
+    config_no_v1 = ProviderConfigRequest(
+        kind=ProviderKind.openai_compatible,
+        endpoint="http://localhost:1345",
+        model="local-model",
+        allow_local_runtime=True,
+    )
+    provider_no_v1 = OpenAICompatibleProvider(config_no_v1)
+    assert provider_no_v1._normalize_path("/v1/chat/completions") == "/v1/chat/completions"
+    req_no_v1 = provider_no_v1._client.build_request("POST", provider_no_v1._normalize_path("/v1/chat/completions"))
+    assert str(req_no_v1.url) == "http://localhost:1345/v1/chat/completions"
+    await provider_no_v1.close()
+
+    # Test OllamaProvider with /v1 cleans endpoint to avoid /v1/api/tags
+    config_ollama_v1 = ProviderConfigRequest(
+        kind=ProviderKind.ollama,
+        endpoint="http://localhost:11434/v1",
+        model="llama3",
+        allow_local_runtime=True,
+    )
+    provider_ollama = OllamaProvider(config_ollama_v1)
+    req_ollama = provider_ollama._client.build_request("GET", provider_ollama._normalize_path("/api/tags"))
+    assert str(req_ollama.url) == "http://localhost:11434/api/tags"
+    await provider_ollama.close()
 
 
 @pytest.mark.asyncio

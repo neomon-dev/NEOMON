@@ -70,7 +70,7 @@ def build_limiter_key(
 
 def default_concurrency_for(config: ProviderConfigRequest) -> int:
     settings = get_settings()
-    if config.kind in {ProviderKind.lm_studio, ProviderKind.ollama}:
+    if config.kind in {ProviderKind.lm_studio, ProviderKind.ollama} or config.allow_local_runtime:
         return settings.local_provider_max_concurrency
     return settings.remote_provider_max_concurrency
 

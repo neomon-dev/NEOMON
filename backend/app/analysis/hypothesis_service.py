@@ -459,7 +459,16 @@ class HypothesisService:
     ) -> list[dict[str, Any]]:
         """LLM enrichment for mechanistic or exploratory scientific hypotheses."""
         from app.schemas import ProviderConfigRequest, ProviderKind
-        prov = create_provider(ProviderConfigRequest(provider=ProviderKind(provider_kind), model=model))
+        p_kind = ProviderKind(provider_kind) if provider_kind in ProviderKind.__members__.values() else ProviderKind.ollama
+        p_endpoint = "http://127.0.0.1:11434" if p_kind == ProviderKind.ollama else "http://127.0.0.1:1234"
+        prov = create_provider(
+            ProviderConfigRequest(
+                kind=p_kind,
+                endpoint=p_endpoint,
+                model=model,
+                allow_local_runtime=True,
+            )
+        )
 
         prompt = (
             f"You are the Hypothesis Generator for NEOMON.\n"

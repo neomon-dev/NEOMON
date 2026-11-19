@@ -1012,8 +1012,16 @@ class ResearchGapEngine:
         """Optional LLM enrichment for nuanced perspective and trade-off gaps."""
         try:
             from app.schemas import ProviderConfigRequest, ProviderKind
-            p_kind = ProviderKind(provider_kind)
-            prov = create_provider(ProviderConfigRequest(provider=p_kind, model=model))
+            p_kind = ProviderKind(provider_kind) if provider_kind in ProviderKind.__members__.values() else ProviderKind.ollama
+            p_endpoint = "http://127.0.0.1:11434" if p_kind == ProviderKind.ollama else "http://127.0.0.1:1234"
+            prov = create_provider(
+                ProviderConfigRequest(
+                    kind=p_kind,
+                    endpoint=p_endpoint,
+                    model=model,
+                    allow_local_runtime=True,
+                )
+            )
         except Exception:
             return []
 

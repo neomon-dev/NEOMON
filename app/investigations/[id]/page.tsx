@@ -723,10 +723,11 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
     if (
       shouldUseProvider &&
       sessionProvider?.kind === "openai_compatible" &&
-      !sessionProvider.apiKey
+      !sessionProvider.apiKey &&
+      !sessionProvider.allowLocalRuntime
     ) {
       setAnalysisError(
-        "OpenAI-compatible provider requires an API key in memory. Please re-enter credentials in Settings."
+        "OpenAI-compatible remote provider requires an API key in memory. Please re-enter credentials in Settings."
       );
       return;
     }
