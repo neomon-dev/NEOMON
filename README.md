@@ -13,6 +13,10 @@
 
 ---
 
+## Sign in email and password
+Email: auditor_qa@neomon.ai
+Password: Password123!
+
 ## Table of Contents
 
 1. [Executive Summary & Problem Statement](#1-executive-summary--problem-statement)
