@@ -17,6 +17,13 @@ import {
   type WorkspaceEvidenceItem,
   type WorkspaceEvidencePage,
 } from "@/lib/workspace";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  DecryptedText,
+  BorderBeam,
+} from "@/components/motion";
 
 const PAGE_SIZE = 20;
 
@@ -163,8 +170,13 @@ export function EvidenceExplorer() {
     <>
       <header className="topbar">
         <div>
-          <p className="eyebrow">Evidence Intelligence Workspace</p>
-          <h1>Evidence Explorer</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <PulseIndicator status="cyan" size={8} />
+            <p className="eyebrow">Evidence Intelligence Workspace</p>
+          </div>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <DecryptedText text="Evidence Explorer" speed={30} />
+          </h1>
         </div>
         <div className="analysis-actions">
           <Link className="outline-button compact-button" href="/sources">
@@ -178,29 +190,35 @@ export function EvidenceExplorer() {
 
       <div className="content">
         <div className="metric-grid">
-          <article className="metric-card">
+          <SpotlightCard className="metric-card" spotlightColor="rgba(37, 217, 242, 0.15)">
             <span className="metric-label">Matching evidence</span>
-            <strong>{pageData.total}</strong>
+            <strong style={{ color: "var(--cyan)" }}>
+              <AnimatedCounter value={pageData.total} />
+            </strong>
             <span className="metric-detail">Persisted passages matching active filters</span>
-          </article>
-          <article className="metric-card">
+          </SpotlightCard>
+          <SpotlightCard className="metric-card" spotlightColor="rgba(39, 135, 255, 0.15)">
             <span className="metric-label">Traceable on page</span>
-            <strong>{pageData.items.filter((item) => item.traceable).length}</strong>
+            <strong style={{ color: "var(--electric-blue)" }}>
+              <AnimatedCounter value={pageData.items.filter((item) => item.traceable).length} />
+            </strong>
             <span className="metric-detail">Direct source & extraction provenance preserved</span>
-          </article>
-          <article className="metric-card">
+          </SpotlightCard>
+          <SpotlightCard className="metric-card" spotlightColor="rgba(53, 224, 177, 0.15)">
             <span className="metric-label">Supporting / Challenging</span>
-            <strong>
-              {pageData.items.filter((item) => item.evidence_type === "supporting").length} /{" "}
-              {pageData.items.filter((item) => item.evidence_type === "contradicting").length}
+            <strong style={{ color: "var(--text-primary)" }}>
+              <AnimatedCounter value={pageData.items.filter((item) => item.evidence_type === "supporting").length} /> /{" "}
+              <AnimatedCounter value={pageData.items.filter((item) => item.evidence_type === "contradicting").length} />
             </strong>
             <span className="metric-detail">On current page (never inferred from score)</span>
-          </article>
-          <article className="metric-card">
+          </SpotlightCard>
+          <SpotlightCard className="metric-card" spotlightColor="rgba(133, 100, 255, 0.15)">
             <span className="metric-label">Investigations</span>
-            <strong>{investigations.length}</strong>
+            <strong style={{ color: "var(--violet)" }}>
+              <AnimatedCounter value={investigations.length} />
+            </strong>
             <span className="metric-detail">Isolated investigation corpora available</span>
-          </article>
+          </SpotlightCard>
         </div>
 
         <section className="panel" style={{ marginTop: 18 }}>
@@ -401,7 +419,8 @@ export function EvidenceExplorer() {
               </div>
 
               {selected && (
-                <aside className="workspace-detail panel" style={{ minHeight: "auto" }}>
+                <aside className="workspace-detail panel" style={{ minHeight: "auto", position: "relative", overflow: "hidden" }}>
+                  <BorderBeam colorFrom="#25D9F2" colorTo="#2787FF" duration={4} size={70} />
                   <div className="panel-heading">
                     <div>
                       <p className="eyebrow blue">Provenance Inspector</p>

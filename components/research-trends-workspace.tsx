@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  DecryptedText,
+  BorderBeam,
+  RevealSection,
+} from "@/components/motion";
 
 export type ResearchTrendTopicView = {
   id: string;
@@ -89,21 +97,24 @@ export function ResearchTrendsWorkspace() {
   return (
     <div className="trends-workspace" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Top Banner */}
-      <div className="panel" style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+      <div className="panel compact" style={{ padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", border: "1px solid rgba(37, 217, 242, 0.25)" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>Research Trend Intelligence</h2>
-            <span style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "12px", background: "rgba(234, 179, 8, 0.15)", color: "#eab308" }}>
-              Milestone 8E
+            <PulseIndicator status="cyan" size={8} />
+            <h2 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "#f8fafc" }}>
+              <DecryptedText text="Research Trend Intelligence" speed={35} />
+            </h2>
+            <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px", background: "rgba(234, 179, 8, 0.15)", color: "#eab308", border: "1px solid rgba(234, 179, 8, 0.3)" }}>
+              TEMPORAL EVOLUTION
             </span>
           </div>
-          <p className="muted" style={{ margin: "4px 0 0", fontSize: "13px" }}>
+          <p className="muted" style={{ margin: "3px 0 0", fontSize: "12px" }}>
             Longitudinal distribution analysis, topic velocity tracking, and emerging research paradigm shifts.
           </p>
         </div>
 
-        <button className="button primary" disabled={analyzing} onClick={handleRunAnalysis}>
-          {analyzing ? "Synthesizing Longitudinal Trends..." : "Run Trend Analysis"}
+        <button className="cyber-primary-btn" disabled={analyzing} onClick={handleRunAnalysis} style={{ padding: "7px 16px", fontSize: "12px" }}>
+          {analyzing ? "Synthesizing Trends..." : "⚡ Run Trend Analysis"}
         </button>
       </div>
 
@@ -130,45 +141,45 @@ export function ResearchTrendsWorkspace() {
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
           {/* Overview Metrics Cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" }}>
-            <div className="panel" style={{ padding: "14px 18px" }}>
+            <SpotlightCard className="panel" spotlightColor="rgba(37, 217, 242, 0.15)" style={{ padding: "14px 18px" }}>
               <div className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>
                 Studies Analyzed
               </div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: "4px", color: "#06b6d4" }}>
-                {trendAnalysis.total_investigations_analyzed}
+              <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: "4px", color: "#25D9F2" }}>
+                <AnimatedCounter value={trendAnalysis.total_investigations_analyzed} />
               </div>
-            </div>
+            </SpotlightCard>
 
-            <div className="panel" style={{ padding: "14px 18px" }}>
+            <SpotlightCard className="panel" spotlightColor="rgba(39, 135, 255, 0.15)" style={{ padding: "14px 18px" }}>
               <div className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>
                 Sources & Citations
               </div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: "4px", color: "#3b82f6" }}>
-                {trendAnalysis.total_sources_analyzed}
+              <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: "4px", color: "#2787FF" }}>
+                <AnimatedCounter value={trendAnalysis.total_sources_analyzed} />
               </div>
-            </div>
+            </SpotlightCard>
 
-            <div className="panel" style={{ padding: "14px 18px" }}>
+            <SpotlightCard className="panel" spotlightColor="rgba(255, 181, 71, 0.15)" style={{ padding: "14px 18px" }}>
               <div className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>
                 Temporal Horizon
               </div>
-              <div style={{ fontSize: "1.3rem", fontWeight: 700, marginTop: "6px", color: "#eab308" }}>
+              <div style={{ fontSize: "1.3rem", fontWeight: 700, marginTop: "6px", color: "#FFB547" }}>
                 {trendAnalysis.temporal_span_start || "Early"} – {trendAnalysis.temporal_span_end || "Present"}
               </div>
-            </div>
+            </SpotlightCard>
 
-            <div className="panel" style={{ padding: "14px 18px" }}>
+            <SpotlightCard className="panel" spotlightColor="rgba(255, 82, 119, 0.15)" style={{ padding: "14px 18px" }}>
               <div className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>
                 Active Contradictions
               </div>
-              <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: "4px", color: "#ef4444" }}>
-                {trendAnalysis.active_contradictions_count}
+              <div style={{ fontSize: "1.6rem", fontWeight: 700, marginTop: "4px", color: "#FF5277" }}>
+                <AnimatedCounter value={trendAnalysis.active_contradictions_count} />
               </div>
-            </div>
+            </SpotlightCard>
           </div>
 
           {/* Executive Summary */}
-          <div className="panel" style={{ padding: "18px 22px" }}>
+          <div className="panel" style={{ padding: "18px 22px", position: "relative" }}>
             <h3 style={{ fontSize: "1.1rem", fontWeight: 700, margin: "0 0 8px" }}>Longitudinal Analysis Summary</h3>
             <p style={{ margin: 0, fontSize: "13.5px", lineHeight: 1.6, color: "#e2e8f0" }}>{trendAnalysis.summary}</p>
           </div>
@@ -177,15 +188,15 @@ export function ResearchTrendsWorkspace() {
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
             {/* Emerging Themes */}
             <div className="panel" style={{ padding: "18px 20px" }}>
-              <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#3b82f6", textTransform: "uppercase", margin: "0 0 12px" }}>
-                🚀 Emerging Themes ({trendAnalysis.emerging_themes.length})
+              <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#2787FF", textTransform: "uppercase", margin: "0 0 12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <PulseIndicator status="cyan" size={6} /> Emerging Themes ({trendAnalysis.emerging_themes.length})
               </h4>
               {trendAnalysis.emerging_themes.length === 0 ? (
                 <p className="muted" style={{ fontSize: "12.5px" }}>No rapid-growth themes identified yet.</p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {trendAnalysis.emerging_themes.map((th, idx) => (
-                    <div key={idx} style={{ padding: "10px 14px", background: "rgba(59, 130, 246, 0.05)", borderLeft: "3px solid #3b82f6", borderRadius: "4px" }}>
+                    <div key={idx} style={{ padding: "10px 14px", background: "rgba(39, 135, 255, 0.05)", borderLeft: "3px solid #2787FF", borderRadius: "4px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                         <strong style={{ fontSize: "13px", color: "#93c5fd" }}>{th.topic}</strong>
                         <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa" }}>{th.growth_rate}</span>
@@ -199,15 +210,15 @@ export function ResearchTrendsWorkspace() {
 
             {/* Consensus Shifts */}
             <div className="panel" style={{ padding: "18px 20px" }}>
-              <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#ef4444", textTransform: "uppercase", margin: "0 0 12px" }}>
-                ⚡ Consensus Shifts & Tensions ({trendAnalysis.consensus_shifts.length})
+              <h4 style={{ fontSize: "13px", fontWeight: 700, color: "#FF5277", textTransform: "uppercase", margin: "0 0 12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <PulseIndicator status="error" size={6} /> Consensus Shifts & Tensions ({trendAnalysis.consensus_shifts.length})
               </h4>
               {trendAnalysis.consensus_shifts.length === 0 ? (
                 <p className="muted" style={{ fontSize: "12.5px" }}>No major paradigm disagreements currently observed.</p>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   {trendAnalysis.consensus_shifts.map((cs, idx) => (
-                    <div key={idx} style={{ padding: "10px 14px", background: "rgba(239, 68, 68, 0.05)", borderLeft: "3px solid #ef4444", borderRadius: "4px" }}>
+                    <div key={idx} style={{ padding: "10px 14px", background: "rgba(255, 82, 119, 0.05)", borderLeft: "3px solid #FF5277", borderRadius: "4px" }}>
                       <div style={{ fontSize: "13px", fontWeight: 700, color: "#fca5a5" }}>{cs.topic}</div>
                       <div className="muted" style={{ fontSize: "12px", marginTop: "3px" }}>{cs.description}</div>
                     </div>
@@ -226,21 +237,26 @@ export function ResearchTrendsWorkspace() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "14px" }}>
               {trendAnalysis.topics.map((t) => {
                 const badge = CLASSIFICATION_STYLES[t.classification] || { bg: "rgba(255,255,255,0.05)", text: "#cbd5e1", label: t.classification };
+                const isHighGrowth = t.growth_rate > 20;
                 return (
-                  <div
+                  <SpotlightCard
                     key={t.id}
+                    spotlightColor={isHighGrowth ? "rgba(37, 217, 242, 0.15)" : "rgba(39, 135, 255, 0.08)"}
                     style={{
                       padding: "16px",
                       borderRadius: "6px",
-                      border: "1px solid var(--border)",
-                      background: "rgba(255,255,255,0.015)",
+                      border: isHighGrowth ? "1px solid rgba(37, 217, 242, 0.4)" : "1px solid var(--border)",
+                      background: "rgba(12, 25, 43, 0.7)",
                       display: "flex",
                       flexDirection: "column",
                       gap: "10px",
+                      position: "relative",
+                      overflow: "hidden",
                     }}
                   >
+                    {isHighGrowth && <BorderBeam colorFrom="#25D9F2" colorTo="#2787FF" duration={4} size={60} />}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
-                      <h4 style={{ fontSize: "14px", fontWeight: 700, margin: 0 }}>{t.topic_name}</h4>
+                      <h4 style={{ fontSize: "14px", fontWeight: 700, margin: 0, color: "#ECF5FF" }}>{t.topic_name}</h4>
                       <span
                         style={{
                           fontSize: "11px",
@@ -264,20 +280,24 @@ export function ResearchTrendsWorkspace() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: "8px" }}>
                       <div>
                         <div className="muted" style={{ fontSize: "10px", textTransform: "uppercase" }}>Activity</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#3b82f6" }}>{t.activity_score.toFixed(0)} / 100</div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#2787FF" }}>
+                          <AnimatedCounter value={Math.round(t.activity_score)} /> / 100
+                        </div>
                       </div>
                       <div>
                         <div className="muted" style={{ fontSize: "10px", textTransform: "uppercase" }}>Quality</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#10b981" }}>{t.quality_score.toFixed(0)} / 100</div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: "#35E0B1" }}>
+                          <AnimatedCounter value={Math.round(t.quality_score)} /> / 100
+                        </div>
                       </div>
                       <div>
                         <div className="muted" style={{ fontSize: "10px", textTransform: "uppercase" }}>Growth</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: t.growth_rate >= 0 ? "#6ee7b7" : "#f87171" }}>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: t.growth_rate >= 0 ? "#35E0B1" : "#FF5277" }}>
                           {t.growth_rate > 0 ? `+${t.growth_rate}%` : `${t.growth_rate}%`}
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </SpotlightCard>
                 );
               })}
             </div>

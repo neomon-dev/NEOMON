@@ -3,6 +3,14 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { requestJson } from "../../../lib/api";
+import { AtmosphericAurora } from "@/components/animated-neural-background";
+import {
+  BorderBeam,
+  RadarScanning,
+  DecryptedText,
+  PulseIndicator,
+  RevealSection,
+} from "@/components/motion";
 
 const SUGGESTIONS = [
   {
@@ -70,67 +78,90 @@ export default function NewInvestigationPage() {
   }
 
   return (
-    <main className="settings-page" style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px" }}>
-      <div style={{ marginBottom: "28px" }}>
-        <p className="eyebrow blue" style={{ letterSpacing: "0.08em", fontWeight: 700 }}>
-          AUTONOMOUS INVESTIGATION INITIATOR
-        </p>
-        <h1 style={{ fontSize: "28px", fontWeight: 700, margin: "6px 0 10px", color: "#f8fafc" }}>
-          Launch Research Investigation
-        </h1>
-        <p style={{ color: "#94a3b8", fontSize: "14px", lineHeight: "1.6", margin: 0 }}>
-          NEOMON orchestrates multi-agent research across academic repositories, preprint servers, and peer-reviewed journals,
-          extracting traceable evidence passages and adjudicating claims through adversarial debate.
-        </p>
-      </div>
+    <main className="settings-page" style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 24px", position: "relative" }}>
+      <AtmosphericAurora showGrid={true} showScanlines={true} />
 
-      {/* Suggested Questions */}
-      <div style={{ marginBottom: "24px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em", display: "block", marginBottom: "8px" }}>
-          Suggested Research Questions
+      {/* Header Deck with Radar Sweep & Cyber Grid */}
+      <RevealSection delay={0.05}>
+        <div style={{ marginBottom: "28px", position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "20px" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+              <PulseIndicator status="active" />
+              <DecryptedText text="MISSION INITIATOR // CONSOLE_v1" speed={25} />
+              <span style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "monospace" }}>
+                [PROTOCOL::MULTI_AGENT_RESEARCH]
+              </span>
+            </div>
+            <h1 style={{ fontSize: "32px", fontWeight: 800, margin: "6px 0 10px", color: "#ECF5FF", letterSpacing: "-0.03em" }}>
+              Launch Research Mission
+            </h1>
+            <p style={{ color: "#91A6C1", fontSize: "14px", lineHeight: "1.6", margin: 0, maxWidth: "600px" }}>
+              Formulate an empirical inquiry. NEOMON orchestrates distributed research agents across preprint servers, academic repositories, and digital libraries to decompose claims, extract verbatim passages, and adjudicate contradictions.
+            </p>
+          </div>
+          <div className="desktop-only" style={{ opacity: 0.85, flexShrink: 0 }}>
+            <RadarScanning size={100} color="#25D9F2" />
+          </div>
+        </div>
+      </RevealSection>
+
+      {/* Suggested Questions Matrix */}
+      <div style={{ marginBottom: "24px", position: "relative", zIndex: 1 }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: "10px" }}>
+          Suggested Research Questions // Benchmark Corpus
         </span>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
           {SUGGESTIONS.map((s) => (
             <button
               key={s.label}
               type="button"
               onClick={() => applySuggestion(s)}
+              className="hud-card"
               style={{
-                background: "#0e1526",
-                border: "1px solid #1e293b",
-                borderRadius: "6px",
-                padding: "6px 12px",
-                color: "#93c5fd",
+                padding: "8px 14px",
+                color: "#e2e8f0",
                 fontSize: "12px",
+                fontWeight: 500,
                 cursor: "pointer",
-                transition: "all 0.15s ease",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#3b82f6")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1e293b")}
             >
-              ✦ {s.label}
+              <span style={{ color: "#38bdf8" }}>✦</span>
+              <span>{s.label}</span>
+              <span style={{ fontSize: "10px", fontFamily: "monospace", color: s.mode === "deep" ? "#c084fc" : "#38bdf8" }}>
+                [{s.mode.toUpperCase()}]
+              </span>
             </button>
           ))}
         </div>
       </div>
 
+      {/* Launch Console Form */}
       <form
-        className="settings-form"
+        className="hud-card"
         onSubmit={submit}
         style={{
-          background: "#0b101d",
-          border: "1px solid #1e293b",
-          borderRadius: "12px",
-          padding: "28px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+          padding: "32px",
+          position: "relative",
+          zIndex: 1,
         }}
       >
-        {/* Research Question */}
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px", fontWeight: 600, fontSize: "13px", color: "#e2e8f0" }}>
-            <span>Research Question <span style={{ color: "#ef4444" }}>*</span></span>
-            <span style={{ fontSize: "11px", color: question.length > 9000 ? "#f87171" : "#64748b" }}>
-              {question.length}/10000 characters
+        <div className="hud-corner-tl" />
+        <div className="hud-corner-tr" />
+        <div className="hud-corner-bl" />
+        <div className="hud-corner-br" />
+
+        {/* Step 1: Research Inquiry */}
+        <div style={{ marginBottom: "26px" }}>
+          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px", fontWeight: 700, fontSize: "13px", color: "#f8fafc" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>01 //</span>
+              <span>Research Inquiry <span style={{ color: "#f43f5e" }}>*</span></span>
+            </span>
+            <span style={{ fontSize: "11px", fontFamily: "monospace", color: question.length > 9000 ? "#f87171" : "var(--muted)" }}>
+              {question.length} / 10,000 CHARACTERS
             </span>
           </label>
           <textarea
@@ -143,92 +174,106 @@ export default function NewInvestigationPage() {
                 if (form) form.requestSubmit();
               }
             }}
-            placeholder="Formulate an explicit, testable scientific or technological inquiry..."
+            placeholder="Formulate an explicit, verifiable technological or scientific research inquiry (e.g., benchmark comparison, architecture evaluation, empirical mechanism)..."
             minLength={10}
             maxLength={10000}
             required
             rows={5}
             style={{
               width: "100%",
-              background: "#080c15",
-              border: "1px solid #233554",
+              background: "rgba(6, 10, 20, 0.8)",
+              border: "1px solid rgba(56, 189, 248, 0.25)",
               borderRadius: "8px",
-              padding: "12px 14px",
+              padding: "14px 16px",
               color: "#f8fafc",
               fontSize: "14px",
               lineHeight: "1.6",
               resize: "vertical",
               outline: "none",
+              boxShadow: "inset 0 2px 4px rgba(0,0,0,0.5)",
+              fontFamily: "inherit",
             }}
           />
         </div>
 
-        {/* Mode Selector */}
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "block", marginBottom: "8px", fontWeight: 600, fontSize: "13px", color: "#e2e8f0" }}>
-            Investigation Mode
+        {/* Step 2: Protocol Selection */}
+        <div style={{ marginBottom: "26px" }}>
+          <label style={{ display: "block", marginBottom: "10px", fontWeight: 700, fontSize: "13px", color: "#f8fafc" }}>
+            <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>02 //</span> Multi-Agent Research Protocol
           </label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
             <button
               type="button"
               onClick={() => setMode("quick")}
+              className="hud-card"
               style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "flex-start",
-                padding: "14px",
-                background: mode === "quick" ? "rgba(59, 130, 246, 0.12)" : "#080c15",
-                border: mode === "quick" ? "1px solid #3b82f6" : "1px solid #1e293b",
-                borderRadius: "8px",
+                padding: "18px",
+                position: "relative",
+                overflow: "hidden",
+                background: mode === "quick" ? "linear-gradient(180deg, rgba(37, 217, 242, 0.14) 0%, rgba(8, 13, 26, 0.95) 100%)" : undefined,
+                borderColor: mode === "quick" ? "#25D9F2" : undefined,
+                boxShadow: mode === "quick" ? "0 0 20px rgba(37, 217, 242, 0.25)" : undefined,
                 cursor: "pointer",
                 textAlign: "left",
-                transition: "all 0.15s ease",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{ fontSize: "16px" }}>⚡</span>
-                <strong style={{ color: mode === "quick" ? "#60a5fa" : "#f1f5f9", fontSize: "13px" }}>
-                  Quick Research
-                </strong>
+              {mode === "quick" && <BorderBeam size={160} duration={8} colorFrom="#25D9F2" colorTo="#2787FF" />}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", marginBottom: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "18px" }}>⚡</span>
+                  <strong style={{ color: mode === "quick" ? "#25D9F2" : "#f1f5f9", fontSize: "14px", fontWeight: 700 }}>
+                    Quick Dialectic Sweep
+                  </strong>
+                </div>
+                {mode === "quick" && <span style={{ color: "#25D9F2", fontSize: "12px", fontWeight: 700 }}>● ACTIVE</span>}
               </div>
-              <span style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.4" }}>
-                Fast scan, primary source ingestion, targeted claim extraction, and instant synthesis.
+              <span style={{ fontSize: "12px", color: "#94a3b8", lineHeight: "1.5" }}>
+                Targeted academic query generation, rapid source retrieval, high-relevance claim extraction, and instant synthesis.
               </span>
             </button>
 
             <button
               type="button"
               onClick={() => setMode("deep")}
+              className="hud-card"
               style={{
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "flex-start",
-                padding: "14px",
-                background: mode === "deep" ? "rgba(139, 92, 246, 0.12)" : "#080c15",
-                border: mode === "deep" ? "1px solid #8b5cf6" : "1px solid #1e293b",
-                borderRadius: "8px",
+                padding: "18px",
+                position: "relative",
+                overflow: "hidden",
+                background: mode === "deep" ? "linear-gradient(180deg, rgba(133, 100, 255, 0.16) 0%, rgba(8, 13, 26, 0.95) 100%)" : undefined,
+                borderColor: mode === "deep" ? "#8564FF" : undefined,
+                boxShadow: mode === "deep" ? "0 0 20px rgba(133, 100, 255, 0.25)" : undefined,
                 cursor: "pointer",
                 textAlign: "left",
-                transition: "all 0.15s ease",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                <span style={{ fontSize: "16px" }}>🔬</span>
-                <strong style={{ color: mode === "deep" ? "#c084fc" : "#f1f5f9", fontSize: "13px" }}>
-                  Deep Multi-Agent Debate
-                </strong>
+              {mode === "deep" && <BorderBeam size={160} duration={8} colorFrom="#8564FF" colorTo="#25D9F2" />}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", marginBottom: "6px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "18px" }}>🔬</span>
+                  <strong style={{ color: mode === "deep" ? "#8564FF" : "#f1f5f9", fontSize: "14px", fontWeight: 700 }}>
+                    Deep Multi-Agent Synthesis
+                  </strong>
+                </div>
+                {mode === "deep" && <span style={{ color: "#8564FF", fontSize: "12px", fontWeight: 700 }}>● ACTIVE</span>}
               </div>
-              <span style={{ fontSize: "11px", color: "#94a3b8", lineHeight: "1.4" }}>
-                Adversarial debate rounds, full knowledge graph construction, study independence clustering, and formal adjudication.
+              <span style={{ fontSize: "12px", color: "#94a3b8", lineHeight: "1.5" }}>
+                Multi-round adversarial debate, full knowledge graph construction, study independence clustering, and calibrated evidence scoring.
               </span>
             </button>
           </div>
         </div>
 
-        {/* Timeframe */}
-        <div style={{ marginBottom: "24px" }}>
-          <label style={{ display: "block", marginBottom: "8px", fontWeight: 600, fontSize: "13px", color: "#e2e8f0" }}>
-            Temporal Boundary (Optional)
+        {/* Step 3: Temporal Scope */}
+        <div style={{ marginBottom: "28px" }}>
+          <label style={{ display: "block", marginBottom: "8px", fontWeight: 700, fontSize: "13px", color: "#f8fafc" }}>
+            <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>03 //</span> Temporal Boundary Filter (Optional)
           </label>
           <input
             value={timeframe}
@@ -236,10 +281,10 @@ export default function NewInvestigationPage() {
             placeholder="e.g. 2021 to 2024, or since 2023"
             style={{
               width: "100%",
-              background: "#080c15",
-              border: "1px solid #233554",
+              background: "rgba(6, 10, 20, 0.8)",
+              border: "1px solid rgba(56, 189, 248, 0.2)",
               borderRadius: "8px",
-              padding: "10px 14px",
+              padding: "11px 14px",
               color: "#f8fafc",
               fontSize: "13px",
               outline: "none",
@@ -247,33 +292,32 @@ export default function NewInvestigationPage() {
           />
         </div>
 
-        {/* Action Controls */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "8px", borderTop: "1px solid #1e293b" }}>
-          <span style={{ fontSize: "11px", color: "#64748b" }}>
-            Press <kbd style={{ background: "#1e293b", padding: "2px 6px", borderRadius: "4px", color: "#cbd5e1" }}>Ctrl + Enter</kbd> to launch
+        {/* Action Bar */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: "14px", borderTop: "1px solid var(--border)", flexWrap: "wrap", gap: "12px" }}>
+          <span style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "monospace" }}>
+            PRESS <kbd style={{ background: "rgba(255,255,255,0.08)", padding: "2px 7px", borderRadius: "4px", color: "#e2e8f0" }}>CTRL + ENTER</kbd> TO LAUNCH MISSION
           </span>
           <button
-            className="primary-button"
+            className="cyber-primary-btn"
             disabled={loading}
             type="submit"
             style={{
-              padding: "10px 24px",
-              fontSize: "13px",
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
               cursor: loading ? "wait" : "pointer",
+              position: "relative",
+              overflow: "hidden",
+              boxShadow: "0 0 25px rgba(37, 217, 242, 0.4)",
             }}
           >
             {loading ? (
               <>
                 <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>◌</span>
-                Initializing Research...
+                <span>INITIALIZING ORCHESTRATION...</span>
               </>
             ) : (
               <>
-                <span>▶</span> Launch Investigation
+                <span>▶</span>
+                <span>LAUNCH RESEARCH MISSION</span>
+                <span style={{ marginLeft: "4px" }}>→</span>
               </>
             )}
           </button>
@@ -288,3 +332,4 @@ export default function NewInvestigationPage() {
     </main>
   );
 }
+

@@ -5,14 +5,16 @@ export default function EvidencePage() {
   return (
     <Suspense
       fallback={
-        <div className="content">
+        <div className="content compact">
           <div className="panel empty-state">
             <p className="muted">Loading Evidence Explorer...</p>
           </div>
         </div>
       }
     >
-      <EvidenceExplorer />
+      <div className="content compact">
+        <EvidenceExplorer />
+      </div>
     </Suspense>
   );
 }

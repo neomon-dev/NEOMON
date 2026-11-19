@@ -72,16 +72,26 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   const { user, workspaces, activeWorkspace, unreadCount, switchWorkspace, logout } = useAuth();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <ProviderSessionProvider>
       <div className="shell">
         <aside className="sidebar">
-          <Link className="brand" href="/">
-            <div className="brand-mark">N</div>
+          <Link className="brand" href="/" title="NEOMON — RESEARCH BEYOND THE SURFACE.">
+            <div className="brand-symbol-container">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/brand/neomon-symbol.png"
+                alt="NEOMON"
+                width={36}
+                height={36}
+                className="brand-symbol-img"
+              />
+            </div>
             <div>
               <strong>NEOMON</strong>
-              <span>Research intelligence</span>
+              <span className="brand-slogan">RESEARCH BEYOND THE SURFACE.</span>
             </div>
           </Link>
           <nav aria-label="Primary navigation">
@@ -128,77 +138,49 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
         </aside>
         <div className="workspace">
           {/* Top Collaborative Header Bar */}
-          <header
-            style={{
-              height: "56px",
-              background: "#080d1a",
-              borderBottom: "1px solid #1a263d",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              padding: "0 28px",
-              position: "sticky",
-              top: 0,
-              zIndex: 30,
-            }}
-          >
-            {/* Workspace Switcher */}
-            <div style={{ position: "relative" }}>
+          <header className="global-header">
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {/* Mobile Menu Toggle Button */}
               <button
                 type="button"
-                onClick={() => setShowWorkspaceMenu((prev) => !prev)}
+                className="mobile-only mobile-menu-toggle-btn"
+                onClick={() => setMobileMenuOpen(true)}
+                aria-label="Open mobile navigation"
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  background: "#101b2f",
-                  border: "1px solid #233554",
+                  background: "rgba(15, 23, 42, 0.6)",
+                  border: "1px solid var(--border)",
+                  color: "#f8fafc",
+                  padding: "6px 10px",
                   borderRadius: "6px",
-                  padding: "6px 12px",
-                  color: "#e2e8f0",
-                  fontSize: "12px",
                   cursor: "pointer",
-                  fontWeight: 500,
+                  fontSize: "15px",
                 }}
               >
-                <span style={{ color: "#60a5fa" }}>👥</span>
-                <span style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {activeWorkspace ? activeWorkspace.name : "Select Workspace"}
-                </span>
-                {activeWorkspace?.user_role && (
-                  <span
-                    style={{
-                      background: "#1e3a5f",
-                      color: "#93c5fd",
-                      borderRadius: "4px",
-                      padding: "1px 5px",
-                      fontSize: "10px",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {activeWorkspace.user_role}
-                  </span>
-                )}
-                <span style={{ fontSize: "10px", color: "#64748b" }}>▼</span>
+                ☰
               </button>
 
-              {showWorkspaceMenu && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "100%",
-                    left: 0,
-                    marginTop: "6px",
-                    background: "#0f172a",
-                    border: "1px solid #334155",
-                    borderRadius: "8px",
-                    boxShadow: "0 10px 25px -5px rgba(0,0,0,0.5)",
-                    width: "280px",
-                    zIndex: 50,
-                    padding: "6px",
-                  }}
+              {/* Workspace Switcher */}
+              <div style={{ position: "relative" }}>
+                <button
+                  type="button"
+                  className="workspace-switcher-btn"
+                  onClick={() => setShowWorkspaceMenu((prev) => !prev)}
                 >
-                  <div style={{ fontSize: "11px", color: "#64748b", padding: "6px 8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  <span style={{ color: "#38bdf8" }}>👥</span>
+                  <span style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {activeWorkspace ? activeWorkspace.name : "Select Workspace"}
+                  </span>
+                  {activeWorkspace?.user_role && (
+                    <span className="workspace-badge-role">
+                      {activeWorkspace.user_role}
+                    </span>
+                  )}
+                  <span style={{ fontSize: "10px", color: "var(--muted)" }}>▼</span>
+                </button>
+
+              {showWorkspaceMenu && (
+                <div className="workspace-dropdown-menu">
+                  <div className="workspace-dropdown-title">
                     Switch Workspace
                   </div>
                   {workspaces.map((ws) => (
@@ -209,20 +191,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                         switchWorkspace(ws.id);
                         setShowWorkspaceMenu(false);
                       }}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        width: "100%",
-                        padding: "8px 10px",
-                        textAlign: "left",
-                        background: activeWorkspace?.id === ws.id ? "#1e293b" : "transparent",
-                        border: "none",
-                        borderRadius: "5px",
-                        color: activeWorkspace?.id === ws.id ? "#38bdf8" : "#cbd5e1",
-                        fontSize: "12px",
-                        cursor: "pointer",
-                      }}
+                      className={activeWorkspace?.id === ws.id ? "workspace-dropdown-item active" : "workspace-dropdown-item"}
                     >
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ws.name}</span>
                       {ws.user_role && (
@@ -232,17 +201,18 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                       )}
                     </button>
                   ))}
-                  <div style={{ borderTop: "1px solid #1e293b", margin: "6px 0" }} />
+                  <div style={{ borderTop: "1px solid var(--border)", margin: "6px 0" }} />
                   <Link
                     href="/workspaces"
                     onClick={() => setShowWorkspaceMenu(false)}
                     style={{
                       display: "block",
-                      padding: "6px 8px",
+                      padding: "7px 8px",
                       fontSize: "12px",
-                      color: "#60a5fa",
+                      color: "#38bdf8",
                       textDecoration: "none",
                       textAlign: "center",
+                      fontWeight: 500,
                     }}
                   >
                     + Manage & Create Workspaces
@@ -250,39 +220,19 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                 </div>
               )}
             </div>
+            </div>
 
             {/* Right section: Notification bell + User avatar */}
-            <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               {/* Notification Bell */}
               <Link
                 href="/notifications"
-                style={{
-                  position: "relative",
-                  color: "#cbd5e1",
-                  fontSize: "16px",
-                  textDecoration: "none",
-                  padding: "4px 8px",
-                  borderRadius: "6px",
-                }}
+                className="header-bell-btn"
+                aria-label="Notifications"
               >
                 🔔
                 {unreadCount > 0 && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      top: "0px",
-                      right: "2px",
-                      background: "#ef4444",
-                      color: "#fff",
-                      borderRadius: "50%",
-                      width: "16px",
-                      height: "16px",
-                      fontSize: "10px",
-                      display: "grid",
-                      placeItems: "center",
-                      fontWeight: 700,
-                    }}
-                  >
+                  <span className="header-bell-badge">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
@@ -293,56 +243,21 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                 <div style={{ position: "relative" }}>
                   <button
                     type="button"
+                    className="user-menu-btn"
                     onClick={() => setShowUserMenu((prev) => !prev)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      background: "transparent",
-                      border: "none",
-                      color: "#e2e8f0",
-                      fontSize: "12px",
-                      cursor: "pointer",
-                    }}
                   >
-                    <div
-                      style={{
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "50%",
-                        background: "#2563eb",
-                        color: "#fff",
-                        display: "grid",
-                        placeItems: "center",
-                        fontWeight: 600,
-                        fontSize: "12px",
-                      }}
-                    >
+                    <div className="user-avatar-circle">
                       {user.display_name ? user.display_name[0].toUpperCase() : "U"}
                     </div>
                     <span style={{ fontWeight: 500 }}>{user.display_name}</span>
-                    <span style={{ fontSize: "10px", color: "#64748b" }}>▼</span>
+                    <span style={{ fontSize: "10px", color: "var(--muted)" }}>▼</span>
                   </button>
 
                   {showUserMenu && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        top: "100%",
-                        right: 0,
-                        marginTop: "6px",
-                        background: "#0f172a",
-                        border: "1px solid #334155",
-                        borderRadius: "8px",
-                        boxShadow: "0 10px 25px -5px rgba(0,0,0,0.5)",
-                        width: "200px",
-                        zIndex: 50,
-                        padding: "6px",
-                      }}
-                    >
-                      <div style={{ padding: "8px 10px", borderBottom: "1px solid #1e293b" }}>
+                    <div className="user-dropdown-menu">
+                      <div style={{ padding: "8px 10px", borderBottom: "1px solid var(--border)" }}>
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "#f8fafc" }}>{user.display_name}</div>
-                        <div style={{ fontSize: "11px", color: "#94a3b8", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        <div style={{ fontSize: "11px", color: "var(--muted)", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {user.email}
                         </div>
                       </div>
@@ -356,6 +271,7 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                           color: "#cbd5e1",
                           textDecoration: "none",
                           borderRadius: "4px",
+                          transition: "background 0.15s ease",
                         }}
                       >
                         Profile & Settings
@@ -389,26 +305,23 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
                   <Link
                     href="/login"
                     style={{
-                      padding: "5px 12px",
+                      padding: "6px 14px",
                       fontSize: "12px",
                       color: "#94a3b8",
                       textDecoration: "none",
-                      border: "1px solid #334155",
+                      border: "1px solid var(--border)",
                       borderRadius: "6px",
+                      transition: "all 0.15s ease",
                     }}
                   >
                     Sign in
                   </Link>
                   <Link
                     href="/register"
+                    className="primary-button"
                     style={{
-                      padding: "5px 12px",
+                      padding: "6px 14px",
                       fontSize: "12px",
-                      color: "#fff",
-                      background: "#2563eb",
-                      textDecoration: "none",
-                      borderRadius: "6px",
-                      fontWeight: 500,
                     }}
                   >
                     Register
@@ -420,6 +333,108 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
 
           <main>{children}</main>
         </div>
+
+        {/* Mobile Navigation Drawer */}
+        {mobileMenuOpen && (
+          <div
+            className="mobile-drawer-backdrop"
+            onClick={() => setMobileMenuOpen(false)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0, 0, 0, 0.75)",
+              backdropFilter: "blur(6px)",
+              zIndex: 100,
+              display: "flex",
+            }}
+          >
+            <div
+              className="mobile-drawer-sheet"
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "280px",
+                maxWidth: "85vw",
+                height: "100%",
+                background: "#070b14",
+                borderRight: "1px solid var(--border)",
+                padding: "20px 16px",
+                display: "flex",
+                flexDirection: "column",
+                overflowY: "auto",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", paddingBottom: "12px", borderBottom: "1px solid var(--border)" }}>
+                <Link className="brand" href="/" onClick={() => setMobileMenuOpen(false)} title="NEOMON — RESEARCH BEYOND THE SURFACE." style={{ margin: 0, padding: 0, border: "none" }}>
+                  <div className="brand-symbol-container" style={{ width: "32px", height: "32px" }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/brand/neomon-symbol.png"
+                      alt="NEOMON"
+                      width={32}
+                      height={32}
+                      className="brand-symbol-img"
+                    />
+                  </div>
+                  <div>
+                    <strong>NEOMON</strong>
+                    <span className="brand-slogan">RESEARCH BEYOND THE SURFACE.</span>
+                  </div>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ background: "none", border: "none", color: "var(--muted)", fontSize: "20px", cursor: "pointer", padding: "4px 8px" }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <nav aria-label="Mobile navigation" style={{ flex: 1 }}>
+                {navSections.map((section) => (
+                  <div key={section.title} className="nav-section" style={{ marginBottom: "12px" }}>
+                    <div className="nav-section-title">{section.title}</div>
+                    {section.items.map((item) => {
+                      const isActive =
+                        item.href === "/"
+                          ? pathname === "/"
+                          : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                      return (
+                        <Link
+                          className={isActive ? "nav-item active" : "nav-item"}
+                          href={item.href}
+                          key={item.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <span className="nav-icon">{item.icon}</span>
+                          {item.label}
+                          {item.href === "/notifications" && unreadCount > 0 && (
+                            <span
+                              style={{
+                                marginLeft: "auto",
+                                background: "#3b82f6",
+                                color: "#fff",
+                                borderRadius: "10px",
+                                padding: "1px 6px",
+                                fontSize: "10px",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {unreadCount}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ))}
+              </nav>
+
+              <div style={{ marginTop: "auto", paddingTop: "12px", borderTop: "1px solid var(--border)" }}>
+                <BackendStatus />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ProviderSessionProvider>
   );

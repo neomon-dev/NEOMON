@@ -3,6 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  DecryptedText,
+  BorderBeam,
+} from "@/components/motion";
 
 export type InvestigationQualityAuditItem = {
   investigation_id: string;
@@ -252,11 +259,13 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-border/60 pb-6">
         <div>
           <div className="flex items-center gap-3">
+            <PulseIndicator status="cyan" size={8} />
             <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <span className="text-xl">🔬</span> Scientific Quality Audit & Calibration
+              <span className="text-xl">🔬</span>{" "}
+              <DecryptedText text="Scientific Quality Audit & Calibration" speed={30} />
             </h1>
             <span className="rounded-full bg-cyan-500/10 px-2.5 py-0.5 text-xs font-semibold text-cyan-400 border border-cyan-500/20">
-              Milestone 8G
+              METHODOLOGICAL INTEGRITY
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-1">
@@ -281,7 +290,8 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
           <button
             onClick={handleTriggerCalibration}
             disabled={calibrating || !selectedId}
-            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-50 transition-colors flex items-center gap-2"
+            className="cyber-primary-btn"
+            style={{ padding: "8px 16px", fontSize: "13px" }}
           >
             {calibrating ? "Calibrating..." : "⚡ Recalibrate"}
           </button>
@@ -302,7 +312,8 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
         <div className="rounded-xl border border-border/80 bg-surface/60 p-5 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-              <span>⚖️</span> Three Decoupled Quality Dimensions
+              <PulseIndicator status="active" size={6} />
+              <span>Three Decoupled Quality Dimensions</span>
             </h2>
             <span className="text-xs text-slate-400">
               Operational completion and question coverage are strictly separated from evidence strength
@@ -311,39 +322,44 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
             {/* Dimension A: Operational Completeness */}
-            <div className="rounded-lg bg-surface-muted/60 border border-border/60 p-4">
+            <SpotlightCard className="rounded-lg bg-surface-muted/60 border border-border/60 p-4" spotlightColor="rgba(39, 135, 255, 0.15)">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-300">Dimension A: Operational Completeness</span>
                 <span className="text-xs text-slate-400">Execution</span>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-white">
-                  {(audit.operational_completeness ?? Math.max(0, 100 - audit.failure_penalty * 2.5)).toFixed(1)}%
+                  <AnimatedCounter value={Math.round(audit.operational_completeness ?? Math.max(0, 100 - audit.failure_penalty * 2.5))} />%
                 </span>
               </div>
               <p className="mt-1.5 text-xs text-slate-400">
                 Execution of planned search, retrieval, and analysis actions (penalized for provider dropouts).
               </p>
-            </div>
+            </SpotlightCard>
 
             {/* Dimension B: Research Coverage */}
-            <div className="rounded-lg bg-surface-muted/60 border border-border/60 p-4">
+            <SpotlightCard className="rounded-lg bg-surface-muted/60 border border-border/60 p-4" spotlightColor="rgba(37, 217, 242, 0.15)">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-cyan-300">Dimension B: Research Coverage</span>
                 <span className="text-xs text-slate-400">Breadth</span>
               </div>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-cyan-400">
-                  {(audit.research_coverage ?? audit.coverage_score).toFixed(1)}%
+                  <AnimatedCounter value={Math.round(audit.research_coverage ?? audit.coverage_score)} />%
                 </span>
               </div>
               <p className="mt-1.5 text-xs text-slate-400">
                 Coverage of atomic research claims and full-text document acquisition rate.
               </p>
-            </div>
+            </SpotlightCard>
 
             {/* Dimension C: Evidence Strength */}
-            <div className="rounded-lg bg-surface-muted/60 border border-border/60 p-4">
+            <SpotlightCard
+              className="rounded-lg bg-surface-muted/60 border border-border/60 p-4"
+              spotlightColor="rgba(133, 100, 255, 0.18)"
+              style={{ position: "relative", overflow: "hidden" }}
+            >
+              <BorderBeam colorFrom="#8564FF" colorTo="#25D9F2" duration={4} size={60} />
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-indigo-300">Dimension C: Evidence Strength</span>
                 <span className={`px-2 py-0.5 rounded text-xs font-bold border ${tierColor(audit.calibrated_tier)}`}>
@@ -352,14 +368,14 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
               </div>
               <div className="mt-2 flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-white">
-                  {(audit.evidence_strength ?? audit.calibrated_score).toFixed(1)}
+                  <AnimatedCounter value={Math.round(audit.evidence_strength ?? audit.calibrated_score)} />
                 </span>
                 <span className="text-xs text-slate-400">/ 100</span>
               </div>
               <p className="mt-1.5 text-xs text-slate-400">
                 Direct empirical proof, verified peer review, and true publication independence.
               </p>
-            </div>
+            </SpotlightCard>
           </div>
         </div>
       )}
@@ -368,7 +384,7 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
       {audit && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Calibrated Tier */}
-          <div className="rounded-xl bg-surface border border-border p-4 shadow-sm">
+          <SpotlightCard className="rounded-xl bg-surface border border-border p-4 shadow-sm" spotlightColor="rgba(37, 217, 242, 0.12)">
             <div className="text-xs font-medium text-slate-400">Calibrated Quality Tier</div>
             <div className="mt-2 flex items-center gap-2">
               <span className={`inline-block px-3 py-1 rounded-md text-sm font-bold border ${tierColor(audit.calibrated_tier)}`}>
@@ -378,13 +394,15 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
             <div className="mt-2 text-xs text-slate-500">
               Evaluated against scientific benchmarks
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* Calibrated vs Raw Score */}
-          <div className="rounded-xl bg-surface border border-border p-4 shadow-sm">
+          <SpotlightCard className="rounded-xl bg-surface border border-border p-4 shadow-sm" spotlightColor="rgba(39, 135, 255, 0.12)">
             <div className="text-xs font-medium text-slate-400">Calibrated Score</div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-white">{audit.calibrated_score.toFixed(1)}</span>
+              <span className="text-2xl font-bold text-white">
+                <AnimatedCounter value={Math.round(audit.calibrated_score)} />
+              </span>
               <span className="text-sm text-slate-400">/ 100</span>
               {audit.failure_penalty > 0 && (
                 <span className="text-xs font-semibold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
@@ -395,13 +413,15 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
             <div className="mt-1 text-xs text-slate-500">
               Raw 5D Score: {audit.raw_score.toFixed(1)}/100
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* Research Coverage */}
-          <div className="rounded-xl bg-surface border border-border p-4 shadow-sm">
+          <SpotlightCard className="rounded-xl bg-surface border border-border p-4 shadow-sm" spotlightColor="rgba(37, 217, 242, 0.12)">
             <div className="text-xs font-medium text-slate-400">Research Coverage</div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-cyan-400">{audit.coverage_score.toFixed(1)}%</span>
+              <span className="text-2xl font-bold text-cyan-400">
+                <AnimatedCounter value={Math.round(audit.coverage_score)} />%
+              </span>
             </div>
             <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2">
               <div
@@ -412,22 +432,24 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
             <div className="mt-1 text-xs text-slate-500">
               {audit.coverage_score < 70 ? "Coverage caps tier to Moderate" : "Adequate coverage threshold"}
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* Verified Peer-Reviewed */}
-          <div className="rounded-xl bg-surface border border-border p-4 shadow-sm">
+          <SpotlightCard className="rounded-xl bg-surface border border-border p-4 shadow-sm" spotlightColor="rgba(133, 100, 255, 0.12)">
             <div className="text-xs font-medium text-slate-400">Verified Peer-Reviewed</div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-bold text-indigo-400">{audit.verified_peer_reviewed_count}</span>
+              <span className="text-2xl font-bold text-indigo-400">
+                <AnimatedCounter value={audit.verified_peer_reviewed_count} />
+              </span>
               <span className="text-sm text-slate-400">/ {audit.total_sources} sources</span>
             </div>
             <div className="mt-1 text-xs text-slate-500">
               {audit.verified_peer_reviewed_count === 0 ? "⚠️ Preprints/trade press only" : "Indexed journal verified"}
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* True Independence Ratio */}
-          <div className="rounded-xl bg-surface border border-border p-4 shadow-sm">
+          <SpotlightCard className="rounded-xl bg-surface border border-border p-4 shadow-sm" spotlightColor="rgba(53, 224, 177, 0.12)">
             <div className="text-xs font-medium text-slate-400">Effective Lineage Clusters</div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-emerald-400">
@@ -440,7 +462,7 @@ export function QualityAuditWorkspace({ initialInvestigationId }: { initialInves
             <div className="mt-1 text-xs text-slate-500">
               Collapsed from syndication & copies
             </div>
-          </div>
+          </SpotlightCard>
         </div>
       )}
 

@@ -6,6 +6,7 @@ import { useProviderSession } from "@/components/provider-context";
 import { ResearchGapWorkspace } from "@/components/research-gap-workspace";
 import { ScientificReliabilityWorkspace } from "@/components/scientific-reliability-workspace";
 import { CollaborationPanel } from "@/components/collaboration-panel";
+import { AtmosphericAurora } from "@/components/animated-neural-background";
 import { apiBaseUrl, requestJson } from "../../../lib/api";
 
 type Investigation = {
@@ -873,38 +874,44 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
   );
 
   return (
-    <div className="inv-workspace-container">
+    <div className="inv-workspace-container" style={{ position: "relative" }}>
       {/* Persistent Investigation Header */}
-      <header className="inv-workspace-header">
-        <div className="inv-header-top">
+      <header className="inv-workspace-header" style={{ position: "relative", overflow: "hidden" }}>
+        <AtmosphericAurora showGrid={true} showScanlines={false} />
+        <div className="inv-header-top" style={{ position: "relative", zIndex: 1 }}>
           <div className="inv-breadcrumb-bar">
             <Link href="/">Dashboard</Link>
             <span>/</span>
-            <Link href="/">Investigations</Link>
+            <Link href="/history">Investigations</Link>
             <span>/</span>
-            <span style={{ color: "#94a3b8" }}>{investigation.id.slice(0, 8)}</span>
+            <span style={{ color: "#38bdf8", fontFamily: "monospace" }}>MISSION::{investigation.id.slice(0, 8)}</span>
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px", fontSize: "12px" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: "6px", color: "#94a3b8" }}>
+            <span className="telemetry-beacon">
               <span
                 style={{
-                  width: "8px",
-                  height: "8px",
+                  width: "6px",
+                  height: "6px",
                   borderRadius: "50%",
                   backgroundColor: sseStatus === "connected" ? "#10b981" : sseStatus === "connecting" ? "#f59e0b" : "#f43f5e",
+                  boxShadow: sseStatus === "connected" ? "0 0 8px #10b981" : undefined,
                   display: "inline-block",
                 }}
               />
-              Live updates: <strong>{sseStatus}</strong>
-              {isJobActive ? " · polling fallback active" : ""}
+              SSE::{sseStatus.toUpperCase()}
+              {isJobActive ? " · POLLING_FALLBACK" : ""}
             </span>
           </div>
         </div>
 
-        <div className="inv-header-main">
+        <div className="inv-header-main" style={{ position: "relative", zIndex: 1 }}>
           <div className="inv-title-group">
-            <p className="eyebrow blue" style={{ margin: "0 0 2px" }}>RESEARCH WORKSPACE</p>
+            <p className="eyebrow blue" style={{ margin: "0 0 4px", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span>RESEARCH WORKSPACE</span>
+              <span>//</span>
+              <span style={{ color: "var(--muted)", fontFamily: "monospace" }}>{investigation.mode?.toUpperCase() || "AUTONOMOUS"}</span>
+            </p>
             <h1 className="inv-question-title">{investigation.question}</h1>
 
             <div className="inv-meta-badges">
@@ -912,13 +919,13 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
                 {investigation.status}
               </span>
               <span className="mode-pill">
-                {sources.length} Sources Discoveries
+                ◈ {sources.length} Sources Ingested
               </span>
               <span className="mode-pill">
-                {evidence.length} Traceable Passages
+                ◇ {evidence.length} Traceable Passages
               </span>
               <span className="mode-pill" style={{ borderColor: investigation.quality_status === "verified" ? "#10b981" : undefined }}>
-                Quality: <strong>{investigation.quality_status}</strong>
+                Quality: <strong style={{ color: "#fff" }}>{investigation.quality_status}</strong>
               </span>
               {analysis?.coverage && (
                 <span className={`mode-pill ${analysis.coverage.is_partially_completed ? "status-queued" : "status-completed"}`}>
@@ -931,12 +938,12 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
           <div className="inv-header-actions">
             {(!analysis || isJobTerminal) && (
               <button
-                className="primary-button compact-button"
+                className="cyber-primary-btn"
                 disabled={submittingAnalysis || isJobActive || (sources.length === 0 && !analysis)}
                 type="button"
                 onClick={() => void triggerAnalysis()}
                 title={sources.length === 0 && !analysis ? "Please discover sources before running analysis" : undefined}
-                style={{ background: "#2563eb", color: "#fff" }}
+                style={{ padding: "8px 18px", fontSize: "12px" }}
               >
                 {submittingAnalysis ? "Starting Analysis..." : analysis ? "↻ Re-run Analysis" : "▶ Start Analysis"}
               </button>
@@ -957,7 +964,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
               type="button"
               className="outline-button compact-button"
               onClick={() => setShowExportPanel((v) => !v)}
-              style={{ background: showExportPanel ? "#1e293b" : undefined }}
+              style={{ background: showExportPanel ? "rgba(56, 189, 248, 0.15)" : undefined, borderColor: showExportPanel ? "#38bdf8" : undefined }}
             >
               {showExportPanel ? "Hide Exports ▲" : "Export Knowledge ⤓"}
             </button>
@@ -973,7 +980,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "overview" ? "active" : ""}`}
             onClick={() => switchTab("overview")}
           >
-            <span>Overview</span>
+            <span>⌂ Overview</span>
           </button>
 
           <button
@@ -981,7 +988,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "intelligence" ? "active" : ""}`}
             onClick={() => switchTab("intelligence")}
           >
-            <span>Multi-Agent Intelligence</span>
+            <span>◎ Multi-Agent Intelligence</span>
             {executions.length > 0 && <span className="inv-tab-pill">{executions.length}</span>}
           </button>
 
@@ -990,7 +997,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "evidence" ? "active" : ""}`}
             onClick={() => switchTab("evidence")}
           >
-            <span>Evidence Explorer</span>
+            <span>◇ Evidence Explorer</span>
             <span className="inv-tab-pill">{evidence.length}</span>
           </button>
 
@@ -999,7 +1006,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "sources" ? "active" : ""}`}
             onClick={() => switchTab("sources")}
           >
-            <span>Sources Library</span>
+            <span>◈ Sources Library</span>
             <span className="inv-tab-pill">{sources.length}</span>
           </button>
 
@@ -1008,7 +1015,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "graph" ? "active" : ""}`}
             onClick={() => switchTab("graph")}
           >
-            <span>Knowledge Graph</span>
+            <span>⌘ Knowledge Graph</span>
           </button>
 
           <button
@@ -1016,7 +1023,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "report" ? "active" : ""}`}
             onClick={() => switchTab("report")}
           >
-            <span>Research Report</span>
+            <span>📄 Research Report</span>
             {report?.evidence_strength && (
               <span className="inv-tab-pill" style={{ color: "#34d399", background: "rgba(16, 185, 129, 0.15)" }}>
                 {report.evidence_strength.score.toFixed(0)}/100
@@ -1029,7 +1036,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "horizon" ? "active" : ""}`}
             onClick={() => switchTab("horizon")}
           >
-            <span>Research Gaps & Horizon</span>
+            <span>🎯 Research Gaps & Horizon</span>
           </button>
 
           <button
@@ -1037,7 +1044,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             className={`inv-tab-button ${activeTab === "collaboration" ? "active" : ""}`}
             onClick={() => switchTab("collaboration")}
           >
-            <span>Collaboration & Review</span>
+            <span>👥 Collaboration & Review</span>
           </button>
         </div>
       </nav>
@@ -1138,42 +1145,62 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
           <div style={{ display: "grid", gap: "24px" }}>
             {/* Key Metrics Grid */}
             <div className="overview-metric-grid">
-              <div className="overview-metric-card">
-                <div>
+              <div className="overview-metric-card hud-card" style={{ padding: "20px" }}>
+                <div className="hud-corner-tl" />
+                <div className="hud-corner-tr" />
+                <div className="hud-corner-bl" />
+                <div className="hud-corner-br" />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div className="overview-metric-label">Literature Ingestion</div>
-                  <div className="overview-metric-value">{sources.length}</div>
+                  <span style={{ fontSize: "16px", color: "#38bdf8" }}>◈</span>
                 </div>
+                <div className="overview-metric-value" style={{ margin: "8px 0 4px", fontSize: "28px" }}>{sources.length}</div>
                 <div className="overview-metric-subtext">
                   {sources.filter((s) => s.inclusion_status === "included").length} relevant · {sources.filter((s) => s.document_url).length} full text
                 </div>
               </div>
 
-              <div className="overview-metric-card">
-                <div>
+              <div className="overview-metric-card hud-card" style={{ padding: "20px" }}>
+                <div className="hud-corner-tl" />
+                <div className="hud-corner-tr" />
+                <div className="hud-corner-bl" />
+                <div className="hud-corner-br" />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div className="overview-metric-label">Evidence Passages</div>
-                  <div className="overview-metric-value">{evidence.length}</div>
+                  <span style={{ fontSize: "16px", color: "#06b6d4" }}>◇</span>
                 </div>
+                <div className="overview-metric-value" style={{ margin: "8px 0 4px", fontSize: "28px" }}>{evidence.length}</div>
                 <div className="overview-metric-subtext">
                   {evidence.filter((e) => e.traceable).length} traceable · {evidenceDistribution.supporting} supporting
                 </div>
               </div>
 
-              <div className="overview-metric-card">
-                <div>
+              <div className="overview-metric-card hud-card" style={{ padding: "20px" }}>
+                <div className="hud-corner-tl" />
+                <div className="hud-corner-tr" />
+                <div className="hud-corner-bl" />
+                <div className="hud-corner-br" />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div className="overview-metric-label">Decomposed Claims</div>
-                  <div className="overview-metric-value">{claims.length}</div>
+                  <span style={{ fontSize: "16px", color: "#a855f7" }}>🔬</span>
                 </div>
+                <div className="overview-metric-value" style={{ margin: "8px 0 4px", fontSize: "28px" }}>{claims.length}</div>
                 <div className="overview-metric-subtext">
                   {decisions.length} adjudicated · {debates.length} debate rounds
                 </div>
               </div>
 
-              <div className="overview-metric-card">
-                <div>
+              <div className="overview-metric-card hud-card" style={{ padding: "20px" }}>
+                <div className="hud-corner-tl" />
+                <div className="hud-corner-tr" />
+                <div className="hud-corner-bl" />
+                <div className="hud-corner-br" />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <div className="overview-metric-label">Evidence Strength</div>
-                  <div className="overview-metric-value" style={{ color: "#34d399" }}>
-                    {report?.evidence_strength ? `${report.evidence_strength.score.toFixed(1)}/100` : "Calibrating"}
-                  </div>
+                  <span style={{ fontSize: "16px", color: "#10b981" }}>🛡️</span>
+                </div>
+                <div className="overview-metric-value" style={{ margin: "8px 0 4px", fontSize: "28px", color: "#34d399" }}>
+                  {report?.evidence_strength ? `${report.evidence_strength.score.toFixed(1)}/100` : "Calibrating"}
                 </div>
                 <div className="overview-metric-subtext">
                   {report?.evidence_strength?.tier.replace("_", " ").toUpperCase() ?? "Awaiting Synthesis"}
@@ -1182,7 +1209,11 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
             </div>
 
             {/* Evidence Distribution Card */}
-            <div className="panel" style={{ padding: "20px" }}>
+            <div className="hud-card" style={{ padding: "24px" }}>
+              <div className="hud-corner-tl" />
+              <div className="hud-corner-tr" />
+              <div className="hud-corner-bl" />
+              <div className="hud-corner-br" />
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <h3 style={{ margin: 0, fontSize: "15px", fontWeight: 600 }}>Evidence Classification Distribution</h3>
                 <span className="muted" style={{ fontSize: "12px" }}>{evidence.length} total passages</span>

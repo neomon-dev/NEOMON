@@ -9,7 +9,7 @@ function QualityAuditContent() {
   const investigationId = searchParams.get("investigation_id") || undefined;
 
   return (
-    <div className="content">
+    <div className="content compact">
       <QualityAuditWorkspace initialInvestigationId={investigationId} />
     </div>
   );
@@ -19,7 +19,7 @@ export default function QualityAuditPage() {
   return (
     <Suspense
       fallback={
-        <div className="content">
+        <div className="content compact">
           <div className="panel empty-state">
             <p className="muted">Loading Scientific Quality Audit...</p>
           </div>

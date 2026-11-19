@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  BorderBeam,
+  RevealSection,
+} from "@/components/motion";
 
 export type HypothesisEvaluationView = {
   id: string;
@@ -206,119 +213,130 @@ export function HypothesisWorkspace({ investigationId, investigationQuestion }: 
   }, [hypotheses, categoryFilter, statusFilter, minTestability, searchQuery]);
 
   return (
-    <div className="hypothesis-workspace" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* Top Banner / Actions */}
-      <div className="panel" style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-        <div>
+    <div className="hypothesis-workspace" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      {/* Compact Action & Filter Strip */}
+      <div className="panel compact" style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: "12px" }}>
+        {/* Header row */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>Hypothesis Generation & Review</h2>
-            <span style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "12px", background: "rgba(168, 85, 247, 0.15)", color: "#a855f7" }}>
-              Milestone 8B
+            <span style={{ fontSize: "14px", fontWeight: 700, color: "#f8fafc" }}>
+              Empirical Hypotheses ({filteredHypotheses.length})
+            </span>
+            <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px", background: "rgba(168, 85, 247, 0.15)", color: "#a855f7", border: "1px solid rgba(168, 85, 247, 0.3)" }}>
+              FALSIFIABLE PROPOSITIONS
             </span>
           </div>
-          <p className="muted" style={{ margin: "4px 0 0", fontSize: "13px" }}>
-            Testable, falsifiable scientific propositions formulated from observed evidence, contradictions, and research gaps.
-          </p>
+
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button
+              className="cyber-primary-btn"
+              disabled={generating}
+              onClick={() => handleGenerate(true)}
+              style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 16px", fontSize: "12px" }}
+            >
+              {generating ? "Formulating Hypotheses..." : "⚡ Regenerate Hypotheses"}
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <button
-            className="button primary"
-            disabled={generating}
-            onClick={() => handleGenerate(true)}
-            style={{ display: "flex", alignItems: "center", gap: "8px" }}
-          >
-            {generating ? "Formulating Hypotheses..." : "Regenerate Hypotheses"}
-          </button>
+        {/* Filters row */}
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", borderTop: "1px solid var(--border)", paddingTop: "10px" }}>
+          <div style={{ flex: 1, minWidth: "200px" }}>
+            <input
+              type="text"
+              className="text-input"
+              placeholder="Search statements, mechanisms, or variables..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{ width: "100%", padding: "6px 12px", fontSize: "12px", borderRadius: "6px", background: "rgba(15, 23, 42, 0.6)", border: "1px solid var(--border)" }}
+            />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--muted)" }}>Category:</label>
+            <select
+              className="select-input"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              style={{ padding: "5px 8px", fontSize: "12px" }}
+            >
+              <option value="all">All Categories</option>
+              <option value="causal">Causal</option>
+              <option value="mechanistic">Mechanistic</option>
+              <option value="correlational">Correlational</option>
+              <option value="comparative">Comparative</option>
+              <option value="exploratory">Exploratory</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--muted)" }}>Status:</label>
+            <select
+              className="select-input"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ padding: "5px 8px", fontSize: "12px" }}
+            >
+              <option value="all">All Statuses</option>
+              <option value="proposed">Proposed</option>
+              <option value="under_review">Under Review</option>
+              <option value="supported_by_subsequent_evidence">Corroborated</option>
+              <option value="challenged_by_subsequent_evidence">Challenged</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--muted)" }}>Min Testability:</label>
+            <input
+              type="range"
+              min="0"
+              max="10"
+              step="0.5"
+              value={minTestability}
+              onChange={(e) => setMinTestability(parseFloat(e.target.value))}
+              style={{ width: "80px", cursor: "pointer" }}
+            />
+            <span style={{ fontSize: "11px", fontFamily: "monospace", color: "#38bdf8", minWidth: "24px" }}>
+              {minTestability.toFixed(1)}
+            </span>
+          </div>
+
+          {(searchQuery || categoryFilter !== "all" || statusFilter !== "all" || minTestability > 0) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setCategoryFilter("all");
+                setStatusFilter("all");
+                setMinTestability(0);
+              }}
+              style={{ background: "none", border: "none", color: "#38bdf8", fontSize: "11px", cursor: "pointer", padding: "4px" }}
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Scientific Principle Notice */}
+      {/* Scientific Principle Notice (Compact) */}
       <div
         style={{
-          padding: "12px 18px",
-          borderRadius: "8px",
-          background: "rgba(59, 130, 246, 0.08)",
-          border: "1px solid rgba(59, 130, 246, 0.25)",
-          fontSize: "12px",
+          padding: "8px 14px",
+          borderRadius: "6px",
+          background: "rgba(59, 130, 246, 0.05)",
+          border: "1px solid rgba(59, 130, 246, 0.15)",
+          fontSize: "11px",
           color: "#93c5fd",
           display: "flex",
           alignItems: "center",
-          gap: "10px",
+          gap: "8px",
         }}
       >
-        <span style={{ fontSize: "16px" }}>🔬</span>
+        <span>🔬</span>
         <span>
-          <strong>Scientific Validity Standard:</strong> A hypothesis is an empirical proposition to be tested, not verified knowledge or proof. Correlation is never conflated with causation. Every hypothesis requires falsification criteria and boundary conditions.
+          <strong>Scientific Principle:</strong> A hypothesis is an empirical proposition to be tested, not verified knowledge. Every hypothesis requires falsification criteria and boundary conditions.
         </span>
-      </div>
-
-      {error && (
-        <div className="panel error-banner" style={{ padding: "12px 18px", color: "#ef4444" }}>
-          <strong>Error:</strong> {error}
-        </div>
-      )}
-
-      {/* Filter Bar */}
-      <div className="panel" style={{ padding: "14px 20px", display: "flex", gap: "14px", flexWrap: "wrap", alignItems: "center" }}>
-        <div style={{ flex: 1, minWidth: "220px" }}>
-          <input
-            type="text"
-            className="text-input"
-            placeholder="Search statement, variables, or mechanism..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ width: "100%", padding: "7px 12px", fontSize: "13px" }}
-          />
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>Category:</label>
-          <select
-            className="select-input"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            style={{ padding: "6px 10px", fontSize: "13px" }}
-          >
-            <option value="all">All Categories</option>
-            <option value="causal">Causal</option>
-            <option value="mechanistic">Mechanistic</option>
-            <option value="correlational">Correlational</option>
-            <option value="comparative">Comparative</option>
-            <option value="exploratory">Exploratory</option>
-          </select>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>Status:</label>
-          <select
-            className="select-input"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ padding: "6px 10px", fontSize: "13px" }}
-          >
-            <option value="all">All Review Statuses</option>
-            <option value="proposed">Proposed</option>
-            <option value="under_review">Under Review</option>
-            <option value="supported_by_subsequent_evidence">Corroborated</option>
-            <option value="challenged_by_subsequent_evidence">Challenged</option>
-            <option value="rejected">Rejected</option>
-          </select>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>Min Testability:</label>
-          <input
-            type="range"
-            min="0"
-            max="10"
-            step="1"
-            value={minTestability}
-            onChange={(e) => setMinTestability(parseFloat(e.target.value))}
-            style={{ width: "80px" }}
-          />
-          <span style={{ fontSize: "12px", fontWeight: 600, minWidth: "24px" }}>{minTestability}</span>
-        </div>
       </div>
 
       {/* Main Content List */}
@@ -352,9 +370,13 @@ export function HypothesisWorkspace({ investigationId, investigationQuestion }: 
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  position: "relative",
+                  overflow: "hidden",
                   transition: "box-shadow 0.2s ease",
+                  boxShadow: isExpanded ? "0 0 25px rgba(37, 217, 242, 0.2)" : undefined,
                 }}
               >
+                {isExpanded && <BorderBeam size={160} duration={8} colorFrom={catStyle.border} colorTo="#25D9F2" />}
                 {/* Header Row */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
                   <div style={{ flex: 1 }}>

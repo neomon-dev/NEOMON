@@ -3,6 +3,13 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { ApiError, requestJson } from "@/lib/api";
+import {
+  PulseIndicator,
+  DecryptedText,
+  SpotlightCard,
+  AnimatedCounter,
+  BorderBeam,
+} from "@/components/motion";
 
 interface BenchmarkDataset {
   id: string;
@@ -153,15 +160,17 @@ export default function BenchmarksPage() {
   };
 
   return (
-    <div className="benchmarks-page" style={{ padding: "32px", maxWidth: "1400px", margin: "0 auto" }}>
+    <div className="content compact">
+    <div className="benchmarks-page" style={{ maxWidth: "1400px", margin: "0 auto" }}>
       <header style={{ marginBottom: "28px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-          <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: 700, letterSpacing: "0.08em" }}>
-            MILESTONE 12 · RESEARCH RELIABILITY BENCHMARKS
+          <PulseIndicator status="cyan" size={8} />
+          <span style={{ fontSize: "11px", color: "#25D9F2", fontWeight: 700, letterSpacing: "0.08em" }}>
+            RESEARCH RELIABILITY & BENCHMARKS
           </span>
         </div>
         <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#f8fafc", margin: "0 0 8px 0" }}>
-          Scientific Benchmark & Quantitative Evaluation Suite
+          <DecryptedText text="Scientific Benchmark & Quantitative Evaluation Suite" speed={25} />
         </h1>
         <p style={{ fontSize: "14px", color: "#94a3b8", margin: 0, maxWidth: "800px" }}>
           Systematic, versioned benchmark datasets verifying retrieval precision, passage entailment, study independence deduplication, and historical regression stability under peer-review standards.
@@ -208,12 +217,15 @@ export default function BenchmarksPage() {
       <div
         style={{
           background: "#080d1a",
-          border: "1px solid #1e293b",
+          border: "1px solid rgba(37, 217, 242, 0.3)",
           borderRadius: "8px",
           padding: "20px",
           marginBottom: "28px",
+          position: "relative",
+          overflow: "hidden",
         }}
       >
+        <BorderBeam colorFrom="#25D9F2" colorTo="#2787FF" duration={5} size={80} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
           <div>
             <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#f8fafc", margin: 0 }}>
@@ -284,7 +296,7 @@ export default function BenchmarksPage() {
 
               <div style={{ background: "#064e3b30", border: "1px solid #059669", padding: "12px", borderRadius: "4px" }}>
                 <h4 style={{ fontSize: "12px", color: "#34d399", margin: "0 0 8px 0", textTransform: "uppercase" }}>
-                  Milestone 12 Calibrated (Peer-Review Defensible)
+                  Calibrated Engine (Peer-Review Defensible)
                 </h4>
                 <div style={{ fontSize: "12px", color: "#cbd5e1", display: "flex", flexDirection: "column", gap: "4px" }}>
                   <div>Quality Score: <strong>{(Number(regressionResult.milestone_12_calibrated?.calibrated_quality_score ?? 0.76) * 100).toFixed(1)}%</strong></div>
@@ -498,6 +510,7 @@ export default function BenchmarksPage() {
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

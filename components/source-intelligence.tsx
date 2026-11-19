@@ -11,6 +11,13 @@ import {
   type WorkspaceSourceItem,
   type WorkspaceSourcePage,
 } from "@/lib/workspace";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  DecryptedText,
+  BorderBeam,
+} from "@/components/motion";
 
 const PAGE_SIZE = 20;
 
@@ -132,8 +139,13 @@ export function SourceIntelligence() {
     <>
       <header className="topbar">
         <div>
-          <p className="eyebrow">Evidence Intelligence Workspace</p>
-          <h1>Source Intelligence</h1>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <PulseIndicator status="cyan" size={8} />
+            <p className="eyebrow">Evidence Intelligence Workspace</p>
+          </div>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <DecryptedText text="Source Intelligence" speed={30} />
+          </h1>
         </div>
         <div className="analysis-actions">
           <Link className="outline-button compact-button" href="/evidence">
@@ -147,26 +159,34 @@ export function SourceIntelligence() {
 
       <div className="content">
         <div className="metric-grid">
-          <article className="metric-card">
+          <SpotlightCard className="metric-card" spotlightColor="rgba(37, 217, 242, 0.15)">
             <span className="metric-label">Matching sources</span>
-            <strong>{pageData.total}</strong>
+            <strong style={{ color: "var(--cyan)" }}>
+              <AnimatedCounter value={pageData.total} />
+            </strong>
             <span className="metric-detail">Persisted sources across active filters</span>
-          </article>
-          <article className="metric-card">
+          </SpotlightCard>
+          <SpotlightCard className="metric-card" spotlightColor="rgba(39, 135, 255, 0.15)">
             <span className="metric-label">Full-text on page</span>
-            <strong>{pageData.items.filter((item) => item.access_level === "full_text").length}</strong>
+            <strong style={{ color: "var(--electric-blue)" }}>
+              <AnimatedCounter value={pageData.items.filter((item) => item.access_level === "full_text").length} />
+            </strong>
             <span className="metric-detail">Sources with retrieved full-text content</span>
-          </article>
-          <article className="metric-card">
+          </SpotlightCard>
+          <SpotlightCard className="metric-card" spotlightColor="rgba(53, 224, 177, 0.15)">
             <span className="metric-label">OA resolved on page</span>
-            <strong>{pageData.items.filter((item) => item.open_access_status === "resolved").length}</strong>
+            <strong style={{ color: "var(--mint)" }}>
+              <AnimatedCounter value={pageData.items.filter((item) => item.open_access_status === "resolved").length} />
+            </strong>
             <span className="metric-detail">Verified open-access full-text resolutions</span>
-          </article>
-          <article className="metric-card">
+          </SpotlightCard>
+          <SpotlightCard className="metric-card" spotlightColor="rgba(133, 100, 255, 0.15)">
             <span className="metric-label">Evidence on page</span>
-            <strong>{pageData.items.reduce((sum, item) => sum + item.evidence_count, 0)}</strong>
+            <strong style={{ color: "var(--violet)" }}>
+              <AnimatedCounter value={pageData.items.reduce((sum, item) => sum + item.evidence_count, 0)} />
+            </strong>
             <span className="metric-detail">Traceable passages extracted from visible sources</span>
-          </article>
+          </SpotlightCard>
         </div>
 
         <section className="panel" style={{ marginTop: 18 }}>
@@ -341,7 +361,8 @@ export function SourceIntelligence() {
               </div>
 
               {selected && (
-                <aside className="workspace-detail panel" style={{ minHeight: "auto" }}>
+                <aside className="workspace-detail panel" style={{ minHeight: "auto", position: "relative", overflow: "hidden" }}>
+                  <BorderBeam colorFrom="#25D9F2" colorTo="#2787FF" duration={4} size={70} />
                   <div className="panel-heading">
                     <div>
                       <p className="eyebrow blue">Source & Document Provenance</p>

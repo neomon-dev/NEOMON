@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  BorderBeam,
+  RevealSection,
+} from "@/components/motion";
 
 export type CrossRelationshipView = {
   id: string;
@@ -168,99 +175,138 @@ export function CrossInvestigationWorkspace() {
   };
 
   return (
-    <div className="cross-investigation-workspace" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-      {/* Top Banner */}
-      <div className="panel" style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>Cross-Investigation Synthesis Hub</h2>
-            <span style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "12px", background: "rgba(6, 182, 212, 0.15)", color: "#06b6d4" }}>
-              Milestone 8C
-            </span>
+    <div className="cross-investigation-workspace" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* Compact Unified Header & Action Bar */}
+      <div className="panel compact" style={{ padding: "16px 20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "14px", marginBottom: "14px" }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0, color: "#f8fafc" }}>Cross-Investigation Synthesis</h1>
+              <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px", background: "rgba(56, 189, 248, 0.15)", color: "#38bdf8", border: "1px solid rgba(56, 189, 248, 0.3)" }}>
+                CROSS-STUDY CONVERGENCE
+              </span>
+            </div>
+            <p className="muted" style={{ margin: "4px 0 0", fontSize: "13px" }}>
+              Synthesize evidence, detect convergent and contradictory claims, and discover shared citations across studies.
+            </p>
           </div>
-          <p className="muted" style={{ margin: "4px 0 0", fontSize: "13px" }}>
-            Synthesize evidence, detect convergent and contradictory claims, and discover shared citations across studies.
-          </p>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ fontSize: "12px", color: selectedInvIds.length >= 2 ? "#38bdf8" : "var(--muted)", fontWeight: 600 }}>
+              {selectedInvIds.length} of {investigations.length} selected
+            </span>
+            <button
+              className="cyber-primary-btn"
+              disabled={synthesizing || selectedInvIds.length < 2}
+              onClick={handleSynthesize}
+              style={{ padding: "8px 18px", fontSize: "12px" }}
+            >
+              {synthesizing ? "Synthesizing Knowledge..." : `Synthesize Selected (${selectedInvIds.length})`}
+            </button>
+          </div>
         </div>
 
-        <div style={{ display: "flex", gap: "10px" }}>
-          <button
-            className="button primary"
-            disabled={synthesizing || selectedInvIds.length < 2}
-            onClick={handleSynthesize}
-          >
-            {synthesizing ? "Synthesizing Cross-Study Knowledge..." : `Synthesize Selected (${selectedInvIds.length})`}
-          </button>
+        {/* Investigation Multi-Selector Card Row */}
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+            <span style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--muted)" }}>
+              Select Studies to Compare (Minimum 2 required)
+            </span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={() => setSelectedInvIds(investigations.map((i) => i.id))}
+                style={{ background: "none", border: "none", color: "#38bdf8", fontSize: "11px", fontWeight: 600, cursor: "pointer", padding: "2px 6px" }}
+              >
+                Select All
+              </button>
+              <span style={{ color: "var(--border)", fontSize: "11px" }}>|</span>
+              <button
+                type="button"
+                onClick={() => setSelectedInvIds([])}
+                style={{ background: "none", border: "none", color: "var(--muted)", fontSize: "11px", fontWeight: 600, cursor: "pointer", padding: "2px 6px" }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "8px", maxHeight: "180px", overflowY: "auto", paddingRight: "4px" }}>
+            {investigations.map((inv) => {
+              const isSelected = selectedInvIds.includes(inv.id);
+              return (
+                <div
+                  key={inv.id}
+                  onClick={() => toggleSelectInv(inv.id)}
+                  style={{
+                    padding: "8px 12px",
+                    borderRadius: "8px",
+                    border: isSelected ? "1px solid #25D9F2" : "1px solid rgba(255, 255, 255, 0.08)",
+                    background: isSelected ? "rgba(37, 217, 242, 0.1)" : "rgba(12, 25, 43, 0.5)",
+                    boxShadow: isSelected ? "0 0 16px -2px rgba(37, 217, 242, 0.35)" : "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    position: "relative",
+                    overflow: "hidden",
+                    transition: "all 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                >
+                  {isSelected && <BorderBeam size={100} duration={6} colorFrom="#25D9F2" colorTo="#2787FF" />}
+                  <div
+                    style={{
+                      width: "16px",
+                      height: "16px",
+                      borderRadius: "4px",
+                      border: isSelected ? "1px solid #38bdf8" : "1px solid var(--muted)",
+                      background: isSelected ? "#38bdf8" : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "#000",
+                      fontSize: "10px",
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isSelected ? "✓" : ""}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "12px", fontWeight: 600, color: isSelected ? "#f8fafc" : "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {inv.question}
+                    </div>
+                    <div className="muted" style={{ fontSize: "10px", marginTop: "1px" }}>Status: {inv.status}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="panel error-banner" style={{ padding: "12px 18px", color: "#ef4444" }}>
+        <div className="panel error-banner" style={{ padding: "10px 16px", color: "#f43f5e", fontSize: "13px" }}>
           <strong>Error:</strong> {error}
         </div>
       )}
 
-      {/* Investigation Multi-Selector */}
-      <div className="panel" style={{ padding: "16px 20px" }}>
-        <div style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--muted)", marginBottom: "10px" }}>
-          Select Studies for Cross-Investigation Synthesis (Minimum 2)
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "10px" }}>
-          {investigations.map((inv) => {
-            const isSelected = selectedInvIds.includes(inv.id);
-            return (
-              <div
-                key={inv.id}
-                onClick={() => toggleSelectInv(inv.id)}
-                style={{
-                  padding: "10px 14px",
-                  borderRadius: "6px",
-                  border: isSelected ? "1px solid #06b6d4" : "1px solid var(--border)",
-                  background: isSelected ? "rgba(6, 182, 212, 0.08)" : "rgba(255,255,255,0.02)",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  transition: "all 0.15s ease",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={isSelected}
-                  onChange={() => {}}
-                  style={{ cursor: "pointer" }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: "13px", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {inv.question}
-                  </div>
-                  <div className="muted" style={{ fontSize: "11px" }}>Status: {inv.status}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
       {/* Navigation Tabs */}
-      <div style={{ display: "flex", gap: "10px", borderBottom: "1px solid var(--border)", paddingBottom: "8px" }}>
+      <div className="tab-nav" style={{ padding: "0 4px" }}>
         <button
-          className={`tab-button ${tab === "synthesis" ? "active" : ""}`}
-          style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, border: "none", background: tab === "synthesis" ? "rgba(6,182,212,0.15)" : "transparent", color: tab === "synthesis" ? "#06b6d4" : "var(--muted)", borderRadius: "6px", cursor: "pointer" }}
+          className={`tab-btn ${tab === "synthesis" ? "active" : ""}`}
           onClick={() => setTab("synthesis")}
         >
           Synthesis Reports ({reports.length})
         </button>
         <button
-          className={`tab-button ${tab === "relationships" ? "active" : ""}`}
-          style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, border: "none", background: tab === "relationships" ? "rgba(6,182,212,0.15)" : "transparent", color: tab === "relationships" ? "#06b6d4" : "var(--muted)", borderRadius: "6px", cursor: "pointer" }}
+          className={`tab-btn ${tab === "relationships" ? "active" : ""}`}
           onClick={() => setTab("relationships")}
         >
           Cross-Study Relationships ({relationships.length})
         </button>
         <button
-          className={`tab-button ${tab === "claims" ? "active" : ""}`}
-          style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, border: "none", background: tab === "claims" ? "rgba(6,182,212,0.15)" : "transparent", color: tab === "claims" ? "#06b6d4" : "var(--muted)", borderRadius: "6px", cursor: "pointer" }}
+          className={`tab-btn ${tab === "claims" ? "active" : ""}`}
           onClick={() => {
             setTab("claims");
             if (globalClaims.length === 0) handleSearchClaims();
@@ -269,8 +315,7 @@ export function CrossInvestigationWorkspace() {
           Global Claim Search
         </button>
         <button
-          className={`tab-button ${tab === "shared_evidence" ? "active" : ""}`}
-          style={{ padding: "8px 16px", fontSize: "13px", fontWeight: 600, border: "none", background: tab === "shared_evidence" ? "rgba(6,182,212,0.15)" : "transparent", color: tab === "shared_evidence" ? "#06b6d4" : "var(--muted)", borderRadius: "6px", cursor: "pointer" }}
+          className={`tab-btn ${tab === "shared_evidence" ? "active" : ""}`}
           onClick={() => setTab("shared_evidence")}
         >
           Shared Evidence & Citations ({sharedEvidence.length})

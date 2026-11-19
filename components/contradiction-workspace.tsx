@@ -2,6 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  DecryptedText,
+  BorderBeam,
+  RevealSection,
+} from "@/components/motion";
 
 export type ContradictionResolutionLogView = {
   id: string;
@@ -178,25 +186,26 @@ export function ContradictionWorkspace() {
   return (
     <div className="contradiction-workspace" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
       {/* Top Banner */}
-      <div className="panel" style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+      <div className="panel compact" style={{ padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: 700, margin: 0 }}>Scientific Contradiction Intelligence</h2>
-            <span style={{ fontSize: "11px", fontWeight: 600, padding: "2px 8px", borderRadius: "12px", background: "rgba(239, 68, 68, 0.15)", color: "#ef4444" }}>
-              Milestone 8D
+            <h2 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "#f8fafc" }}>Scientific Contradiction Intelligence</h2>
+            <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px", background: "rgba(244, 63, 94, 0.15)", color: "#f43f5e", border: "1px solid rgba(244, 63, 94, 0.3)" }}>
+              EMPIRICAL DISCREPANCIES
             </span>
           </div>
-          <p className="muted" style={{ margin: "4px 0 0", fontSize: "13px" }}>
+          <p className="muted" style={{ margin: "3px 0 0", fontSize: "12px" }}>
             Identify, classify, and track empirical discrepancies across claims and studies without forcing artificial consensus.
           </p>
         </div>
 
         <button
-          className="button primary"
+          className="cyber-primary-btn"
           disabled={detecting}
           onClick={handleDetect}
+          style={{ padding: "7px 16px", fontSize: "12px" }}
         >
-          {detecting ? "Scanning for Contradictions..." : "Detect Scientific Contradictions"}
+          {detecting ? "Scanning for Contradictions..." : "⚡ Detect Scientific Contradictions"}
         </button>
       </div>
 
@@ -368,8 +377,12 @@ export function ContradictionWorkspace() {
                   display: "flex",
                   flexDirection: "column",
                   gap: "14px",
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: c.severity === "critical" ? "0 0 20px rgba(255, 82, 119, 0.2)" : undefined,
                 }}
               >
+                {c.severity === "critical" && <BorderBeam size={160} duration={8} colorFrom="#FF5277" colorTo="#FFB547" />}
                 {/* Header */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px" }}>
                   <div>

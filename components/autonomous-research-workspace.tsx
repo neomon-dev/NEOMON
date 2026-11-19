@@ -3,6 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  BorderBeam,
+  RevealSection,
+} from "@/components/motion";
 
 export type AutonomousWorkflowView = {
   id: string;
@@ -476,7 +483,7 @@ export function AutonomousResearchWorkspace({
               <span className="text-xl">⚡</span> Autonomous Research Workflow Engine
             </h1>
             <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-400 border border-amber-500/20">
-              Milestone 9
+              AUTONOMOUS RESEARCH ENGINE
             </span>
           </div>
           <p className="text-sm text-slate-400 mt-1">
@@ -556,55 +563,60 @@ export function AutonomousResearchWorkspace({
         </div>
       )}
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Workflows</div>
-          <div className="text-2xl font-bold text-white mt-1">
-            {workflows.filter((w) => ["executing", "planning", "evaluating"].includes(w.status)).length}
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">{workflows.length} total defined</div>
-        </div>
+      {/* Summary KPI Cards with Cursor-Tracked Spotlight */}
+      <RevealSection delay={0.08}>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <SpotlightCard spotlightColor="rgba(37, 217, 242, 0.15)" style={{ padding: "16px" }}>
+            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Active Workflows</div>
+            <div className="text-2xl font-bold text-white mt-1">
+              <AnimatedCounter value={workflows.filter((w) => ["executing", "planning", "evaluating"].includes(w.status)).length} />
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">{workflows.length} total defined</div>
+          </SpotlightCard>
 
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Cycles Completed</div>
-          <div className="text-2xl font-bold text-cyan-400 mt-1">
-            {activeWorkflow ? `${activeWorkflow.current_cycle_number} / ${activeWorkflow.max_cycles}` : "0"}
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">Iterative research loops</div>
-        </div>
+          <SpotlightCard spotlightColor="rgba(39, 135, 255, 0.15)" style={{ padding: "16px" }}>
+            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Cycles Completed</div>
+            <div className="text-2xl font-bold text-cyan-400 mt-1">
+              {activeWorkflow ? (
+                <span>
+                  <AnimatedCounter value={activeWorkflow.current_cycle_number} />
+                  <span className="text-slate-500 text-base"> / {activeWorkflow.max_cycles}</span>
+                </span>
+              ) : "0"}
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">Iterative research loops</div>
+          </SpotlightCard>
 
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Sources Acquired</div>
-          <div className="text-2xl font-bold text-emerald-400 mt-1">
-            +{activeWorkflow?.total_sources_acquired || 0}
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">{activeWorkflow?.total_searches_executed || 0} searches executed</div>
-        </div>
+          <SpotlightCard spotlightColor="rgba(53, 224, 177, 0.15)" style={{ padding: "16px" }}>
+            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Sources Acquired</div>
+            <div className="text-2xl font-bold text-emerald-400 mt-1">
+              +<AnimatedCounter value={activeWorkflow?.total_sources_acquired || 0} />
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">{activeWorkflow?.total_searches_executed || 0} searches executed</div>
+          </SpotlightCard>
 
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Evidence Passages</div>
-          <div className="text-2xl font-bold text-amber-400 mt-1">
-            +{activeWorkflow?.total_evidence_acquired || 0}
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">8G calibrated & verified</div>
-        </div>
+          <SpotlightCard spotlightColor="rgba(255, 181, 71, 0.15)" style={{ padding: "16px" }}>
+            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Evidence Passages</div>
+            <div className="text-2xl font-bold text-amber-400 mt-1">
+              +<AnimatedCounter value={activeWorkflow?.total_evidence_acquired || 0} />
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">8G calibrated & verified</div>
+          </SpotlightCard>
 
-        <div className="rounded-xl border border-border bg-surface p-4">
-          <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Engine State</div>
-          <div className="text-lg font-bold text-white mt-1 capitalize flex items-center gap-1.5">
-            {activeWorkflow ? (
-              <span className={`inline-block w-2.5 h-2.5 rounded-full ${
-                activeWorkflow.status === "executing" ? "bg-emerald-400 animate-ping" : "bg-slate-400"
-              }`} />
-            ) : null}
-            {activeWorkflow?.status.replace("_", " ") || "Idle"}
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">
-            {activeWorkflow?.autonomy_mode || "no"} mode
-          </div>
+          <SpotlightCard spotlightColor="rgba(133, 100, 255, 0.15)" style={{ padding: "16px" }}>
+            <div className="text-xs font-medium text-slate-400 uppercase tracking-wider">Engine State</div>
+            <div className="text-lg font-bold text-white mt-1 capitalize flex items-center gap-1.5">
+              {activeWorkflow ? (
+                <PulseIndicator status={activeWorkflow.status === "executing" ? "active" : "warning"} size={8} />
+              ) : null}
+              {activeWorkflow?.status.replace("_", " ") || "Idle"}
+            </div>
+            <div className="text-xs text-slate-500 mt-0.5">
+              {activeWorkflow?.autonomy_mode || "no"} mode
+            </div>
+          </SpotlightCard>
         </div>
-      </div>
+      </RevealSection>
 
       {/* Main Content: Workflow Selector & Live Monitor */}
       {workflows.length === 0 ? (

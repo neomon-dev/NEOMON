@@ -7,14 +7,14 @@ export default function SynthesisPage() {
   return (
     <Suspense
       fallback={
-        <div className="content">
+        <div className="content compact">
           <div className="panel empty-state">
             <p className="muted">Loading Cross-Investigation Synthesis Workspace...</p>
           </div>
         </div>
       }
     >
-      <div className="content">
+      <div className="content compact">
         <CrossInvestigationWorkspace />
       </div>
     </Suspense>

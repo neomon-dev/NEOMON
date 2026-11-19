@@ -33,26 +33,42 @@ function GapsContent() {
   const currentInv = investigations.find((i) => i.id === selectedId);
 
   return (
-    <div className="content">
-      <div className="investigation-select-bar panel" style={{ marginBottom: "16px", padding: "12px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px", width: "100%" }}>
-          <label htmlFor="inv-selector" style={{ fontWeight: 600, fontSize: "13px", whiteSpace: "nowrap" }}>
-            Select Investigation:
-          </label>
-          <select
-            id="inv-selector"
-            className="select-input"
-            style={{ maxWidth: "600px", flex: 1 }}
-            value={selectedId}
-            onChange={(e) => setSelectedId(e.target.value)}
-          >
-            {investigations.map((inv) => (
-              <option key={inv.id} value={inv.id}>
-                {inv.question} ({inv.status})
-              </option>
-            ))}
-          </select>
-        </div>
+    <div className="content compact">
+      {/* Sleek inline investigation selector bar */}
+      <div
+        className="inv-selector-bar"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          padding: "8px 16px",
+          marginBottom: "12px",
+          background: "var(--surface)",
+          borderRadius: "8px",
+          border: "1px solid var(--border)",
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ fontSize: "11px", fontWeight: 700, color: "#f59e0b", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          Target Investigation:
+        </span>
+        <select
+          id="inv-selector"
+          className="select-input"
+          style={{ maxWidth: "520px", flex: 1, fontSize: "12px", padding: "5px 10px" }}
+          value={selectedId}
+          onChange={(e) => setSelectedId(e.target.value)}
+        >
+          {investigations.map((inv) => (
+            <option key={inv.id} value={inv.id}>
+              {inv.question} [{inv.status}]
+            </option>
+          ))}
+        </select>
+        <div style={{ flex: 1 }} />
+        <span style={{ fontSize: "11px", color: "var(--muted)", fontFamily: "monospace" }}>
+          CORPUS::{investigations.length} MISSIONS
+        </span>
       </div>
 
       {selectedId ? (
@@ -77,7 +93,7 @@ export default function GapsPage() {
   return (
     <Suspense
       fallback={
-        <div className="content">
+        <div className="content compact">
           <div className="panel empty-state">
             <p className="muted">Loading Research Gap Workspace...</p>
           </div>

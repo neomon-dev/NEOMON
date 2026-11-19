@@ -5,6 +5,14 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { requestJson } from "@/lib/api";
 import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  DecryptedText,
+  BorderBeam,
+  RevealSection,
+} from "@/components/motion";
+import {
   agentStatusBadgeClass,
   formatAgentStatus,
   formatDurationSeconds,
@@ -106,8 +114,14 @@ export function AgentObservatory() {
     <>
       <header className="topbar">
         <div>
-          <p className="eyebrow">Evidence Intelligence Workspace</p>
-          <h1>Agent Observatory</h1>
+          <p className="eyebrow" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <PulseIndicator status="active" />
+            <DecryptedText text="MULTI_AGENT_OBSERVATORY // TELEMETRY" speed={25} />
+          </p>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ color: "#25D9F2" }}>◎</span>
+            Agent Observatory & Execution Matrix
+          </h1>
         </div>
         <div className="analysis-actions">
           <label className="mode-toggle">
@@ -125,44 +139,70 @@ export function AgentObservatory() {
           >
             Refresh telemetry
           </button>
-          <Link className="primary-button" href="/investigations/new">
+          <Link className="cyber-primary-btn" href="/investigations/new">
             + New investigation
           </Link>
         </div>
       </header>
 
       <div className="content">
-        <div className="metric-grid">
-          <article className="metric-card">
-            <span className="metric-label">Generating / Queued</span>
-            <strong>
-              {data?.summary.generating ?? 0} / {data?.summary.waiting_in_queue ?? 0}
-            </strong>
-            <span className="metric-detail">
-              Active jobs: {data?.summary.active_jobs ?? 0} of {data?.summary.total_jobs ?? 0}
-            </span>
-          </article>
-          <article className="metric-card">
-            <span className="metric-label">Completed executions</span>
-            <strong>{data?.summary.completed ?? 0}</strong>
-            <span className="metric-detail">Validated outputs out of {data?.summary.total_executions ?? 0} total runs</span>
-          </article>
-          <article className="metric-card">
-            <span className="metric-label">Failed / Cancelled</span>
-            <strong>
-              {data?.summary.failed ?? 0} / {data?.summary.cancelled ?? 0}
-            </strong>
-            <span className="metric-detail">Queue timeouts, validation rejections, and user cancellations</span>
-          </article>
-          <article className="metric-card">
-            <span className="metric-label">Local runtime policy</span>
-            <strong>1 concurrent</strong>
-            <span className="metric-detail">
-              Queue limit: {formatDurationSeconds(data?.summary.provider_queue_wait_timeout_seconds)} · Read:{" "}
-              {formatDurationSeconds(data?.summary.local_inference_timeout_seconds)}
-            </span>
-          </article>
-        </div>
+        <RevealSection delay={0.08}>
+          <div className="metric-grid">
+            <SpotlightCard spotlightColor="rgba(37, 217, 242, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Generating / Queued</span>
+                <span style={{ fontSize: "15px", color: "#25D9F2" }}>⚙️</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+                  <AnimatedCounter value={data?.summary.generating ?? 0} /> / <AnimatedCounter value={data?.summary.waiting_in_queue ?? 0} />
+                </strong>
+                <span className="metric-detail">
+                  Active jobs: {data?.summary.active_jobs ?? 0} of {data?.summary.total_jobs ?? 0}
+                </span>
+              </div>
+            </SpotlightCard>
+
+            <SpotlightCard spotlightColor="rgba(53, 224, 177, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Completed executions</span>
+                <span style={{ fontSize: "15px", color: "#35E0B1" }}>✓</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+                  <AnimatedCounter value={data?.summary.completed ?? 0} />
+                </strong>
+                <span className="metric-detail">Validated outputs out of {data?.summary.total_executions ?? 0} total runs</span>
+              </div>
+            </SpotlightCard>
+
+            <SpotlightCard spotlightColor="rgba(255, 82, 119, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Failed / Cancelled</span>
+                <span style={{ fontSize: "15px", color: "#FF5277" }}>⚠</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+                  <AnimatedCounter value={data?.summary.failed ?? 0} /> / <AnimatedCounter value={data?.summary.cancelled ?? 0} />
+                </strong>
+                <span className="metric-detail">Queue timeouts and cancellations</span>
+              </div>
+            </SpotlightCard>
+
+            <SpotlightCard spotlightColor="rgba(39, 135, 255, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Local runtime policy</span>
+                <span style={{ fontSize: "15px", color: "#2787FF" }}>⏱</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "26px", color: "#ECF5FF", display: "block", margin: "6px 0" }}>1 concurrent</strong>
+                <span className="metric-detail">
+                  Queue limit: {formatDurationSeconds(data?.summary.provider_queue_wait_timeout_seconds)}
+                </span>
+              </div>
+            </SpotlightCard>
+          </div>
+        </RevealSection>
 
         <section className="panel" style={{ marginTop: 18 }}>
           <div className="panel-heading">
@@ -182,11 +222,15 @@ export function AgentObservatory() {
                 key={agent.identifier}
                 type="button"
                 className={`workspace-card${roleFilter === agent.identifier ? " selected" : ""}`}
+                style={{ position: "relative", overflow: "hidden" }}
                 onClick={() => {
                   setRoleFilter((prev) => (prev === agent.identifier ? "all" : agent.identifier));
                   setOffset(0);
                 }}
               >
+                {roleFilter === agent.identifier && (
+                  <BorderBeam size={120} duration={6} colorFrom="#25D9F2" colorTo="#8564FF" />
+                )}
                 <div className="row-header">
                   <strong style={{ fontSize: 12 }}>{agent.name}</strong>
                   <span className={agentStatusBadgeClass(agent.latest_status)}>

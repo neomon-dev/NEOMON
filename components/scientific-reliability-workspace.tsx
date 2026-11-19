@@ -267,7 +267,7 @@ export function ScientificReliabilityWorkspace({ investigationId }: { investigat
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #1e293b", paddingBottom: "16px", marginBottom: "20px" }}>
         <div>
           <span style={{ fontSize: "11px", color: "#38bdf8", fontWeight: 700, letterSpacing: "0.08em" }}>
-            MILESTONE 12 · SCIENTIFIC RELIABILITY & REPRODUCIBILITY
+            SCIENTIFIC RELIABILITY & REPRODUCIBILITY ENGINE
           </span>
           <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#f8fafc", margin: "4px 0" }}>
             Research Intelligence Validation Engine

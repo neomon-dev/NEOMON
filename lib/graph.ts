@@ -467,11 +467,15 @@ export function buildFlowElements(
       target: edge.target,
       label: edge.label,
       type: "smoothstep",
-      animated: edge.relationship_type === "contradicts",
+      animated:
+        edge.relationship_type === "supports" ||
+        edge.relationship_type === "contradicts" ||
+        edge.relationship_type === "extracted_from_source",
       style: {
         stroke: style.stroke,
-        strokeWidth: edge.relationship_type === "supports" || edge.relationship_type === "contradicts" ? 2.2 : 1.5,
+        strokeWidth: edge.relationship_type === "supports" || edge.relationship_type === "contradicts" ? 2.4 : 1.6,
         strokeDasharray: style.strokeDasharray,
+        filter: edge.relationship_type === "contradicts" ? "drop-shadow(0 0 4px rgba(255, 82, 119, 0.5))" : edge.relationship_type === "supports" ? "drop-shadow(0 0 4px rgba(53, 224, 177, 0.4))" : undefined,
       },
       labelStyle: {
         fill: "#b8c7df",

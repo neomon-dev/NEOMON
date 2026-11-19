@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  DecryptedText,
+  RevealSection,
+} from "@/components/motion";
 
 export type UnifiedIntelligenceOverview = {
   total_investigations: number;
@@ -104,20 +111,20 @@ export function UnifiedIntelligenceWorkspace() {
   return (
     <div className="unified-intelligence-workspace" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {/* Top Banner */}
-      <div className="panel" style={{ padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+      <div className="panel compact" style={{ padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: 0 }}>Research Intelligence Hub</h2>
-            <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "12px", background: "rgba(16, 185, 129, 0.15)", color: "#10b981" }}>
-              Milestone 8 Unified Workspace
+            <h2 style={{ fontSize: "1.15rem", fontWeight: 700, margin: 0, color: "#f8fafc" }}>Research Intelligence Hub</h2>
+            <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
+              SYNTHESIS INTELLIGENCE
             </span>
           </div>
-          <p className="muted" style={{ margin: "4px 0 0", fontSize: "13.5px" }}>
+          <p className="muted" style={{ margin: "3px 0 0", fontSize: "12px" }}>
             Neural Evidence Orchestration & Multi-Agent Observation Network — interconnected multi-study intelligence.
           </p>
         </div>
 
-        <button className="button secondary" onClick={loadOverview} disabled={loadingOverview}>
+        <button className="outline-button compact-button" onClick={loadOverview} disabled={loadingOverview} style={{ padding: "6px 14px", fontSize: "12px" }}>
           Refresh Metrics
         </button>
       </div>
@@ -128,74 +135,76 @@ export function UnifiedIntelligenceWorkspace() {
         </div>
       )}
 
-      {/* Overview Metrics Cards */}
+      {/* Overview Metrics Cards with Spotlight & Counter */}
       {overview && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" }}>
-          <Link href="/gaps" style={{ textDecoration: "none", color: "inherit" }}>
-            <div className="panel hover-panel" style={{ padding: "16px 20px", cursor: "pointer", transition: "transform 0.15s ease" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Research Gaps</span>
-                <span>⚠️</span>
-              </div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 700, marginTop: "4px", color: "#f59e0b" }}>
-                {overview.total_gaps}
-              </div>
-              <div className="muted" style={{ fontSize: "11px", marginTop: "2px" }}>8A Discovery Engine →</div>
-            </div>
-          </Link>
+        <RevealSection delay={0.08}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "14px" }}>
+            <Link href="/gaps" style={{ textDecoration: "none", color: "inherit" }}>
+              <SpotlightCard spotlightColor="rgba(255, 181, 71, 0.15)" style={{ padding: "16px 20px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Research Gaps</span>
+                  <span>⚠️</span>
+                </div>
+                <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "4px", color: "#FFB547" }}>
+                  <AnimatedCounter value={overview.total_gaps} />
+                </div>
+                <div className="muted" style={{ fontSize: "11px", marginTop: "2px", color: "#38bdf8" }}>8A Discovery Engine →</div>
+              </SpotlightCard>
+            </Link>
 
-          <Link href="/hypotheses" style={{ textDecoration: "none", color: "inherit" }}>
-            <div className="panel hover-panel" style={{ padding: "16px 20px", cursor: "pointer", transition: "transform 0.15s ease" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Hypotheses</span>
-                <span>🔬</span>
-              </div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 700, marginTop: "4px", color: "#a855f7" }}>
-                {overview.total_hypotheses}
-              </div>
-              <div className="muted" style={{ fontSize: "11px", marginTop: "2px" }}>8B Testable Formulations →</div>
-            </div>
-          </Link>
+            <Link href="/hypotheses" style={{ textDecoration: "none", color: "inherit" }}>
+              <SpotlightCard spotlightColor="rgba(133, 100, 255, 0.15)" style={{ padding: "16px 20px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Hypotheses</span>
+                  <span>🔬</span>
+                </div>
+                <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "4px", color: "#8564FF" }}>
+                  <AnimatedCounter value={overview.total_hypotheses} />
+                </div>
+                <div className="muted" style={{ fontSize: "11px", marginTop: "2px", color: "#38bdf8" }}>8B Testable Formulations →</div>
+              </SpotlightCard>
+            </Link>
 
-          <Link href="/synthesis" style={{ textDecoration: "none", color: "inherit" }}>
-            <div className="panel hover-panel" style={{ padding: "16px 20px", cursor: "pointer", transition: "transform 0.15s ease" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Cross-Study Links</span>
-                <span>🔗</span>
-              </div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 700, marginTop: "4px", color: "#06b6d4" }}>
-                {overview.total_cross_relationships}
-              </div>
-              <div className="muted" style={{ fontSize: "11px", marginTop: "2px" }}>8C Knowledge Synthesis →</div>
-            </div>
-          </Link>
+            <Link href="/synthesis" style={{ textDecoration: "none", color: "inherit" }}>
+              <SpotlightCard spotlightColor="rgba(37, 217, 242, 0.15)" style={{ padding: "16px 20px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Cross-Study Links</span>
+                  <span>🔗</span>
+                </div>
+                <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "4px", color: "#25D9F2" }}>
+                  <AnimatedCounter value={overview.total_cross_relationships} />
+                </div>
+                <div className="muted" style={{ fontSize: "11px", marginTop: "2px", color: "#38bdf8" }}>8C Knowledge Synthesis →</div>
+              </SpotlightCard>
+            </Link>
 
-          <Link href="/contradictions" style={{ textDecoration: "none", color: "inherit" }}>
-            <div className="panel hover-panel" style={{ padding: "16px 20px", cursor: "pointer", transition: "transform 0.15s ease" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Contradictions</span>
-                <span>⚖️</span>
-              </div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 700, marginTop: "4px", color: "#ef4444" }}>
-                {overview.active_contradictions}
-              </div>
-              <div className="muted" style={{ fontSize: "11px", marginTop: "2px" }}>8D Empirical Tensions →</div>
-            </div>
-          </Link>
+            <Link href="/contradictions" style={{ textDecoration: "none", color: "inherit" }}>
+              <SpotlightCard spotlightColor="rgba(255, 82, 119, 0.15)" style={{ padding: "16px 20px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Contradictions</span>
+                  <span>⚖️</span>
+                </div>
+                <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "4px", color: "#FF5277" }}>
+                  <AnimatedCounter value={overview.active_contradictions} />
+                </div>
+                <div className="muted" style={{ fontSize: "11px", marginTop: "2px", color: "#38bdf8" }}>8D Empirical Tensions →</div>
+              </SpotlightCard>
+            </Link>
 
-          <Link href="/trends" style={{ textDecoration: "none", color: "inherit" }}>
-            <div className="panel hover-panel" style={{ padding: "16px 20px", cursor: "pointer", transition: "transform 0.15s ease" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Trend Topics</span>
-                <span>📈</span>
-              </div>
-              <div style={{ fontSize: "1.8rem", fontWeight: 700, marginTop: "4px", color: "#eab308" }}>
-                {overview.active_trends_count}
-              </div>
-              <div className="muted" style={{ fontSize: "11px", marginTop: "2px" }}>8E Temporal Intelligence →</div>
-            </div>
-          </Link>
-        </div>
+            <Link href="/trends" style={{ textDecoration: "none", color: "inherit" }}>
+              <SpotlightCard spotlightColor="rgba(53, 224, 177, 0.15)" style={{ padding: "16px 20px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: "11px", fontWeight: 700, textTransform: "uppercase" }}>Trend Topics</span>
+                  <span>📈</span>
+                </div>
+                <div style={{ fontSize: "2rem", fontWeight: 700, marginTop: "4px", color: "#35E0B1" }}>
+                  <AnimatedCounter value={overview.active_trends_count} />
+                </div>
+                <div className="muted" style={{ fontSize: "11px", marginTop: "2px", color: "#38bdf8" }}>8E Temporal Intelligence →</div>
+              </SpotlightCard>
+            </Link>
+          </div>
+        </RevealSection>
       )}
 
       {/* Global Multi-Entity Research Search Engine */}

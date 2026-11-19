@@ -50,26 +50,32 @@ export default function LoginPage() {
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
           <div
             style={{
-              width: "44px",
-              height: "44px",
-              background: "#1e3a5f",
-              color: "#60a5fa",
-              borderRadius: "10px",
-              display: "grid",
-              placeItems: "center",
-              fontSize: "20px",
-              fontWeight: 700,
-              margin: "0 auto 12px",
-              border: "1px solid #3b82f6",
+              width: "56px",
+              height: "56px",
+              margin: "0 auto 14px",
+              filter: "drop-shadow(0 0 20px rgba(54, 197, 222, 0.4))",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            N
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/brand/neomon-symbol.png"
+              alt="NEOMON"
+              width={56}
+              height={56}
+              style={{ objectFit: "contain" }}
+            />
           </div>
-          <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#f8fafc", margin: "0 0 6px" }}>
+          <h1 style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "0.08em", color: "#f8fafc", margin: "0 0 4px" }}>
             Sign in to NEOMON
           </h1>
+          <p style={{ color: "#36C5DE", fontSize: "10.5px", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", margin: "0 0 8px" }}>
+            RESEARCH BEYOND THE SURFACE.
+          </p>
           <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>
-            Collaborative research intelligence & multi-user workspaces
+            Autonomous research intelligence & collaborative workspaces
           </p>
         </div>
 

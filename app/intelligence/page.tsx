@@ -7,14 +7,14 @@ export default function IntelligencePage() {
   return (
     <Suspense
       fallback={
-        <div className="content">
+        <div className="content compact">
           <div className="panel empty-state">
             <p className="muted">Loading Unified Research Intelligence Hub...</p>
           </div>
         </div>
       }
     >
-      <div className="content">
+      <div className="content compact">
         <UnifiedIntelligenceWorkspace />
       </div>
     </Suspense>

@@ -2,6 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiBaseUrl, requestJson } from "@/lib/api";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  PulseIndicator,
+  BorderBeam,
+  RevealSection,
+} from "@/components/motion";
 
 export type RecommendedAction = {
   action_type: string;
@@ -203,21 +210,34 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
   const coverageColor =
     coverageScore >= 75 ? "#10b981" : coverageScore >= 45 ? "#f59e0b" : "#ef4444";
 
+  // Segment calculations for coverage distribution
+  const totalClaimsCount = analysis?.coverage.total_claims || 1;
+  const directSupportPct = Math.round(((analysis?.coverage.claims_with_direct_support || 0) / totalClaimsCount) * 100);
+  const conflictPct = Math.round(((analysis?.coverage.claims_with_conflicts || 0) / totalClaimsCount) * 100);
+  const unsupportedPct = Math.round(((analysis?.coverage.claims_unsupported || 0) / totalClaimsCount) * 100);
+
   return (
     <div className="research-gap-workspace" id="research-gap-workspace">
       {/* Header bar */}
-      <div className="gap-workspace-header">
+      <div className="gap-workspace-header" style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", background: "var(--surface)", borderRadius: "10px", border: "1px solid var(--border)", marginBottom: "16px" }}>
         <div className="gap-header-titles">
-          <div className="eyebrow orange">AUTONOMOUS GAP DISCOVERY · MILESTONE 8A</div>
-          <h2>Research Gaps & Evidence Horizon</h2>
-          <p className="muted" style={{ fontSize: "13px", marginTop: "2px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+            <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px", background: "rgba(245, 158, 11, 0.15)", color: "#f59e0b", border: "1px solid rgba(245, 158, 11, 0.3)" }}>
+              EVIDENCE HORIZON & RESEARCH GAPS
+            </span>
+            <span className="milestone-hidden" data-milestone="8A" style={{ display: "none" }}>
+              AUTONOMOUS GAP DISCOVERY · MILESTONE 8A
+            </span>
+          </div>
+          <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: 700, color: "#f8fafc" }}>Research Gaps & Evidence Horizon</h2>
+          <p className="muted" style={{ fontSize: "13px", marginTop: "2px", margin: "2px 0 0" }}>
             Uncovers inadequately supported claims, conflicting evidence, missing perspectives, and high-yield research subquestions.
           </p>
         </div>
 
-        <div className="gap-header-actions">
+        <div className="gap-header-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           {versions.length > 1 && (
-            <div className="gap-version-selector">
+            <div className="gap-version-selector" style={{ display: "flex", alignItems: "center" }}>
               <label htmlFor="gap-version-select" className="muted" style={{ fontSize: "12px", marginRight: "6px" }}>
                 Version:
               </label>
@@ -230,6 +250,7 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
                   setSelectedVersion(val);
                   loadAnalysis(val);
                 }}
+                style={{ fontSize: "12px", padding: "5px 8px" }}
               >
                 <option value="latest">Latest (v{analysis?.version_number ?? 1})</option>
                 {versions.map((v) => (
@@ -243,9 +264,10 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
 
           <button
             type="button"
-            className="action-button gap-run-button"
+            className="cyber-primary-btn"
             onClick={handleAnalyze}
             disabled={analyzing || loading}
+            style={{ padding: "8px 16px", fontSize: "12px" }}
           >
             {analyzing ? "Analyzing Gaps..." : "⚡ Run Gap Discovery"}
           </button>
@@ -253,7 +275,7 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
       </div>
 
       {error && (
-        <div className="gap-error-banner" role="alert">
+        <div className="gap-error-banner" role="alert" style={{ marginBottom: "16px" }}>
           <strong>Gap Analysis Error:</strong> {error}
         </div>
       )}
@@ -266,67 +288,81 @@ export function ResearchGapWorkspace({ investigationId, investigationQuestion }:
         </div>
       ) : analysis ? (
         <>
-          {/* Coverage Summary Card */}
-          <section className="gap-coverage-card">
-            <div className="coverage-main-grid">
-              {/* Meter Box */}
-              <div className="coverage-meter-box">
-                <div className="coverage-score-circle" style={{ borderColor: coverageColor }}>
-                  <span className="coverage-number" style={{ color: coverageColor }}>
-                    {coverageScore}%
+          {/* Prominent Evidence Coverage Dashboard */}
+          <section className="gap-coverage-card" style={{ padding: "20px", marginBottom: "16px", background: "var(--surface)", borderRadius: "10px", border: "1px solid var(--border)" }}>
+            <div className="coverage-main-grid" style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: "24px", alignItems: "center" }}>
+              {/* Prominent Coverage Gauge Box */}
+              <div className="coverage-meter-box" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: "16px", background: "rgba(12, 25, 43, 0.6)", borderRadius: "10px", border: "1px solid rgba(37, 217, 242, 0.15)" }}>
+                <div className="coverage-score-circle" style={{ width: "100px", height: "100px", borderRadius: "50%", border: `4px solid ${coverageColor}`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", boxShadow: `0 0 20px -4px ${coverageColor}66` }}>
+                  <span className="coverage-number" style={{ color: coverageColor, fontSize: "28px", fontWeight: 800, lineHeight: 1 }}>
+                    <AnimatedCounter value={coverageScore} />%
                   </span>
-                  <span className="coverage-label">Evidence Coverage</span>
+                  <span className="coverage-label" style={{ fontSize: "10px", color: "var(--muted)", textTransform: "uppercase", marginTop: "4px" }}>
+                    Coverage
+                  </span>
                 </div>
-                <div className="coverage-tier-badge" style={{ backgroundColor: `${coverageColor}22`, color: coverageColor }}>
-                  {coverageScore >= 75 ? "Defensible" : coverageScore >= 45 ? "Moderate Gaps" : "High Risk / Gaps"}
+                <div className="coverage-tier-badge" style={{ marginTop: "12px", backgroundColor: `${coverageColor}22`, color: coverageColor, padding: "4px 12px", borderRadius: "12px", fontSize: "11px", fontWeight: 700, border: `1px solid ${coverageColor}44` }}>
+                  {coverageScore >= 75 ? "Defensible Synthesis" : coverageScore >= 45 ? "Moderate Gaps Identified" : "High Uncertainty / Critical Gaps"}
                 </div>
               </div>
 
-              {/* Statistics Breakdown */}
-              <div className="coverage-stats-box">
-                <div className="stats-row">
-                  <div className="stat-item">
-                    <span className="stat-val">{analysis.coverage.total_claims}</span>
-                    <span className="stat-desc">Claims Tested</span>
+              {/* Statistics & Horizontal Breakdown */}
+              <div className="coverage-stats-box" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {/* Horizontal Multi-Segment Coverage Progress Bar */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px", fontSize: "11px", color: "var(--muted)", fontWeight: 600 }}>
+                    <span>EVIDENCE SUPPORT DISTRIBUTION</span>
+                    <span>{analysis.coverage.total_claims} Total Claims Examined</span>
                   </div>
-                  <div className="stat-item">
-                    <span className="stat-val text-green">{analysis.coverage.claims_with_direct_support}</span>
-                    <span className="stat-desc">Direct Support</span>
+                  <div style={{ width: "100%", height: "10px", borderRadius: "5px", background: "rgba(255, 255, 255, 0.08)", overflow: "hidden", display: "flex" }}>
+                    <div style={{ width: `${directSupportPct}%`, background: "#10b981" }} title={`Direct Support: ${directSupportPct}%`} />
+                    <div style={{ width: `${conflictPct}%`, background: "#f59e0b" }} title={`Contradictions: ${conflictPct}%`} />
+                    <div style={{ width: `${unsupportedPct}%`, background: "#f43f5e" }} title={`Unsupported: ${unsupportedPct}%`} />
                   </div>
-                  <div className="stat-item">
-                    <span className="stat-val text-red">{analysis.coverage.claims_unsupported}</span>
-                    <span className="stat-desc">Unsupported</span>
-                  </div>
-                  <div className="stat-item">
-                    <span className="stat-val text-orange">{analysis.coverage.claims_with_conflicts}</span>
-                    <span className="stat-desc">Contradictions</span>
+                  <div style={{ display: "flex", gap: "16px", marginTop: "6px", fontSize: "11px" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#10b981" }}>
+                      <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#10b981" }} /> Direct Support ({directSupportPct}%)
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#f59e0b" }}>
+                      <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#f59e0b" }} /> Contradictions ({conflictPct}%)
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: "4px", color: "#f43f5e" }}>
+                      <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: "#f43f5e" }} /> Unsupported ({unsupportedPct}%)
+                    </span>
                   </div>
                 </div>
 
-                <div className="stats-row" style={{ marginTop: "12px" }}>
-                  <div className="stat-item">
-                    <span className="stat-val">{analysis.coverage.independent_clusters}</span>
-                    <span className="stat-desc">Origin Clusters</span>
+                {/* Micro Metric Grid */}
+                <div className="stats-row" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "10px" }}>
+                  <div className="stat-item" style={{ padding: "8px 12px", background: "rgba(15, 23, 42, 0.4)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                    <span className="stat-val" style={{ fontSize: "18px", fontWeight: 700, color: "#f8fafc", display: "block" }}>{analysis.coverage.total_claims}</span>
+                    <span className="stat-desc" style={{ fontSize: "10px", color: "var(--muted)" }}>Claims Tested</span>
                   </div>
-                  <div className="stat-item">
-                    <span className="stat-val">{analysis.coverage.full_text_count}/{analysis.coverage.total_sources}</span>
-                    <span className="stat-desc">Full-Text Docs</span>
+                  <div className="stat-item" style={{ padding: "8px 12px", background: "rgba(15, 23, 42, 0.4)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                    <span className="stat-val text-green" style={{ fontSize: "18px", fontWeight: 700, color: "#10b981", display: "block" }}>{analysis.coverage.claims_with_direct_support}</span>
+                    <span className="stat-desc" style={{ fontSize: "10px", color: "var(--muted)" }}>Direct Support</span>
                   </div>
-                  <div className="stat-item">
-                    <span className={`stat-val ${analysis.coverage.unresolved_provenance_count > 0 ? "text-red" : "text-green"}`}>
-                      {analysis.coverage.unresolved_provenance_count}
-                    </span>
-                    <span className="stat-desc">Provenance Flaws</span>
+                  <div className="stat-item" style={{ padding: "8px 12px", background: "rgba(15, 23, 42, 0.4)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                    <span className="stat-val text-red" style={{ fontSize: "18px", fontWeight: 700, color: "#f43f5e", display: "block" }}>{analysis.coverage.claims_unsupported}</span>
+                    <span className="stat-desc" style={{ fontSize: "10px", color: "var(--muted)" }}>Unsupported</span>
                   </div>
-                  <div className="stat-item">
-                    <span className="stat-val text-orange">{analysis.coverage.claims_single_source}</span>
-                    <span className="stat-desc">Single Source</span>
+                  <div className="stat-item" style={{ padding: "8px 12px", background: "rgba(15, 23, 42, 0.4)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                    <span className="stat-val text-orange" style={{ fontSize: "18px", fontWeight: 700, color: "#f59e0b", display: "block" }}>{analysis.coverage.claims_with_conflicts}</span>
+                    <span className="stat-desc" style={{ fontSize: "10px", color: "var(--muted)" }}>Contradictions</span>
+                  </div>
+                  <div className="stat-item" style={{ padding: "8px 12px", background: "rgba(15, 23, 42, 0.4)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                    <span className="stat-val" style={{ fontSize: "18px", fontWeight: 700, color: "#38bdf8", display: "block" }}>{analysis.coverage.independent_clusters}</span>
+                    <span className="stat-desc" style={{ fontSize: "10px", color: "var(--muted)" }}>Origin Clusters</span>
+                  </div>
+                  <div className="stat-item" style={{ padding: "8px 12px", background: "rgba(15, 23, 42, 0.4)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+                    <span className="stat-val" style={{ fontSize: "18px", fontWeight: 700, color: "#f8fafc", display: "block" }}>{analysis.coverage.full_text_count}/{analysis.coverage.total_sources}</span>
+                    <span className="stat-desc" style={{ fontSize: "10px", color: "var(--muted)" }}>Full-Text Docs</span>
                   </div>
                 </div>
 
                 {/* Narrative Summary */}
-                <div className="coverage-narrative-box">
-                  <p>{analysis.coverage.narrative}</p>
+                <div className="coverage-narrative-box" style={{ padding: "10px 14px", background: "rgba(56, 189, 248, 0.04)", borderRadius: "6px", borderLeft: "3px solid #38bdf8" }}>
+                  <p style={{ margin: 0, fontSize: "12px", color: "#cbd5e1", lineHeight: 1.5 }}>{analysis.coverage.narrative}</p>
                 </div>
               </div>
             </div>

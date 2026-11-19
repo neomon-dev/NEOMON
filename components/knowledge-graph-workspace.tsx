@@ -31,6 +31,13 @@ import {
   type KnowledgeNodeData,
 } from "@/lib/graph";
 import type { InvestigationSummary } from "@/lib/workspace";
+import {
+  SpotlightCard,
+  AnimatedCounter,
+  DecryptedText,
+  PulseIndicator,
+  RevealSection,
+} from "@/components/motion";
 
 const nodeTypes = { knowledgeNode: KnowledgeGraphNode };
 
@@ -274,8 +281,14 @@ function GraphCanvasInner() {
     <>
       <header className="topbar">
         <div>
-          <p className="eyebrow">Evidence Intelligence Workspace</p>
-          <h1>Knowledge Graph</h1>
+          <p className="eyebrow" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <PulseIndicator status="active" />
+            <DecryptedText text="EVIDENCE NETWORK // SYNAPTIC_GRAPH" speed={25} />
+          </p>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span style={{ color: "#25D9F2" }}>⌘</span>
+            Knowledge Graph Architecture
+          </h1>
         </div>
         <div className="analysis-actions">
           {graphData?.investigation_id && (
@@ -283,39 +296,69 @@ function GraphCanvasInner() {
               Open investigation
             </Link>
           )}
-          <Link className="primary-button" href="/investigations/new">
+          <Link className="cyber-primary-btn" href="/investigations/new">
             + New investigation
           </Link>
         </div>
       </header>
 
       <div className="content">
-        <div className="metric-grid">
-          <article className="metric-card">
-            <span className="metric-label">Visible nodes</span>
-            <strong>{flowNodes.length}</strong>
-            <span className="metric-detail">
-              Total persisted claims: {graphData?.total_counts.claims ?? 0} · evidence: {graphData?.total_counts.evidence ?? 0}
-            </span>
-          </article>
-          <article className="metric-card">
-            <span className="metric-label">Persisted edges</span>
-            <strong>{flowEdges.length}</strong>
-            <span className="metric-detail">Zero fabricated links or similarity guesses</span>
-          </article>
-          <article className="metric-card">
-            <span className="metric-label">Search highlights</span>
-            <strong>{matchedNodeIds.length}</strong>
-            <span className="metric-detail">Matches across visible graph labels & claims</span>
-          </article>
-          <article className="metric-card">
-            <span className="metric-label">Graph coverage</span>
-            <strong>{graphData?.truncated ? "Bounded slice" : "Complete"}</strong>
-            <span className="metric-detail">
-              {graphData?.total_counts.sources ?? 0} sources · {graphData?.total_counts.documents ?? 0} documents
-            </span>
-          </article>
-        </div>
+        <RevealSection delay={0.08}>
+          <div className="metric-grid">
+            <SpotlightCard spotlightColor="rgba(37, 217, 242, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Visible nodes</span>
+                <span style={{ fontSize: "15px", color: "#25D9F2" }}>⌘</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+                  <AnimatedCounter value={flowNodes.length} />
+                </strong>
+                <span className="metric-detail">
+                  Total persisted claims: {graphData?.total_counts.claims ?? 0} · evidence: {graphData?.total_counts.evidence ?? 0}
+                </span>
+              </div>
+            </SpotlightCard>
+            <SpotlightCard spotlightColor="rgba(39, 135, 255, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Persisted edges</span>
+                <span style={{ fontSize: "15px", color: "#2787FF" }}>🔗</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+                  <AnimatedCounter value={flowEdges.length} />
+                </strong>
+                <span className="metric-detail">Directional evidence flows and citations</span>
+              </div>
+            </SpotlightCard>
+            <SpotlightCard spotlightColor="rgba(133, 100, 255, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Search highlights</span>
+                <span style={{ fontSize: "15px", color: "#8564FF" }}>🔍</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+                  <AnimatedCounter value={matchedNodeIds.length} />
+                </strong>
+                <span className="metric-detail">Matches across visible graph labels & claims</span>
+              </div>
+            </SpotlightCard>
+            <SpotlightCard spotlightColor="rgba(53, 224, 177, 0.15)">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
+                <span className="metric-label">Graph coverage</span>
+                <span style={{ fontSize: "15px", color: "#35E0B1" }}>🌐</span>
+              </div>
+              <div style={{ padding: "0 18px 16px" }}>
+                <strong style={{ fontSize: "24px", color: "#ECF5FF", display: "block", margin: "6px 0" }}>
+                  {graphData?.truncated ? "Bounded slice" : "Complete"}
+                </strong>
+                <span className="metric-detail">
+                  {graphData?.total_counts.sources ?? 0} sources · {graphData?.total_counts.documents ?? 0} documents
+                </span>
+              </div>
+            </SpotlightCard>
+          </div>
+        </RevealSection>
 
         <section className="panel" style={{ marginTop: 18 }}>
           <div className="workspace-toolbar">
@@ -445,16 +488,16 @@ function GraphCanvasInner() {
                     setSelectedEdgeId(null);
                   }}
                 >
-                  <Background color="#1d2b44" gap={22} size={1} />
+                  <Background color="#25D9F2" gap={24} size={1.2} style={{ opacity: 0.18 }} />
                   <Controls />
                   <MiniMap
-                    maskColor="#090d16aa"
+                    maskColor="rgba(5, 9, 20, 0.85)"
                     nodeColor={(node) => {
                       const data = node.data as KnowledgeNodeData | undefined;
-                      return data ? NODE_TYPE_META[data.type]?.accent ?? "#4b9dff" : "#4b9dff";
+                      return data ? NODE_TYPE_META[data.type]?.accent ?? "#25D9F2" : "#25D9F2";
                     }}
                     pannable
-                    style={{ background: "#0b111e", border: "1px solid #223049" }}
+                    style={{ background: "#050914", border: "1px solid rgba(37, 217, 242, 0.25)", borderRadius: "8px" }}
                     zoomable
                   />
                 </ReactFlow>
