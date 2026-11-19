@@ -66,22 +66,26 @@ export function CinematicIntro() {
     };
     window.addEventListener("keydown", handleKeyDown);
 
-    // Ensure audio is immediately unmuted on the very first user interaction
+    // Ensure audio is immediately active and unmuted on the earliest possible user interaction
     const handleFirstGesture = () => {
-      if (videoRef.current && videoRef.current.muted) {
+      if (videoRef.current) {
         videoRef.current.muted = false;
         videoRef.current.volume = 1.0;
         setIsMuted(false);
         setAutoplayBlocked(false);
       }
     };
-    window.addEventListener("pointerdown", handleFirstGesture, { passive: true });
-    window.addEventListener("touchstart", handleFirstGesture, { passive: true });
+    window.addEventListener("pointermove", handleFirstGesture, { once: true, passive: true });
+    window.addEventListener("pointerdown", handleFirstGesture, { once: true, passive: true });
+    window.addEventListener("touchstart", handleFirstGesture, { once: true, passive: true });
+    window.addEventListener("focus", handleFirstGesture, { once: true, passive: true });
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("pointermove", handleFirstGesture);
       window.removeEventListener("pointerdown", handleFirstGesture);
       window.removeEventListener("touchstart", handleFirstGesture);
+      window.removeEventListener("focus", handleFirstGesture);
       if (completeTimerRef.current) {
         clearTimeout(completeTimerRef.current);
       }
@@ -100,17 +104,31 @@ export function CinematicIntro() {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            // Unmuted playback allowed directly
+            // Direct unmuted playback succeeded
             setIsMuted(false);
             setAutoplayBlocked(false);
           })
           .catch((err) => {
-            // Browser policy prevented unmuted autoplay; fall back to muted and notify user
-            console.warn("Unmuted autoplay restricted by browser policy; falling back to muted:", err);
+            // Browser policy delayed unmuted playback until interaction: start playback visually,
+            // keep the button in UNMUTED state ("🔊 SOUND ON") at start, and unmute on earliest motion.
+            console.warn("Autoplay policy delayed unmuted audio:", err);
             video.muted = true;
-            setIsMuted(true);
-            setAutoplayBlocked(true);
             video.play().catch(() => {});
+            setIsMuted(false);
+            setAutoplayBlocked(false);
+
+            const activateSound = () => {
+              if (videoRef.current) {
+                videoRef.current.muted = false;
+                videoRef.current.volume = 1.0;
+                setIsMuted(false);
+              }
+            };
+            window.addEventListener("pointermove", activateSound, { once: true, passive: true });
+            window.addEventListener("pointerdown", activateSound, { once: true, passive: true });
+            window.addEventListener("keydown", activateSound, { once: true, passive: true });
+            window.addEventListener("touchstart", activateSound, { once: true, passive: true });
+            window.addEventListener("focus", activateSound, { once: true, passive: true });
           });
       }
     }
