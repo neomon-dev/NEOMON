@@ -9,7 +9,6 @@ export function CinematicIntro() {
   const [isFadingOut, setIsFadingOut] = useState(false);
   const [hasVideoError, setHasVideoError] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
-  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const completeTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -20,17 +19,13 @@ export function CinematicIntro() {
     }, 550);
   }, []);
 
-  const toggleSound = useCallback((e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation();
-    }
+  const toggleSound = useCallback(() => {
     if (videoRef.current) {
       const targetMuted = !videoRef.current.muted;
       videoRef.current.muted = targetMuted;
       videoRef.current.volume = 1.0;
       setIsMuted(targetMuted);
       if (!targetMuted) {
-        setAutoplayBlocked(false);
         videoRef.current.play().catch(() => {});
       }
     }
@@ -72,7 +67,6 @@ export function CinematicIntro() {
         videoRef.current.muted = false;
         videoRef.current.volume = 1.0;
         setIsMuted(false);
-        setAutoplayBlocked(false);
       }
     };
     window.addEventListener("pointermove", handleFirstGesture, { once: true, passive: true });
@@ -106,16 +100,14 @@ export function CinematicIntro() {
           .then(() => {
             // Direct unmuted playback succeeded
             setIsMuted(false);
-            setAutoplayBlocked(false);
           })
           .catch((err) => {
             // Browser policy delayed unmuted playback until interaction: start playback visually,
-            // keep the button in UNMUTED state ("🔊 SOUND ON") at start, and unmute on earliest motion.
+            // and unmute on earliest motion.
             console.warn("Autoplay policy delayed unmuted audio:", err);
             video.muted = true;
             video.play().catch(() => {});
             setIsMuted(false);
-            setAutoplayBlocked(false);
 
             const activateSound = () => {
               if (videoRef.current) {
@@ -154,7 +146,6 @@ export function CinematicIntro() {
       role="dialog"
       aria-modal="true"
       aria-label="NEOMON Intro Experience"
-      onClick={isMuted ? toggleSound : undefined}
       style={{
         position: "fixed",
         inset: 0,
@@ -167,7 +158,7 @@ export function CinematicIntro() {
         transition: "opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
         pointerEvents: isFadingOut ? "none" : "auto",
         overflow: "hidden",
-        cursor: isMuted ? "pointer" : "default",
+        cursor: "default",
       }}
     >
       {/* Subtle background glow */}
@@ -196,44 +187,6 @@ export function CinematicIntro() {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Sound toggle button */}
-        <button
-          type="button"
-          onClick={toggleSound}
-          aria-label={isMuted ? "Unmute Audio" : "Mute Audio"}
-          style={{
-            background: isMuted ? "rgba(8, 47, 73, 0.85)" : "rgba(8, 126, 171, 0.6)",
-            border: isMuted ? "1px solid rgba(54, 197, 222, 0.6)" : "1px solid rgba(54, 197, 222, 0.4)",
-            backdropFilter: "blur(8px)",
-            color: "#F5FAFC",
-            fontSize: "12px",
-            fontWeight: 600,
-            letterSpacing: "0.08em",
-            padding: "8px 16px",
-            borderRadius: "20px",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            transition: "all 0.2s ease",
-            boxShadow: isMuted
-              ? "0 0 20px rgba(54, 197, 222, 0.35)"
-              : "0 0 15px rgba(54, 197, 222, 0.15)",
-            animation: autoplayBlocked ? "soundPulseNotice 1.5s ease-in-out infinite" : "none",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = "rgba(54, 197, 222, 0.9)";
-            e.currentTarget.style.transform = "translateY(-1px)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = isMuted ? "rgba(54, 197, 222, 0.6)" : "rgba(54, 197, 222, 0.4)";
-            e.currentTarget.style.transform = "translateY(0)";
-          }}
-        >
-          <span>{isMuted ? "🔇 UNMUTE AUDIO" : "🔊 SOUND ON"}</span>
-          <span style={{ fontSize: "10px", opacity: 0.6, fontFamily: "monospace" }}>[M]</span>
-        </button>
-
         {/* Skip button */}
         <button
           type="button"
