@@ -12,7 +12,7 @@ from app.auth.dependencies import get_current_user
 from app.schemas_m12 import BenchmarkDatasetResponse, BenchmarkRunResponse
 from app.benchmarks.service import BenchmarkService
 
-router = APIRouter(prefix="/api/v1/benchmarks", tags=["benchmarks"])
+router = APIRouter(prefix="/benchmarks", tags=["benchmarks"])
 
 
 def _to_dataset_response(b: BenchmarkDataset) -> BenchmarkDatasetResponse:

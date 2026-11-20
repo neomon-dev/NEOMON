@@ -12,7 +12,7 @@ from app.collaboration.permission_service import PermissionService
 from app.schemas_m12 import MethodologyAuditFindingResponse
 from app.analysis.methodology_audit_service import MethodologyAuditService
 
-router = APIRouter(prefix="/api/v1/research/investigations/{investigation_id}/methodology-audit", tags=["methodology-audit"])
+router = APIRouter(prefix="/research/investigations/{investigation_id}/methodology-audit", tags=["methodology-audit"])
 
 
 def _to_response(f: MethodologyAuditFinding) -> MethodologyAuditFindingResponse:

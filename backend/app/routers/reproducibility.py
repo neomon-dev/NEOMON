@@ -13,7 +13,7 @@ from app.collaboration.permission_service import PermissionService
 from app.schemas_m12 import ManifestIntegrityResponse, ResearchExecutionManifestResponse
 from app.research.reproducibility_service import ReproducibilityService
 
-router = APIRouter(prefix="/api/v1/research/investigations/{investigation_id}/reproducibility", tags=["reproducibility"])
+router = APIRouter(prefix="/research/investigations/{investigation_id}/reproducibility", tags=["reproducibility"])
 
 
 def _to_response(m: ResearchExecutionManifest) -> ResearchExecutionManifestResponse:

@@ -15,6 +15,7 @@ router = APIRouter(tags=["health"])
 _START_TIME = time.time()
 
 
+@router.get("/", response_model=HealthResponse)
 @router.get("/health", response_model=HealthResponse)
 async def health() -> HealthResponse:
     """Liveness probe indicating process is active."""

@@ -7,7 +7,7 @@ import { ResearchGapWorkspace } from "@/components/research-gap-workspace";
 import { ScientificReliabilityWorkspace } from "@/components/scientific-reliability-workspace";
 import { CollaborationPanel } from "@/components/collaboration-panel";
 import { AtmosphericAurora } from "@/components/animated-neural-background";
-import { apiBaseUrl, requestJson } from "../../../lib/api";
+import { apiBaseUrl, requestJson, resolveApiUrl } from "../../../lib/api";
 
 type Investigation = {
   id: string;
@@ -460,7 +460,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
       const cursorParam = lastEventIdRef.current
         ? `&last_event_id=${encodeURIComponent(lastEventIdRef.current)}`
         : "";
-      source = new EventSource(`${apiBaseUrl}/events?investigation_id=${id}${cursorParam}${ticketParam}`, {
+      source = new EventSource(`${resolveApiUrl("/events")}?investigation_id=${id}${cursorParam}${ticketParam}`, {
         withCredentials: true,
       });
       source.onopen = () => {
@@ -793,7 +793,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
       const token = typeof window !== "undefined" ? localStorage.getItem("neomon_session_token") : null;
       const headers: HeadersInit = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(`${apiBaseUrl}/research/investigations/${investigation.id}/export/${endpoint}`, {
+      const res = await fetch(resolveApiUrl(`/research/investigations/${investigation.id}/export/${endpoint}`), {
         headers,
         credentials: "include",
       });

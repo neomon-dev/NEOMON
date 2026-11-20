@@ -20,7 +20,7 @@ from app.collaboration.schemas import (
     ActivityResponse,
 )
 
-router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
+router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
 
 @router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)

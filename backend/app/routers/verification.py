@@ -13,7 +13,7 @@ from app.collaboration.permission_service import PermissionService
 from app.schemas_m12 import ChallengeCorrectionRequest, EvidenceVerificationRecordResponse
 from app.analysis.evidence_verification_service import EvidenceVerificationService
 
-router = APIRouter(prefix="/api/v1/research/investigations/{investigation_id}/verification", tags=["verification"])
+router = APIRouter(prefix="/research/investigations/{investigation_id}/verification", tags=["verification"])
 
 
 def _to_response(rec: EvidenceVerificationRecord) -> EvidenceVerificationRecordResponse:

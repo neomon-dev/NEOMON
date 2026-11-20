@@ -29,7 +29,7 @@ from app.collaboration.schemas import (
     NotificationPreferenceUpdateRequest,
 )
 
-router = APIRouter(prefix="/api/v1/collaboration", tags=["collaboration"])
+router = APIRouter(prefix="/collaboration", tags=["collaboration"])
 
 
 # ==========================================
