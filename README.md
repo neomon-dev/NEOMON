@@ -16,6 +16,8 @@
 ## Sign in email and password
 Email: auditor_qa@neomon.ai or admin@neomon.ai
 Password: Password123!
+## OR
+Register
 
 ## Table of Contents
 
