@@ -12,7 +12,7 @@ from app.collaboration.permission_service import PermissionService
 from app.schemas_m12 import HumanEvidenceCorrectionCreate, HumanEvidenceCorrectionResponse
 from app.analysis.human_review_service import HumanReviewService
 
-router = APIRouter(prefix="/api/v1/research/investigations/{investigation_id}/corrections", tags=["corrections"])
+router = APIRouter(prefix="/research/investigations/{investigation_id}/corrections", tags=["corrections"])
 
 
 def _to_response(c: HumanEvidenceCorrection) -> HumanEvidenceCorrectionResponse:

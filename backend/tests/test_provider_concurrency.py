@@ -88,7 +88,8 @@ async def test_lm_studio_simultaneous_calls_execute_sequentially_and_cap_at_one(
         max_active = max(max_active, active)
         try:
             await asyncio.sleep(0.02)
-            req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+            url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+            req = httpx.Request(method, url)
             return httpx.Response(
                 200,
                 json={"choices": [{"message": {"content": json.dumps({"idx": idx})}}], "usage": {}},
@@ -131,7 +132,8 @@ async def test_ollama_maximum_active_inference_never_exceeds_one():
         max_active = max(max_active, active)
         try:
             await asyncio.sleep(0.02)
-            req = httpx.Request(method, f"http://127.0.0.1:11434{path}")
+            url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:11434{path}"
+            req = httpx.Request(method, url)
             return httpx.Response(
                 200,
                 json={"model": "qwen2.5:7b", "message": {"content": "{}"}, "prompt_eval_count": 1, "eval_count": 1},
@@ -163,12 +165,14 @@ async def test_unrelated_providers_execute_independently_without_blocking():
         lm_entered.set()
         await lm_release.wait()
         completion_order.append("lm_studio")
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]}, request=req)
 
     async def ollama_request(method: str, path: str, **kwargs):
         completion_order.append("ollama")
-        req = httpx.Request(method, f"http://127.0.0.1:11434{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:11434{path}"
+        req = httpx.Request(method, url)
         return httpx.Response(200, json={"message": {"content": "{}"}}, request=req)
 
     async def remote_request(method: str, path: str, **kwargs):
@@ -214,7 +218,8 @@ async def test_queue_releases_after_provider_error():
     async def fake_request(method: str, path: str, **kwargs):
         nonlocal calls
         calls += 1
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         if calls == 1:
             return httpx.Response(500, request=req)
         return httpx.Response(200, json={"choices": [{"message": {"content": json.dumps({"ok": True})}}]}, request=req)
@@ -327,7 +332,8 @@ async def test_queue_wait_timeout_and_inference_read_timeout_are_separate():
     async def slow_then_fast(method: str, path: str, **kwargs):
         nonlocal call_idx
         call_idx += 1
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         if call_idx == 1:
             await asyncio.sleep(0.08)  # longer than 0.05s, simulated as completed response
         else:
@@ -471,7 +477,8 @@ async def test_multi_agent_analysis_tracks_waiting_generating_and_completes_sequ
         try:
             await asyncio.sleep(0.01)
             payload = build_payload(kwargs["json"]["messages"])
-            req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+            url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+            req = httpx.Request(method, url)
             return httpx.Response(
                 200,
                 json={"choices": [{"message": {"content": json.dumps(payload)}}], "usage": {"total_tokens": 10}},
@@ -555,7 +562,8 @@ async def test_cancelling_queued_multi_agent_analysis_marks_executions_cancelled
 
     async def fake_httpx_request(self, method: str, path: str, **kwargs):
         sys_msg = kwargs["json"]["messages"][0]["content"]
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         if "claims array" in sys_msg:
             return httpx.Response(
                 200,

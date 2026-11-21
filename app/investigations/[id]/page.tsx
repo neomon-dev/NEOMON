@@ -7,7 +7,7 @@ import { ResearchGapWorkspace } from "@/components/research-gap-workspace";
 import { ScientificReliabilityWorkspace } from "@/components/scientific-reliability-workspace";
 import { CollaborationPanel } from "@/components/collaboration-panel";
 import { AtmosphericAurora } from "@/components/animated-neural-background";
-import { apiBaseUrl, requestJson } from "../../../lib/api";
+import { apiBaseUrl, requestJson, resolveApiUrl } from "../../../lib/api";
 
 type Investigation = {
   id: string;
@@ -99,6 +99,9 @@ type AgentExecution = {
   queue_wait_seconds?: number | null;
   inference_duration_seconds?: number | null;
   queue_position?: number | null;
+  execution_device?: string | null;
+  tokens_per_second?: number | null;
+  ttft_ms?: number | null;
 };
 
 type ClaimAnalysis = {
@@ -460,7 +463,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
       const cursorParam = lastEventIdRef.current
         ? `&last_event_id=${encodeURIComponent(lastEventIdRef.current)}`
         : "";
-      source = new EventSource(`${apiBaseUrl}/events?investigation_id=${id}${cursorParam}${ticketParam}`, {
+      source = new EventSource(`${resolveApiUrl("/events")}?investigation_id=${id}${cursorParam}${ticketParam}`, {
         withCredentials: true,
       });
       source.onopen = () => {
@@ -793,7 +796,7 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
       const token = typeof window !== "undefined" ? localStorage.getItem("neomon_session_token") : null;
       const headers: HeadersInit = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      const res = await fetch(`${apiBaseUrl}/research/investigations/${investigation.id}/export/${endpoint}`, {
+      const res = await fetch(resolveApiUrl(`/research/investigations/${investigation.id}/export/${endpoint}`), {
         headers,
         credentials: "include",
       });
@@ -1518,7 +1521,14 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
                             </span>
                           </div>
                           <small style={{ fontSize: "11px", color: "#94a3b8" }}>
+                            {execution.execution_device ? (
+                              <span style={{ color: "#38bdf8", marginRight: "4px", fontWeight: 600 }}>
+                                [{execution.execution_device}]
+                              </span>
+                            ) : null}
                             {execution.model ?? "rule_based"}
+                            {execution.tokens_per_second ? ` · ${execution.tokens_per_second.toFixed(1)} tok/s` : ""}
+                            {execution.ttft_ms ? ` · ttft ${execution.ttft_ms.toFixed(0)}ms` : ""}
                             {execution.queue_wait_seconds ? ` · wait ${execution.queue_wait_seconds.toFixed(1)}s` : ""}
                             {execution.inference_duration_seconds ? ` · gen ${execution.inference_duration_seconds.toFixed(1)}s` : ""}
                             {execution.error_message ? ` · ${execution.error_message}` : ""}

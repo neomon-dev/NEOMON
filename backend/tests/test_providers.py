@@ -4,7 +4,11 @@ from unittest.mock import AsyncMock, patch
 import httpx
 import pytest
 
-from app.providers.base import ProviderRequestError, validate_provider_endpoint
+from app.providers.base import (
+    ProviderRequestError,
+    resolve_endpoint_url,
+    validate_provider_endpoint,
+)
 from app.providers.ollama import OllamaProvider
 from app.providers.openai_compatible import OpenAICompatibleProvider
 from app.schemas import ProviderConfigRequest, ProviderKind
@@ -225,3 +229,140 @@ def test_provider_test_and_analysis_use_consistent_local_runtime_validation(clie
     assert ok_resp.status_code == 200
     assert ok_resp.json()["connected"] is True
     assert ok_resp.json()["models"] == ["qwen2.5-7b"]
+
+
+def test_resolve_endpoint_url_variations():
+    """Verify endpoint resolution with and without trailing slash, deduplicating /v1 and supporting root fallbacks."""
+    # 1. Base ending with /v1
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1", "/v1/models") == "http://127.0.0.1:8000/v1/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1/", "/v1/models") == "http://127.0.0.1:8000/v1/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1", "v1/models") == "http://127.0.0.1:8000/v1/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1", "/v1/chat/completions") == "http://127.0.0.1:8000/v1/chat/completions"
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1/", "/v1/chat/completions") == "http://127.0.0.1:8000/v1/chat/completions"
+
+    # 2. Base without /v1
+    assert resolve_endpoint_url("http://127.0.0.1:8000", "/v1/models") == "http://127.0.0.1:8000/v1/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000/", "/v1/models") == "http://127.0.0.1:8000/v1/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000", "/v1/chat/completions") == "http://127.0.0.1:8000/v1/chat/completions"
+
+    # 3. Root fallbacks when server exposes /models or /chat/completions at root
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1", "/models") == "http://127.0.0.1:8000/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1/", "/models") == "http://127.0.0.1:8000/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000", "/models") == "http://127.0.0.1:8000/models"
+    assert resolve_endpoint_url("http://127.0.0.1:8000/v1", "/chat/completions") == "http://127.0.0.1:8000/chat/completions"
+    assert resolve_endpoint_url("http://127.0.0.1:8000", "/chat/completions") == "http://127.0.0.1:8000/chat/completions"
+
+
+@pytest.mark.asyncio
+async def test_openvino_model_discovery_and_chat_completion():
+    """Verify discovery of openvino-qwen3-8b and chat completion."""
+    config = ProviderConfigRequest(
+        kind=ProviderKind.openai_compatible,
+        endpoint="http://127.0.0.1:8000/v1",
+        model="openvino-qwen3-8b",
+        api_key="sk-local",
+        allow_local_runtime=True,
+    )
+    provider = OpenAICompatibleProvider(config)
+
+    # 1. Model discovery returning standard OpenVINO list format
+    discovery_response = httpx.Response(
+        200,
+        json={
+            "object": "list",
+            "data": [
+                {
+                    "id": "openvino-qwen3-8b",
+                    "object": "model",
+                    "created": 1795275322,
+                    "owned_by": "local-openvino",
+                }
+            ],
+        },
+        request=httpx.Request("GET", "http://127.0.0.1:8000/v1/models"),
+    )
+
+    # 2. Chat completion returning Qwen3 output with think tag
+    chat_response = httpx.Response(
+        200,
+        json={
+            "id": "chatcmpl-test123",
+            "object": "chat.completion",
+            "created": 1795275341,
+            "model": "openvino-qwen3-8b",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": "<think>\nSynthesizing evidence.\n</think>\n\nEvidence validated.",
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"prompt_tokens": 15, "completion_tokens": 10, "total_tokens": 25},
+        },
+        request=httpx.Request("POST", "http://127.0.0.1:8000/v1/chat/completions"),
+    )
+
+    async def mock_request(method, url, **kwargs):
+        if "models" in str(url):
+            return discovery_response
+        return chat_response
+
+    provider._client.request = AsyncMock(side_effect=mock_request)
+    try:
+        models = await provider.discover_models()
+        assert "openvino-qwen3-8b" in models
+
+        result = await provider.complete(
+            [{"role": "user", "content": "Analyze findings."}],
+            model="openvino-qwen3-8b",
+        )
+        assert "<think>" in result["content"]
+        assert "Evidence validated." in result["content"]
+        assert result["model"] == "openvino-qwen3-8b"
+        assert result["usage"]["total_tokens"] == 25
+    finally:
+        await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_provider_diagnostic_logging_does_not_leak_api_keys(caplog):
+    """Verify diagnostic logs record URL, method, status, but never leak sensitive API keys."""
+    import logging
+    secret_key = "sk-super-secret-local-credential-do-not-leak"
+    config = ProviderConfigRequest(
+        kind=ProviderKind.openai_compatible,
+        endpoint="http://127.0.0.1:8000/v1",
+        model="openvino-qwen3-8b",
+        api_key=secret_key,
+        allow_local_runtime=True,
+    )
+    provider = OpenAICompatibleProvider(config)
+
+    req = httpx.Request("GET", "http://127.0.0.1:8000/v1/models")
+    res = httpx.Response(200, json={"data": [{"id": "openvino-qwen3-8b"}]}, request=req)
+    provider._client.request = AsyncMock(return_value=res)
+
+    with caplog.at_level(logging.INFO):
+        models = await provider.discover_models()
+
+    assert "openvino-qwen3-8b" in models
+    all_log_text = caplog.text
+    # Sensitive API key must NEVER appear in logs
+    assert secret_key not in all_log_text
+    # Diagnostic request and response URLs and statuses MUST appear
+    assert "http://127.0.0.1:8000/v1/models" in all_log_text
+    assert "Provider request: kind=openai_compatible method=GET url=http://127.0.0.1:8000/v1/models" in all_log_text
+    assert "Provider response: kind=openai_compatible method=GET url=http://127.0.0.1:8000/v1/models status=200" in all_log_text
+    await provider.close()
+
+
+@pytest.mark.asyncio
+async def test_self_referential_port_collision_detection():
+    """Verify endpoint pointing to NEOMON backend's own port is flagged with an actionable error."""
+    # Settings has port=8001
+    with pytest.raises(ProviderRequestError) as exc_info:
+        await validate_provider_endpoint("http://127.0.0.1:8001/v1", ProviderKind.openai_compatible, allow_local_runtime=True)
+    assert "port collision" in str(exc_info.value).lower()

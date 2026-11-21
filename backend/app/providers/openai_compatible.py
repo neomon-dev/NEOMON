@@ -136,6 +136,11 @@ class OpenAICompatibleProvider(AIProvider):
         if not effective_model:
             raise ProviderRequestError("No model specified and could not discover models from OpenAI-compatible provider.")
 
+        effective_max_tokens = kwargs.get("max_tokens") or kwargs.get("max_completion_tokens")
+        if effective_max_tokens is None and response_schema is not None:
+            effective_max_tokens = 2048
+        temperature = kwargs.get("temperature")
+
         candidates = self._response_format_candidates(
             response_schema=response_schema,
             schema_name=schema_name,
@@ -148,10 +153,21 @@ class OpenAICompatibleProvider(AIProvider):
                     "model": effective_model,
                     "messages": messages,
                 }
+                if effective_max_tokens is not None:
+                    body["max_tokens"] = effective_max_tokens
+                    body["max_completion_tokens"] = effective_max_tokens
+                if temperature is not None:
+                    body["temperature"] = temperature
                 if response_format is not None:
                     body["response_format"] = response_format
                 try:
-                    response = await self._request("POST", "/v1/chat/completions", json=body)
+                    try:
+                        response = await self._request("POST", "/v1/chat/completions", json=body)
+                    except ProviderRequestError as exc:
+                        if exc.status_code == 404:
+                            response = await self._request("POST", "/chat/completions", json=body)
+                        else:
+                            raise
                     used_mode = mode
                     break
                 except ProviderRequestError as exc:
@@ -191,6 +207,13 @@ class OpenAICompatibleProvider(AIProvider):
         if not isinstance(content, str):
             raise ProviderRequestError("OpenAI-compatible provider returned no structured message content.")
         usage = data.get("usage") or {}
+        exec_dev = usage.get("execution_device")
+        if not exec_dev:
+            m_lower = (data.get("model") or effective_model or "").lower()
+            if "openvino" in m_lower or "gpu" in m_lower:
+                exec_dev = "Intel Arc GPU"
+            else:
+                exec_dev = "Local Device"
         return {
             "content": content,
             "model": data.get("model") or effective_model,
@@ -200,5 +223,9 @@ class OpenAICompatibleProvider(AIProvider):
                 "prompt_tokens": usage.get("prompt_tokens"),
                 "completion_tokens": usage.get("completion_tokens"),
                 "total_tokens": usage.get("total_tokens"),
+                "ttft_ms": usage.get("ttft_ms"),
+                "tokens_per_second": usage.get("tokens_per_second"),
+                "duration_seconds": usage.get("duration_seconds"),
+                "execution_device": exec_dev,
             },
         }

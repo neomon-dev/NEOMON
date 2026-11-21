@@ -35,6 +35,7 @@ from app.routers import (
     export,
     gaps,
     graph,
+    hardware,
     health,
     hypotheses,
     intelligence,
@@ -128,20 +129,40 @@ def create_app() -> FastAPI:
 
     prefix = f"/api/{settings.api_version}"
 
+    @app.get("/", tags=["health"])
+    async def root():
+        """Root endpoint returning service identity, version, and endpoints."""
+        return {
+            "status": "ok",
+            "service": settings.app_name,
+            "version": settings.api_version,
+            "demo_mode": settings.demo_mode,
+            "docs": "/docs",
+            "health": "/health",
+            "api_prefix": prefix,
+        }
+
     # Liveness, readiness, and metrics mounted at both root and /api/v1
     app.include_router(health.router)
     app.include_router(health.router, prefix=prefix)
 
-    # Core API routers
+    # Core API routers mounted at both /api/v1 and root for maximum client compatibility
     app.include_router(providers.router, prefix=prefix)
+    app.include_router(providers.router)
     app.include_router(agents.router, prefix=prefix)
+    app.include_router(agents.router)
     app.include_router(events.router, prefix=prefix)
     app.include_router(events.router)
     app.include_router(research.router, prefix=prefix)
+    app.include_router(research.router)
     app.include_router(analysis.router, prefix=prefix)
+    app.include_router(analysis.router)
     app.include_router(workspace.router, prefix=prefix)
+    app.include_router(workspace.router)
     app.include_router(graph.router, prefix=prefix)
+    app.include_router(graph.router)
     app.include_router(export.router, prefix=prefix)
+    app.include_router(export.router)
     app.include_router(gaps.router, prefix=prefix)
     app.include_router(gaps.router)
     app.include_router(hypotheses.router, prefix=prefix)
@@ -158,21 +179,35 @@ def create_app() -> FastAPI:
     app.include_router(quality_audit.router)
     app.include_router(autonomous_workflows.router, prefix=prefix)
     app.include_router(autonomous_workflows.router)
+    app.include_router(hardware.router, prefix=prefix)
+    app.include_router(hardware.router)
 
     # M10 & M11 additions
+    app.include_router(auth.router, prefix=prefix)
     app.include_router(auth.router)
+    app.include_router(workspaces.router, prefix=prefix)
     app.include_router(workspaces.router)
+    app.include_router(invitations.router, prefix=prefix)
     app.include_router(invitations.router)
+    app.include_router(collaboration.router, prefix=prefix)
     app.include_router(collaboration.router)
+    app.include_router(jobs.router, prefix=prefix)
     app.include_router(jobs.router)
 
     # M12 Scientific Reliability & Reproducibility additions
+    app.include_router(verification.router, prefix=prefix)
     app.include_router(verification.router)
+    app.include_router(claim_synthesis.router, prefix=prefix)
     app.include_router(claim_synthesis.router)
+    app.include_router(study_independence.router, prefix=prefix)
     app.include_router(study_independence.router)
+    app.include_router(methodology_audit.router, prefix=prefix)
     app.include_router(methodology_audit.router)
+    app.include_router(reproducibility.router, prefix=prefix)
     app.include_router(reproducibility.router)
+    app.include_router(benchmarks.router, prefix=prefix)
     app.include_router(benchmarks.router)
+    app.include_router(corrections.router, prefix=prefix)
     app.include_router(corrections.router)
 
     return app

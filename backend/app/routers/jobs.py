@@ -14,7 +14,7 @@ from app.jobs.service import JobService
 from app.jobs.worker import worker_service
 from app.collaboration.permission_service import PermissionService
 
-router = APIRouter(prefix="/api/v1/jobs", tags=["jobs"])
+router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 def _job_to_response(job: BackgroundJob) -> JobResponse:

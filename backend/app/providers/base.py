@@ -121,6 +121,44 @@ def _is_private_lan(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return False
 
 
+def resolve_endpoint_url(endpoint: str, path: str) -> str:
+    """Deterministically resolve a target path against an endpoint URL without duplicating /v1.
+
+    Guarantees:
+    - Never generates duplicate '/v1/v1/'.
+    - If path starts with '/v1/' and endpoint ends with '/v1', does not duplicate '/v1'.
+    - If path is a root path like '/models' or '/chat/completions' and endpoint ends with '/v1',
+      resolves to the root host path (stripping the trailing /v1).
+    - Preserves custom base paths like '/api/v1', '/custom/v1', etc.
+    """
+    clean_ep = endpoint.strip().rstrip("/")
+    norm_path = path if path.startswith("/") else "/" + path
+    parts = urlsplit(clean_ep)
+    base_path = parts.path
+
+    if base_path.endswith("/v1"):
+        if norm_path == "/v1":
+            resolved_path = base_path
+        elif norm_path.startswith("/v1/"):
+            resolved_path = base_path + norm_path[3:]
+        elif norm_path in {"/models", "/chat/completions"} or norm_path.startswith(("/models/", "/chat/completions/")):
+            parent_base = base_path[:-3]
+            resolved_path = (parent_base + norm_path) if parent_base else norm_path
+        else:
+            resolved_path = base_path + norm_path
+    elif base_path.endswith("/api"):
+        if norm_path == "/api":
+            resolved_path = base_path
+        elif norm_path.startswith("/api/"):
+            resolved_path = base_path + norm_path[4:]
+        else:
+            resolved_path = base_path + norm_path
+    else:
+        resolved_path = (base_path + norm_path) if base_path else norm_path
+
+    return f"{parts.scheme}://{parts.netloc}{resolved_path}"
+
+
 def _format_network_error(exc: Exception, endpoint: str, timeout: float) -> str:
     """Format network and timeout exceptions into actionable diagnostic messages."""
     ep_netloc = urlsplit(endpoint).netloc or endpoint
@@ -228,6 +266,12 @@ async def validate_provider_endpoint(
                 raise ProviderRequestError(
                     "Local runtime hostname resolved to an unauthorized private address."
                 )
+            backend_port = getattr(settings, "port", None)
+            if backend_port is not None and ip.is_loopback and resolved_port == backend_port:
+                raise ProviderRequestError(
+                    f"Provider endpoint points to the NEOMON backend server itself on port {resolved_port} (port collision). "
+                    f"Configure your external local AI model server (e.g. OpenVINO, LM Studio, Ollama) on a separate port from NEOMON."
+                )
         elif ip.is_reserved:
             raise ProviderRequestError("Reserved provider addresses are not allowed.")
 
@@ -272,6 +316,10 @@ class AIProvider(ABC):
             follow_redirects=False,
         )
 
+    def resolve_url(self, path: str) -> str:
+        """Resolve a subpath against the configured endpoint."""
+        return resolve_endpoint_url(self.config.endpoint, path)
+
     def _normalize_path(self, path: str) -> str:
         """Strip duplicate /v1 or /api path prefix if the client base_url already contains it."""
         ep_parts = urlsplit(self.config.endpoint)
@@ -313,15 +361,28 @@ class AIProvider(ABC):
         await self._client.aclose()
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
+        target_url = self.resolve_url(path)
         await validate_provider_endpoint(
-            self.config.endpoint,
+            target_url,
             self.config.kind,
             allow_local_runtime=self.config.allow_local_runtime,
         )
-        target_path = self._normalize_path(path)
+        logger.info(
+            "Provider request: kind=%s method=%s url=%s",
+            self.config.kind.value,
+            method,
+            target_url,
+        )
         for attempt in range(self.config.retry_count + 1):
             try:
-                response = await self._client.request(method, target_path, **kwargs)
+                response = await self._client.request(method, target_url, **kwargs)
+                logger.info(
+                    "Provider response: kind=%s method=%s url=%s status=%s",
+                    self.config.kind.value,
+                    method,
+                    target_url,
+                    response.status_code,
+                )
                 if 300 <= response.status_code < 400:
                     location = response.headers.get("location")
                     if location:
@@ -338,8 +399,17 @@ class AIProvider(ABC):
                 response.raise_for_status()
                 return response
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
+                logger.warning(
+                    "Provider network error: kind=%s method=%s url=%s attempt=%s/%s error=%s",
+                    self.config.kind.value,
+                    method,
+                    target_url,
+                    attempt + 1,
+                    self.config.retry_count + 1,
+                    str(exc),
+                )
                 if attempt >= self.config.retry_count:
-                    err_msg = _format_network_error(exc, self.config.endpoint, self.inference_timeout_seconds)
+                    err_msg = _format_network_error(exc, target_url, self.inference_timeout_seconds)
                     raise ProviderRequestError(err_msg) from exc
                 await asyncio.sleep(min(0.25 * (2**attempt), 2))
             except httpx.HTTPStatusError as exc:
@@ -358,9 +428,10 @@ class AIProvider(ABC):
                 if not summary.endswith("."):
                     summary += "."
                 logger.warning(
-                    "Provider HTTP error: kind=%s endpoint=%s model=%s status=%s error_type=%s detail=%s",
+                    "Provider HTTP error: kind=%s method=%s url=%s model=%s status=%s error_type=%s detail=%s",
                     self.config.kind.value,
-                    urlsplit(self.config.endpoint).netloc,
+                    method,
+                    target_url,
                     model_hint or self.config.model,
                     status,
                     err_type,

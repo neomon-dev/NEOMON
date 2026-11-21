@@ -1,4 +1,4 @@
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8001/api/v1";
 
 type ErrorPayload = {
   error?: string;
@@ -19,13 +19,27 @@ export class ApiError extends Error {
 }
 
 export function resolveApiUrl(path: string): string {
-  const base = apiBaseUrl.replace(/\/+$/, "");
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-  // Deduplicate redundant /api/v1 prefix if already present in base URL
-  if (base.endsWith("/api/v1") && normalizedPath.startsWith("/api/v1/")) {
-    return `${base}${normalizedPath.slice(7)}`;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
   }
-  return `${base}${normalizedPath}`;
+  const base = apiBaseUrl.replace(/\/+$/, "");
+  let normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  // If base already ends with /api/v1
+  if (base.endsWith("/api/v1")) {
+    if (normalizedPath.startsWith("/api/v1/")) {
+      normalizedPath = normalizedPath.slice(7);
+    }
+    return `${base}${normalizedPath}`;
+  }
+
+  // Base does not end with /api/v1
+  if (normalizedPath.startsWith("/api/v1/")) {
+    return `${base}${normalizedPath}`;
+  }
+
+  // Ensure standard /api/v1 prefix is included
+  return `${base}/api/v1${normalizedPath}`;
 }
 
 export async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {

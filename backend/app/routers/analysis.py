@@ -235,6 +235,9 @@ async def list_executions(
         queue_wait = usage.get("queue_wait_seconds") if isinstance(usage, dict) else None
         inference_dur = usage.get("inference_duration_seconds") if isinstance(usage, dict) else None
         queue_pos = usage.get("queue_position") if isinstance(usage, dict) else None
+        exec_dev = usage.get("execution_device") if isinstance(usage, dict) else None
+        tps = usage.get("tokens_per_second") if isinstance(usage, dict) else None
+        ttft = usage.get("ttft_ms") if isinstance(usage, dict) else None
         views.append(
             AgentExecutionView(
                 id=row.id,
@@ -248,6 +251,9 @@ async def list_executions(
                 queue_wait_seconds=float(queue_wait) if isinstance(queue_wait, (int, float)) else None,
                 inference_duration_seconds=float(inference_dur) if isinstance(inference_dur, (int, float)) else None,
                 queue_position=int(queue_pos) if isinstance(queue_pos, int) else None,
+                execution_device=str(exec_dev) if exec_dev else None,
+                tokens_per_second=float(tps) if isinstance(tps, (int, float)) else None,
+                ttft_ms=float(ttft) if isinstance(ttft, (int, float)) else None,
             )
         )
     return views

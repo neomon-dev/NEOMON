@@ -13,7 +13,7 @@ from app.collaboration.permission_service import PermissionService
 from app.schemas_m12 import StudyClusterResponse
 from app.research.study_independence_service import StudyIndependenceService
 
-router = APIRouter(prefix="/api/v1/research/investigations/{investigation_id}/study-independence", tags=["study-independence"])
+router = APIRouter(prefix="/research/investigations/{investigation_id}/study-independence", tags=["study-independence"])
 
 
 def _to_response(c: StudyIndependenceCluster) -> StudyClusterResponse:

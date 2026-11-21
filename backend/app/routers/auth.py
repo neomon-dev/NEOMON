@@ -23,7 +23,7 @@ from app.collaboration.schemas import (
     UserProfileUpdateRequest,
 )
 
-router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def _user_to_response(user: User) -> UserResponse:

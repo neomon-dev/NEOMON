@@ -13,7 +13,7 @@ from app.collaboration.permission_service import PermissionService
 from app.schemas_m12 import ClaimSynthesisResultResponse
 from app.analysis.claim_synthesis_service import ClaimSynthesisService
 
-router = APIRouter(prefix="/api/v1/research/investigations/{investigation_id}/claim-synthesis", tags=["claim-synthesis"])
+router = APIRouter(prefix="/research/investigations/{investigation_id}/claim-synthesis", tags=["claim-synthesis"])
 
 
 def _to_response(res: ClaimSynthesisResult) -> ClaimSynthesisResultResponse:

@@ -28,7 +28,7 @@ class DeclineInvitationRequest(BaseModel):
     token: str
 
 
-@router.post("/api/v1/workspaces/{workspace_id}/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/workspaces/{workspace_id}/invitations", response_model=InvitationResponse, status_code=status.HTTP_201_CREATED)
 async def invite_member(
     workspace_id: uuid.UUID,
     req: InvitationCreateRequest,
@@ -46,7 +46,7 @@ async def invite_member(
     return InvitationResponse(**result)
 
 
-@router.get("/api/v1/workspaces/{workspace_id}/invitations", response_model=List[InvitationResponse])
+@router.get("/workspaces/{workspace_id}/invitations", response_model=List[InvitationResponse])
 async def list_workspace_invitations(
     workspace_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -58,7 +58,7 @@ async def list_workspace_invitations(
     return [InvitationResponse(**i) for i in invites]
 
 
-@router.get("/api/v1/invitations/lookup", response_model=InvitationDetailResponse)
+@router.get("/invitations/lookup", response_model=InvitationDetailResponse)
 async def lookup_invitation(
     token: str = Query(..., min_length=1),
     db: AsyncSession = Depends(get_session),
@@ -69,7 +69,7 @@ async def lookup_invitation(
     return InvitationDetailResponse(**details)
 
 
-@router.post("/api/v1/invitations/accept", dependencies=[Depends(rate_limit_auth())])
+@router.post("/invitations/accept", dependencies=[Depends(rate_limit_auth())])
 async def accept_invitation(
     req: AcceptInvitationRequest,
     user: User = Depends(get_current_user),
@@ -80,7 +80,7 @@ async def accept_invitation(
     return await service.accept_invitation(req.token, user)
 
 
-@router.post("/api/v1/invitations/decline")
+@router.post("/invitations/decline")
 async def decline_invitation(
     req: DeclineInvitationRequest,
     db: AsyncSession = Depends(get_session),
@@ -91,7 +91,7 @@ async def decline_invitation(
     return {"message": "Invitation declined."}
 
 
-@router.delete("/api/v1/workspaces/{workspace_id}/invitations/{invitation_id}")
+@router.delete("/workspaces/{workspace_id}/invitations/{invitation_id}")
 async def revoke_invitation(
     workspace_id: uuid.UUID,
     invitation_id: uuid.UUID,

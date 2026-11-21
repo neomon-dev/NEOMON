@@ -37,6 +37,18 @@ export function SpotlightCard({
     setOpacity(0);
   };
 
+  const activeBorderColor = opacity > 0 ? borderColor : "var(--border, rgba(37, 217, 242, 0.12))";
+
+  // Prevent React shorthand vs longhand style property conflicts (e.g. border vs borderBottom)
+  const {
+    border: propBorder,
+    borderTop: propBorderTop,
+    borderRight: propBorderRight,
+    borderBottom: propBorderBottom,
+    borderLeft: propBorderLeft,
+    ...restStyle
+  } = style || {};
+
   return (
     <div
       ref={divRef}
@@ -48,12 +60,15 @@ export function SpotlightCard({
       style={{
         position: "relative",
         background: "var(--panel, #0C192B)",
-        border: `1px solid ${opacity > 0 ? borderColor : "var(--border, rgba(37, 217, 242, 0.12))"}`,
+        borderTop: propBorderTop || propBorder || `1px solid ${activeBorderColor}`,
+        borderRight: propBorderRight || propBorder || `1px solid ${activeBorderColor}`,
+        borderBottom: propBorderBottom || propBorder || `1px solid ${activeBorderColor}`,
+        borderLeft: propBorderLeft || propBorder || `1px solid ${activeBorderColor}`,
         borderRadius: "var(--radius-md, 10px)",
         overflow: "hidden",
         transition: "border-color 0.25s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease",
         boxShadow: opacity > 0 ? "0 8px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(37, 217, 242, 0.1)" : "0 4px 16px rgba(0, 0, 0, 0.4)",
-        ...style,
+        ...restStyle,
       }}
     >
       {/* Specular Spotlight Overlay */}
