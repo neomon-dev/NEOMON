@@ -114,7 +114,8 @@ async def test_lm_studio_never_sends_json_object_and_falls_back_from_json_schema
     async def fake_request(method: str, path: str, **kwargs):
         body = kwargs["json"]
         recorded_bodies.append(body)
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         if "response_format" in body:
             return httpx.Response(
                 400,
@@ -199,7 +200,8 @@ async def test_markdown_fenced_json_and_bounded_validation_correction():
     async def fake_request(method: str, path: str, **kwargs):
         nonlocal attempts
         attempts += 1
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         if attempts == 1:
             # Missing required search_objectives/evidence_categories -> fails PlannerPayload validation
             bad = {"claims": [{"text": "Invalid partial claim", "explanation": "Missing fields", "priority": 1}]}
@@ -251,7 +253,8 @@ async def test_invalid_json_and_fabricated_validation_failure_stop_after_bounded
     async def always_invalid(method: str, path: str, **kwargs):
         nonlocal attempts
         attempts += 1
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         return httpx.Response(
             200,
             json={"choices": [{"message": {"content": "Not valid JSON output at all"}}]},
@@ -294,7 +297,8 @@ async def test_planner_analysis_surfaces_stage_model_and_http_400_detail(isolate
     loopback = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 1234))]
 
     async def always_400(self, method: str, path: str, **kwargs):
-        req = httpx.Request(method, f"http://127.0.0.1:1234{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:1234{path}"
+        req = httpx.Request(method, url)
         return httpx.Response(
             400,
             json={"error": {"message": "Context length exceeded for model", "type": "invalid_request_error"}},
@@ -324,7 +328,8 @@ async def test_remote_openai_compatible_and_ollama_compatibility():
     async def remote_request(method: str, path: str, **kwargs):
         body = kwargs["json"]
         remote_bodies.append(body)
-        req = httpx.Request(method, f"https://api.example.com{path}")
+        url = path if path.startswith(("http://", "https://")) else f"https://api.example.com{path}"
+        req = httpx.Request(method, url)
         if body.get("response_format", {}).get("type") == "json_schema":
             return httpx.Response(400, json={"error": {"message": "json_schema not supported"}}, request=req)
         return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]}, request=req)
@@ -341,7 +346,8 @@ async def test_remote_openai_compatible_and_ollama_compatibility():
     loopback = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 11434))]
 
     async def ollama_request(method: str, path: str, **kwargs):
-        req = httpx.Request(method, f"http://127.0.0.1:11434{path}")
+        url = path if path.startswith(("http://", "https://")) else f"http://127.0.0.1:11434{path}"
+        req = httpx.Request(method, url)
         return httpx.Response(200, json={"message": {"content": '{"ok": true}'}}, request=req)
 
     try:

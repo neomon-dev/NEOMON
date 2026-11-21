@@ -35,6 +35,7 @@ from app.routers import (
     export,
     gaps,
     graph,
+    hardware,
     health,
     hypotheses,
     intelligence,
@@ -178,6 +179,8 @@ def create_app() -> FastAPI:
     app.include_router(quality_audit.router)
     app.include_router(autonomous_workflows.router, prefix=prefix)
     app.include_router(autonomous_workflows.router)
+    app.include_router(hardware.router, prefix=prefix)
+    app.include_router(hardware.router)
 
     # M10 & M11 additions
     app.include_router(auth.router, prefix=prefix)

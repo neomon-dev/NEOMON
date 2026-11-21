@@ -99,6 +99,9 @@ type AgentExecution = {
   queue_wait_seconds?: number | null;
   inference_duration_seconds?: number | null;
   queue_position?: number | null;
+  execution_device?: string | null;
+  tokens_per_second?: number | null;
+  ttft_ms?: number | null;
 };
 
 type ClaimAnalysis = {
@@ -1518,7 +1521,14 @@ export default function InvestigationPage({ params }: { params: Promise<{ id: st
                             </span>
                           </div>
                           <small style={{ fontSize: "11px", color: "#94a3b8" }}>
+                            {execution.execution_device ? (
+                              <span style={{ color: "#38bdf8", marginRight: "4px", fontWeight: 600 }}>
+                                [{execution.execution_device}]
+                              </span>
+                            ) : null}
                             {execution.model ?? "rule_based"}
+                            {execution.tokens_per_second ? ` · ${execution.tokens_per_second.toFixed(1)} tok/s` : ""}
+                            {execution.ttft_ms ? ` · ttft ${execution.ttft_ms.toFixed(0)}ms` : ""}
                             {execution.queue_wait_seconds ? ` · wait ${execution.queue_wait_seconds.toFixed(1)}s` : ""}
                             {execution.inference_duration_seconds ? ` · gen ${execution.inference_duration_seconds.toFixed(1)}s` : ""}
                             {execution.error_message ? ` · ${execution.error_message}` : ""}

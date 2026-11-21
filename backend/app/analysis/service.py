@@ -29,6 +29,17 @@ from app.analysis.report_service import (
     compute_evidence_strength,
     save_report_version,
 )
+from app.analysis.structured_parser import extract_json_object
+from app.analysis.context_manager import (
+    AGENT_BUDGETS,
+    DEFAULT_BUDGET,
+    build_specialist_agent_context,
+    build_adjudication_compact_context,
+    compact_evidence_text,
+    estimate_tokens,
+)
+from app.analysis.scheduler import gpu_scheduler
+from app.hardware.npu_service import npu_auxiliary_service
 from app.research.scientific_integrity import classify_evidence_for_claim
 from app.config import get_settings
 from app.events import EventBroker
@@ -147,35 +158,13 @@ class _ReportSectionsListPayload(BaseModel):
     sections: list[ReportSectionPayload]
 
 
-def _extract_json_object(raw_content: str) -> dict[str, Any]:
+def _extract_json_object(
+    raw_content: str,
+    *,
+    response_model: type[BaseModel] | None = None,
+) -> dict[str, Any]:
     """Decode a JSON object from raw model text, stripping thinking tags and optional markdown fences."""
-    cleaned = _THINK_TAG_RE.sub("", raw_content).strip()
-    stripped = cleaned if cleaned else raw_content.strip()
-    try:
-        parsed = json.loads(stripped)
-        if not isinstance(parsed, dict):
-            raise ValueError("structured output must be a JSON object")
-        return parsed
-    except json.JSONDecodeError:
-        pass
-
-    for match in _JSON_FENCE_RE.finditer(stripped):
-        candidate = match.group(1).strip()
-        try:
-            parsed = json.loads(candidate)
-            if isinstance(parsed, dict):
-                return parsed
-        except json.JSONDecodeError:
-            continue
-
-    first_brace = stripped.find("{")
-    last_brace = stripped.rfind("}")
-    if first_brace != -1 and last_brace > first_brace:
-        parsed = json.loads(stripped[first_brace : last_brace + 1])
-        if not isinstance(parsed, dict):
-            raise ValueError("structured output must be a JSON object")
-        return parsed
-    raise ValueError("model response did not contain a valid JSON object")
+    return extract_json_object(raw_content, response_model=response_model)
 
 
 async def _optional_llm_json(
@@ -201,9 +190,12 @@ async def _optional_llm_json(
         {"role": "user", "content": prompt},
     ]
     complete_kwargs: dict[str, Any] = {}
-    if response_model is not None and isinstance(provider, OpenAICompatibleProvider):
-        complete_kwargs["response_schema"] = response_model.model_json_schema()
-        complete_kwargs["schema_name"] = stage_name
+    budget = AGENT_BUDGETS.get(stage_name, DEFAULT_BUDGET)
+    if response_model is not None:
+        complete_kwargs["max_tokens"] = budget.max_completion_tokens
+        if isinstance(provider, OpenAICompatibleProvider):
+            complete_kwargs["response_schema"] = response_model.model_json_schema()
+            complete_kwargs["schema_name"] = stage_name
 
     usage: dict[str, Any] = {}
     total_queue_wait_seconds = 0.0
@@ -231,9 +223,10 @@ async def _optional_llm_json(
         try:
             if not isinstance(provider, AIProvider):
                 await _tracked_state("generating", {})
-            async with inference_state_listener(_tracked_state):
-                result = await provider.complete(messages, model=model, **complete_kwargs)
-        except (ProviderRequestError, ProviderQueueTimeoutError, ProviderQueueFullError) as exc:
+            async with gpu_scheduler.lease(stage_name, estimated_prompt_tokens=estimate_tokens(prompt)):
+                async with inference_state_listener(_tracked_state):
+                    result = await provider.complete(messages, model=model, **complete_kwargs)
+        except (ProviderRequestError, ProviderQueueTimeoutError, ProviderQueueFullError, TimeoutError) as exc:
             if generating_started_monotonic is not None:
                 total_inference_seconds += time.monotonic() - generating_started_monotonic
             elif queued_started_monotonic is not None and attempt_queue_wait == 0.0:
@@ -267,7 +260,7 @@ async def _optional_llm_json(
         if not isinstance(content, str):
             return None, usage, f"provider returned no content (stage={stage_name}, model={effective_model or 'default'})"
         try:
-            parsed = _extract_json_object(content)
+            parsed = _extract_json_object(content, response_model=response_model)
             if response_model is not None:
                 validated = response_model.model_validate(parsed)
                 dumped = validated.model_dump(mode="json")
@@ -287,13 +280,13 @@ async def _optional_llm_json(
                     effective_model,
                     exc,
                 )
-                messages.append({"role": "assistant", "content": content})
+                messages.append({"role": "assistant", "content": content[:1200]})
                 messages.append(
                     {
                         "role": "user",
                         "content": (
                             f"Your previous JSON output failed validation: {exc}. "
-                            "Return ONLY a corrected JSON object matching the schema, using only the originally supplied IDs."
+                            "Return ONLY a corrected JSON object strictly matching the schema, using only the originally supplied IDs."
                         ),
                     }
                 )
@@ -316,7 +309,8 @@ async def _create_execution(
     *,
     status: str = "generating",
 ) -> AnalysisAgentExecution:
-    execution = AnalysisAgentExecution(job_id=job.id, agent_identifier=identifier, model=model, status=status)
+    effective_model = model or job.default_model
+    execution = AnalysisAgentExecution(job_id=job.id, agent_identifier=identifier, model=effective_model, status=status)
     execution.started_at = datetime.now(UTC)
     session.add(execution)
     await session.commit()
@@ -712,11 +706,31 @@ def compute_analysis_coverage(
 
 
 _EXACT_CLAIM_RULE = (
-    "Return JSON only with an 'arguments' array containing EXACTLY ONE argument object per supplied claim_id "
-    "(do not repeat or omit any claim_id). If no relevant evidence was supplied for a claim, still include one "
-    "argument object for that claim_id with evidence_ids: [], source_ids: [], evidence_basis: 'none', and "
-    "confidence.level: 'insufficient'. Every evidence_id and source_id must come from the supplied evidence; "
-    "never invent evidence, sources, quotations, dates, or missing methods."
+    "\nOutput ONLY a valid JSON object matching this EXACT SCHEMA with no markdown fences or conversational text:\n"
+    "{\n"
+    '  "arguments": [\n'
+    "    {\n"
+    '      "claim_id": "<exact_claim_uuid_from_input>",\n'
+    '      "argument_type": "supporting",\n'
+    '      "text": "Evidence-grounded factual analysis...",\n'
+    '      "evidence_ids": ["<exact_evidence_uuid_from_input>"],\n'
+    '      "source_ids": ["<exact_source_uuid_from_input>"],\n'
+    '      "evidence_basis": "direct",\n'
+    '      "reasoning_summary": "Summary of reasoning...",\n'
+    '      "limitations": ["Scope limitation..."],\n'
+    '      "confidence": {\n'
+    '        "level": "strong",\n'
+    '        "explanation": "Why this confidence level was assigned..."\n'
+    "      }\n"
+    "    }\n"
+    "  ]\n"
+    "}\n"
+    "Rules:\n"
+    "- Output EXACTLY ONE argument object per supplied claim_id (do NOT omit any claim_id).\n"
+    "- confidence MUST be an object with 'level' (strong|moderate|weak|insufficient|contested) and 'explanation'.\n"
+    "- evidence_basis must be 'direct', 'indirect', or 'none'.\n"
+    "- If no evidence supports the claim, set evidence_ids: [], source_ids: [], evidence_basis: 'none', confidence.level: 'insufficient'.\n"
+    "- Use only the exact UUIDs supplied in the input."
 )
 
 ROLE_SYSTEM_INSTRUCTIONS: dict[str, str] = {
@@ -863,6 +877,20 @@ async def run_analysis(
         await session.commit()
         await _publish(broker, EventType.analysis_stage_changed, job.investigation_id, stage=job.status)
 
+        # Intel AI Boost NPU Auxiliary Intent and Domain Classification
+        try:
+            npu_classification = npu_auxiliary_service.classify_query(question)
+            logger.info(
+                "NPU classification for query '%s': domain=%s complexity=%s device=%s latency=%.2fms",
+                question,
+                npu_classification.domain,
+                npu_classification.complexity,
+                npu_classification.execution_device,
+                npu_classification.latency_ms,
+            )
+        except Exception as npu_exc:
+            logger.warning("NPU auxiliary classification bypassed: %s", npu_exc)
+
         evidence = list(
             (
                 await session.scalars(
@@ -913,10 +941,28 @@ async def run_analysis(
                 provider,
                 role_models.get("intelligence_planner"),
                 (
-                    "Return JSON only with a claims array of 1 to 5 distinct, independently investigable claims. "
-                    "Each claim object must include: text (string >= 10 chars), explanation (string), priority (int 1-5), "
-                    "search_objectives (non-empty string array), evidence_categories (non-empty string array), "
-                    "and dependencies (UUID array, usually []). Do not cite or invent evidence."
+                    "You are the Intelligence Planner for NEOMON.\n"
+                    "Decompose the research question into a claims array of 1 to 5 distinct, verifiable claims.\n"
+                    "Output ONLY a valid JSON object matching the exact schema below. Do NOT include markdown fences, extra text, or any extra keys.\n\n"
+                    "JSON SCHEMA:\n"
+                    "{\n"
+                    '  "claims": [\n'
+                    "    {\n"
+                    '      "text": "Clear, verifiable assertion (at least 10 chars)",\n'
+                    '      "explanation": "Why this claim is critical to the research question",\n'
+                    '      "priority": 1,\n'
+                    '      "search_objectives": ["key factual aspect to verify"],\n'
+                    '      "evidence_categories": ["empirical", "economic"],\n'
+                    '      "dependencies": []\n'
+                    "    }\n"
+                    "  ]\n"
+                    "}\n"
+                    "Rules:\n"
+                    "- priority must be an integer between 1 and 5.\n"
+                    "- search_objectives must be a non-empty array of strings.\n"
+                    "- evidence_categories must be a non-empty array of strings.\n"
+                    "- dependencies must be an empty list [] unless referencing previous claim UUIDs.\n"
+                    "- Do NOT add any extra fields."
                 ),
                 json.dumps({"question": question}),
                 response_model=PlannerPayload,
@@ -1019,11 +1065,13 @@ async def run_analysis(
                         seen_claims.add(item.claim_id)
                         if set(item.evidence_ids) - evidence_ids:
                             raise ValueError("argument references evidence outside the investigation")
-                        if set(item.source_ids) - source_ids:
+                        expected_sources = {evidence_source_map[ev_id] for ev_id in item.evidence_ids if ev_id in evidence_source_map}
+                        if not item.source_ids:
+                            item.source_ids = list(expected_sources)
+                        elif set(item.source_ids) - source_ids:
                             raise ValueError("argument references sources outside the investigation")
-                        expected_sources = {evidence_source_map[ev_id] for ev_id in item.evidence_ids}
-                        if set(item.source_ids) != expected_sources:
-                            raise ValueError("argument source_ids must match the source_ids of cited evidence_ids")
+                        elif set(item.source_ids) != expected_sources:
+                            item.source_ids = list(expected_sources)
                     if duplicates:
                         raise ValueError(
                             f"agent output contained duplicate claim arguments for claim_id(s): {', '.join(duplicates)}"
@@ -1033,31 +1081,14 @@ async def run_analysis(
                         missing_str = ", ".join(str(item) for item in sorted(missing_claims, key=str))
                         raise ValueError(f"agent output omitted claim_id(s): {missing_str}")
 
+                specialist_context = build_specialist_agent_context(
+                    role, claims, associated_evidence, sources, documents
+                )
                 llm_payload, usage, role_error = await _optional_llm_json(
                     provider,
                     role_models.get(role),
                     ROLE_SYSTEM_INSTRUCTIONS[role],
-                    json.dumps(
-                        {
-                            "role": role,
-                            "claims": [
-                                {
-                                    "claim_id": str(item.id),
-                                    "text": item.text,
-                                    "evidence": [
-                                        {
-                                            "evidence_id": str(evidence_item.id),
-                                            "source_id": str(evidence_item.source_id),
-                                            "text": _evidence_text(evidence_item),
-                                            "type": evidence_item.evidence_type,
-                                        }
-                                        for evidence_item in associated_evidence.get(item.id, [])
-                                    ],
-                                }
-                                for item in claims
-                            ],
-                        }
-                    ),
+                    json.dumps(specialist_context),
                     response_model=_ArgumentsListPayload,
                     stage_name=role,
                     on_state_change=_make_state_callback(
@@ -1341,43 +1372,9 @@ async def run_analysis(
             role_models.get("conflict_adjudicator"),
             status="waiting_in_queue" if provider is not None else "generating",
         )
-        adjudication_context = {
-            "claims": [
-                {
-                    "claim_id": str(item.id),
-                    "text": item.text,
-                    "associated_evidence_ids": [str(ev.id) for ev in associated_evidence.get(item.id, [])],
-                    "persisted_argument_count": len(arguments_by_claim.get(item.id, [])),
-                }
-                for item in claims
-            ],
-            "arguments": [
-                {
-                    "argument_id": str(item.id),
-                    "claim_id": str(item.claim_id),
-                    "agent": item.agent_identifier,
-                    "type": item.argument_type,
-                    "text": item.text,
-                    "evidence_ids": json.loads(item.evidence_ids_json),
-                    "evidence_basis": item.evidence_basis,
-                    "limitations": json.loads(item.limitations_json),
-                }
-                for item in arguments
-            ],
-            "evidence": [
-                {
-                    "evidence_id": str(item.id),
-                    "source_id": str(item.source_id),
-                    "claim_id": str(item.claim_id) if item.claim_id else None,
-                    "exact_text": _evidence_text(item),
-                    "type": item.evidence_type,
-                    "relevance_score": item.relevance_score,
-                    "document_id": str(item.document_id) if item.document_id else None,
-                    "access_level": documents[item.document_id].access_level if item.document_id in documents else "metadata_only",
-                }
-                for item in evidence
-            ],
-        }
+        adjudication_context = build_adjudication_compact_context(
+            claims, arguments, evidence, associated_evidence, documents
+        )
         if provider is None:
             await _publish(
                 broker,
@@ -1670,7 +1667,7 @@ async def run_analysis(
                 "evidence": [
                     {
                         "evidence_id": str(item.id),
-                        "exact_text": item.exact_text,
+                        "exact_text": compact_evidence_text(item.exact_text, max_length=400),
                         "type": item.evidence_type,
                         "source_url": sources[item.source_id].original_url,
                         "access_level": documents[item.document_id].access_level if item.document_id in documents else "metadata_only",
@@ -1678,7 +1675,7 @@ async def run_analysis(
                         "page_number": item.page_number,
                         "section_name": item.section_name,
                     }
-                    for item in evidence
+                    for item in evidence[:16]
                 ],
             }
             raw_report, report_usage, report_error = await _optional_llm_json(
