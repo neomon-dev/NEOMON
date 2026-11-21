@@ -151,7 +151,13 @@ class OpenAICompatibleProvider(AIProvider):
                 if response_format is not None:
                     body["response_format"] = response_format
                 try:
-                    response = await self._request("POST", "/v1/chat/completions", json=body)
+                    try:
+                        response = await self._request("POST", "/v1/chat/completions", json=body)
+                    except ProviderRequestError as exc:
+                        if exc.status_code == 404:
+                            response = await self._request("POST", "/chat/completions", json=body)
+                        else:
+                            raise
                     used_mode = mode
                     break
                 except ProviderRequestError as exc:

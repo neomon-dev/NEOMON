@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     app_name: str = "NEOMON API"
     environment: str = "development"
     debug: bool = False
+    port: int = Field(default=8001, ge=1, le=65535)
     api_version: str = "v1"
     database_url: str = DEFAULT_DATABASE_URL
     allowed_origins: list[str] = Field(

@@ -1,3 +1,4 @@
+from app.providers.base import AIProvider
 from app.agents.advocate import AdvocateAgent
 from app.agents.citation_genealogy import CitationGenealogyAgent
 from app.agents.conflict_adjudicator import ConflictAdjudicatorAgent
@@ -28,8 +29,8 @@ AGENT_CLASSES = {
 }
 
 
-def create_agent(identifier: str):
+def create_agent(identifier: str, provider: AIProvider | None = None):
     agent_class = AGENT_CLASSES.get(identifier)
     if agent_class is None:
         raise KeyError(identifier)
-    return agent_class()
+    return agent_class(provider=provider)

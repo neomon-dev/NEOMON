@@ -37,6 +37,8 @@ export function SpotlightCard({
     setOpacity(0);
   };
 
+  const activeBorderColor = opacity > 0 ? borderColor : "var(--border, rgba(37, 217, 242, 0.12))";
+
   return (
     <div
       ref={divRef}
@@ -48,7 +50,10 @@ export function SpotlightCard({
       style={{
         position: "relative",
         background: "var(--panel, #0C192B)",
-        border: `1px solid ${opacity > 0 ? borderColor : "var(--border, rgba(37, 217, 242, 0.12))"}`,
+        borderTop: `1px solid ${activeBorderColor}`,
+        borderRight: `1px solid ${activeBorderColor}`,
+        borderBottom: `1px solid ${activeBorderColor}`,
+        borderLeft: `1px solid ${activeBorderColor}`,
         borderRadius: "var(--radius-md, 10px)",
         overflow: "hidden",
         transition: "border-color 0.25s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease",
