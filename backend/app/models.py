@@ -1685,5 +1685,53 @@ class HumanEvidenceCorrection(Base):
     user: Mapped["User"] = relationship()
 
 
+class ResearchMonitoringConfig(Base):
+    """Recurring research monitoring configuration triggered via n8n or scheduled automations."""
+    __tablename__ = "research_monitoring_configs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), index=True)
+    investigation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("investigations.id", ondelete="CASCADE"), index=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    query_keywords: Mapped[str] = mapped_column(Text)
+    interval_minutes: Mapped[int] = mapped_column(Integer, default=60)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    max_new_sources_per_run: Mapped[int] = mapped_column(Integer, default=5)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    workspace: Mapped["Workspace"] = relationship()
+    investigation: Mapped["Investigation"] = relationship()
+    creator: Mapped["User"] = relationship()
+    runs: Mapped[list["ResearchMonitoringRun"]] = relationship(back_populates="config", cascade="all, delete-orphan")
+
+
+class ResearchMonitoringRun(Base):
+    """Individual execution record of an automated research monitoring run."""
+    __tablename__ = "research_monitoring_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    monitoring_config_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("research_monitoring_configs.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
+    triggered_by: Mapped[str] = mapped_column(String(32), default="n8n")
+    sources_discovered: Mapped[int] = mapped_column(Integer, default=0)
+    evidence_extracted: Mapped[int] = mapped_column(Integer, default=0)
+    contradictions_detected: Mapped[int] = mapped_column(Integer, default=0)
+    execution_latency_ms: Mapped[float] = mapped_column(Float, default=0.0)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), unique=True, index=True, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    details_json: Mapped[str] = mapped_column(Text, default="{}")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    config: Mapped["ResearchMonitoringConfig"] = relationship(back_populates="runs")
+
+
+
 
 

@@ -94,6 +94,11 @@ class Settings(BaseSettings):
     research_max_document_bytes: int = Field(default=5_000_000, ge=100_000, le=50_000_000)
     initial_admin_password: str | None = None
 
+    # n8n Automation Integration
+    n8n_webhook_url: str | None = None
+    n8n_api_key: str | None = None
+    n8n_service_token: str | None = None
+
     @field_validator("database_url", mode="before")
     @classmethod
     def resolve_and_normalize_database_url(cls, value: object) -> object:

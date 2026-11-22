@@ -1,0 +1,174 @@
+{
+  "name": "NEOMON Automated Research Monitoring",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger-1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/monitoring?workspace_id={{ $env.NEOMON_WORKSPACE_ID }}&is_active=true",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-get-active-monitors",
+      "name": "Get Active Monitors",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/integrations/n8n/events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.NEOMON_SERVICE_TOKEN || 'neomon_n8n_s2s_default_secret' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "monitoring.trigger"
+            },
+            {
+              "name": "idempotency_key",
+              "value": "={{ $json.id }}_{{ $now.format('yyyyMMddHH') }}"
+            },
+            {
+              "name": "payload",
+              "value": "={{ { monitoring_config_id: $json.id, workspace_id: $json.workspace_id, investigation_id: $json.investigation_id } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-trigger-monitoring-run",
+      "name": "Trigger Monitoring Cycle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.sources_discovered }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "filter-new-findings",
+      "name": "New Evidence Discovered?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/integrations/n8n/test",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.NEOMON_SERVICE_TOKEN || 'neomon_n8n_s2s_default_secret' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "monitoring_summary_logged"
+            },
+            {
+              "name": "payload",
+              "value": "={{ { run_id: $json.run_id, sources_discovered: $json.sources_discovered, contradictions_detected: $json.contradictions_detected } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "log-monitoring-success",
+      "name": "Log Findings to NEOMON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1180, 240]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Active Monitors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Monitors": {
+      "main": [
+        [
+          {
+            "node": "Trigger Monitoring Cycle",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Monitoring Cycle": {
+      "main": [
+        [
+          {
+            "node": "New Evidence Discovered?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New Evidence Discovered?": {
+      "main": [
+        [
+          {
+            "node": "Log Findings to NEOMON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

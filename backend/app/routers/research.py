@@ -93,7 +93,7 @@ async def create_investigation(
         user_ws = await session.scalar(
             select(WorkspaceMember.workspace_id)
             .where(WorkspaceMember.user_id == user.id)
-            .order_by(WorkspaceMember.created_at.asc())
+            .order_by(WorkspaceMember.joined_at.asc())
             .limit(1)
         )
         ws_id = user_ws or DEFAULT_GLOBAL_WORKSPACE_ID

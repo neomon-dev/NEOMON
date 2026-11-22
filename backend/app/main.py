@@ -42,6 +42,7 @@ from app.routers import (
     invitations,
     jobs,
     methodology_audit,
+    integrations_n8n,
     providers,
     quality_audit,
     reproducibility,
@@ -209,6 +210,12 @@ def create_app() -> FastAPI:
     app.include_router(benchmarks.router)
     app.include_router(corrections.router, prefix=prefix)
     app.include_router(corrections.router)
+
+    # n8n Automation & Research Monitoring
+    app.include_router(integrations_n8n.router, prefix=prefix)
+    app.include_router(integrations_n8n.router)
+    app.include_router(integrations_n8n.monitoring_router, prefix=prefix)
+    app.include_router(integrations_n8n.monitoring_router)
 
     return app
 

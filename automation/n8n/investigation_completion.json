@@ -1,0 +1,119 @@
+{
+  "name": "NEOMON Investigation Completion Notification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "neomon-investigation-completed",
+        "options": {}
+      },
+      "id": "webhook-trigger-1",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/research/investigations/{{ $json.body.investigation_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "http-get-investigation-details",
+      "name": "Fetch Investigation Details",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "completed"
+            }
+          ]
+        }
+      },
+      "id": "check-completion-status",
+      "name": "Is Investigation Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/integrations/n8n/test",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.NEOMON_SERVICE_TOKEN || 'neomon_n8n_s2s_default_secret' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "investigation_completed_notification_dispatched"
+            },
+            {
+              "name": "payload",
+              "value": "={{ { investigation_id: $json.id, question: $json.question, quality_status: $json.quality_status, source_count: $json.relevant_source_count, evidence_count: $json.evidence_count } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-completion-dispatch",
+      "name": "Dispatch Completion Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 240]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Investigation Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Investigation Details": {
+      "main": [
+        [
+          {
+            "node": "Is Investigation Completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Investigation Completed?": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Completion Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

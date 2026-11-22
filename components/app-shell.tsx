@@ -57,6 +57,12 @@ const navSections: NavSection[] = [
     ],
   },
   {
+    title: "Automation & Monitoring",
+    items: [
+      { label: "Automation", icon: "⚡", href: "/automation" },
+    ],
+  },
+  {
     title: "Collaboration & System",
     items: [
       { label: "Workspaces", icon: "👥", href: "/workspaces" },

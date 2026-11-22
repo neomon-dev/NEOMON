@@ -1,0 +1,160 @@
+{
+  "name": "NEOMON Human Approval and Report Delivery",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "neomon-report-approval-request",
+        "options": {}
+      },
+      "id": "webhook-approval-trigger",
+      "name": "Approval Request Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/collaboration/reviews/{{ $json.body.review_request_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-review-request",
+      "name": "Get Review Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.decision || 'approved' }}",
+              "value2": "approved"
+            }
+          ]
+        }
+      },
+      "id": "evaluate-decision",
+      "name": "Is Report Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/integrations/n8n/events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.NEOMON_SERVICE_TOKEN || 'neomon_n8n_s2s_default_secret' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "report.approval_decision"
+            },
+            {
+              "name": "payload",
+              "value": "={{ { review_request_id: $json.id, reviewer_id: $json.target_id || $env.NEOMON_AUTHORIZED_REVIEWER_ID, decision: 'approved', rationale: 'Approved by formal review board via n8n' } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "submit-approval-to-neomon",
+      "name": "Submit Approval to NEOMON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 220]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEOMON_BACKEND_URL || 'http://127.0.0.1:8001' }}/api/v1/integrations/n8n/events",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.NEOMON_SERVICE_TOKEN || 'neomon_n8n_s2s_default_secret' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "event_type",
+              "value": "report.approval_decision"
+            },
+            {
+              "name": "payload",
+              "value": "={{ { review_request_id: $json.id, reviewer_id: $json.target_id || $env.NEOMON_AUTHORIZED_REVIEWER_ID, decision: 'rejected', rationale: 'Rejected: evidence criteria or methodology ungrounded' } }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "submit-rejection-to-neomon",
+      "name": "Submit Rejection to NEOMON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [960, 380]
+    }
+  ],
+  "connections": {
+    "Approval Request Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get Review Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Review Request": {
+      "main": [
+        [
+          {
+            "node": "Is Report Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Report Approved?": {
+      "main": [
+        [
+          {
+            "node": "Submit Approval to NEOMON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Submit Rejection to NEOMON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
