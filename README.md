@@ -23,19 +23,21 @@ Register
 
 1. [Executive Summary & Problem Statement](#1-executive-summary--problem-statement)
 2. [Target Audience & Comparative Distinction](#2-target-audience--comparative-distinction)
-3. [Core Capabilities & Research Pillars](#3-core-capabilities--research-pillars)
-4. [Technology Stack](#4-technology-stack)
-5. [System Architecture](#5-system-architecture)
-6. [Windows Installation & Getting Started](#6-windows-installation--getting-started)
-7. [CRITICAL NOTICE: User-Supplied AI Provider Requirement](#7-critical-notice-user-supplied-ai-provider-requirement)
-8. [CRITICAL NOTICE: Optional Tavily Search Configuration](#8-critical-notice-optional-tavily-search-configuration)
-9. [Comprehensive Environment Variable Reference](#9-comprehensive-environment-variable-reference)
-10. [Database Management & Migration Strategy](#10-database-management--migration-strategy)
-11. [Production Deployment Architecture](#11-production-deployment-architecture)
-12. [Security, Privacy & Compliance Architecture](#12-security-privacy--compliance-architecture)
-13. [Troubleshooting Guide & Diagnostics](#13-troubleshooting-guide--diagnostics)
-14. [Feature Documentation Index](#14-feature-documentation-index)
-15. [License & Contribution Terms](#15-license--contribution-terms)
+3. [Core Capabilities & Research Workflow](#3-core-capabilities--research-workflow)
+4. [Streamlined User Navigation](#4-streamlined-user-navigation)
+5. [n8n Automation Architecture](#5-n8n-automation-architecture)
+6. [Technology Stack](#6-technology-stack)
+7. [System Architecture](#7-system-architecture)
+8. [Windows Installation & Getting Started](#8-windows-installation--getting-started)
+9. [CRITICAL NOTICE: User-Supplied AI Provider Requirement](#9-critical-notice-user-supplied-ai-provider-requirement)
+10. [CRITICAL NOTICE: Optional Tavily Search Configuration](#10-critical-notice-optional-tavily-search-configuration)
+11. [Comprehensive Environment Variable Reference](#11-comprehensive-environment-variable-reference)
+12. [Database Management & Migration Strategy](#12-database-management--migration-strategy)
+13. [Production Deployment Architecture](#13-production-deployment-architecture)
+14. [Security, Privacy & Compliance Architecture](#14-security-privacy--compliance-architecture)
+15. [Troubleshooting Guide & Diagnostics](#15-troubleshooting-guide--diagnostics)
+16. [Feature Documentation Index](#16-feature-documentation-index)
+17. [License & Contribution Terms](#17-license--contribution-terms)
 
 ---
 
@@ -78,26 +80,71 @@ NEOMON rejects conversational "black-box" answering in favor of an **auditable, 
 
 ---
 
-## 3. Core Capabilities & Research Pillars
+## 3. Core Capabilities & Research Workflow
+
+NEOMON is focused on delivering a dependable, transparent 5-stage research workflow:
 
 ```
-+---------------------------------------------------------------------------------------+
-|                                    NEOMON ENGINE                                      |
-+--------------------------+----------------------------+-------------------------------+
-|  RETRIEVAL & DISCOVERY   |    EVIDENCE & INTEGRITY    |   MULTI-AGENT ADJUDICATION    |
-|  - arXiv API             |  - Exact Passage Hashing   |  - Advocate Agent             |
-|  - Crossref API          |  - Character Provenance    |  - Skeptic Agent              |
-|  - OpenAlex API          |  - Methodological Auditing |  - Moderator Adjudication     |
-|  - Unpaywall Integration |  - P-Hacking Risk Analysis |  - Methodology Auditor        |
-|  - Tavily Web Crawler    |  - Citation Genealogy      |  - Domain Specialists         |
-+--------------------------+----------------------------+-------------------------------+
-|   LONGITUDINAL INSIGHTS  |     KNOWLEDGE TOPOLOGY     |     GOVERNANCE & WORKFLOW     |
-|  - Contradiction Engine  |  - React Flow Entity Graph |  - Multi-User Workspaces      |
-|  - Research Gap Mining   |  - 16 Relational Entity IDs|  - Role-Based Access Control  |
-|  - Hypothesis Generation |  - Claim-to-Evidence Links |  - Autonomous Convergence     |
-|  - Trend Trajectories   |  - Interactive Filtering   |  - Multi-Format Knowledge Exp |
-+--------------------------+----------------------------+-------------------------------+
+  +-------------------------------------------------------------------------+
+  |                        CORE RESEARCH PIPELINE                           |
+  +-------------------------------------------------------------------------+
+  |  1. RESEARCH QUESTION INPUT                                             |
+  |     - Transparent research planning & claim decomposition               |
+  |                                                                         |
+  |  2. ACADEMIC SOURCE DISCOVERY & EXTRACTION                              |
+  |     - OpenAlex, Crossref, arXiv, Unpaywall, Tavily API integration      |
+  |     - Verbatim sentence passage extraction & sha256 provenance          |
+  |                                                                         |
+  |  3. DIALECTICAL ADVERSARIAL ANALYSIS                                    |
+  |     - Advocate Agent (supporting claims with verified passages)         |
+  |     - Skeptic Agent (stress-testing & uncovering counter-evidence)      |
+  |     - Methodology Auditor (sample size, blinding, p-hacking audit)      |
+  |                                                                         |
+  |  4. CONTRADICTION & UNCERTAINTY ADJUDICATION                            |
+  |     - Detection of empirical conflicts & study independence clustering  |
+  |     - Calibrated confidence verdicts without hallucinations             |
+  |                                                                         |
+  |  5. TRACEABLE SCIENTIFIC SYNTHESIS & REPORT                             |
+  |     - Comprehensive 18-section research report with full citations      |
+  |     - Multi-format exports (PDF, Markdown, JSON-LD, BibTeX, CSV)        |
+  +-------------------------------------------------------------------------+
 ```
+
+---
+
+## 4. Streamlined User Navigation
+
+NEOMON's user interface is purposefully organized around 6 primary navigation items, eliminating sidebar clutter while retaining all deep research capabilities within the investigation workspace:
+
+1. **Dashboard (`/`)**: High-level telemetry, active missions, literature ingestion counts, and quick launch triggers.
+2. **New Investigation (`/investigations/new`)**: Direct research query submission, provider selection, and claim decomposition.
+3. **Research History (`/history`)**: Complete searchable record of past investigations, statuses, and execution metadata.
+4. **Evidence & Reports (`/evidence`)**: Centralized repository of extracted passages, claim-evidence associations, source intelligence, and synthesized reports.
+5. **Automation (`/automation`)**: Dedicated n8n workflow monitoring, scheduled research triggers, and webhook management.
+6. **Settings (`/settings`)**: AI provider configuration, model routing, local OpenVINO/Ollama endpoints, and system diagnostics.
+
+*(Note: Specialized analytical capabilities including Knowledge Graphs, Contradiction Intelligence, Research Gaps, Study Independence Clusters, and Peer Review workflows are seamlessly consolidated directly inside the Investigation Workspace).*
+
+---
+
+## 5. n8n Automation Architecture
+
+NEOMON includes a high-performance, secure integration module for **n8n** automation pipelines, allowing asynchronous research monitoring and human-in-the-loop notifications:
+
+* **Workflow A: Automated Research Monitoring (`research_monitoring.json`)**
+  - Configurable schedule trigger (cron interval).
+  - Fetches active monitors from NEOMON `/api/v1/monitoring`.
+  - Executes incremental source discovery with deduplication and contradiction evaluation.
+  - Returns execution telemetry and dispatches researcher notifications.
+* **Workflow B: Investigation Completion Notification (`investigation_completion.json`)**
+  - Webhook triggered on investigation completion.
+  - Retrieves structured report summary and formats notification payloads.
+* **Workflow C: Human Approval & Report Delivery (`report_approval_delivery.json`)**
+  - Webhook triggered when a report is flagged for peer approval.
+  - Independent server-side verification of reviewer roles and self-approval guards.
+  - Automatically releases publication artifacts upon approval.
+
+Ready-to-import workflow blueprints and full setup guides are located in `automation/n8n/`.
 
 ### 1. Autonomous Hypothesis & Query Decomposition
 Given an arbitrary research topic or clinical query, NEOMON decomposes the prompt into four orthogonal research vectors: causal mechanisms, counter-evidence, empirical benchmarks, and critical perspectives. It preserves technical acronyms (e.g., *GLP-1*, *DDR5*, *LoRA*, *CRISPR*) to prevent semantic drift.

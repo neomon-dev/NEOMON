@@ -25,49 +25,19 @@ const navSections: NavSection[] = [
     items: [
       { label: "Dashboard", icon: "⌂", href: "/" },
       { label: "New investigation", icon: "+", href: "/investigations/new" },
-      { label: "Autonomous research", icon: "⚡", href: "/autonomous" },
       { label: "Research history", icon: "↺", href: "/history" },
     ],
   },
   {
-    title: "Evidence & Knowledge",
+    title: "Evidence & Adjudication",
     items: [
-      { label: "Intelligence hub", icon: "❖", href: "/intelligence" },
-      { label: "Evidence library", icon: "◇", href: "/evidence" },
-      { label: "Source intelligence", icon: "◈", href: "/sources" },
-      { label: "Knowledge graph", icon: "⌘", href: "/graph" },
+      { label: "Evidence & Reports", icon: "◇", href: "/evidence" },
     ],
   },
   {
-    title: "Analysis & Synthesis",
-    items: [
-      { label: "Research gaps", icon: "🎯", href: "/gaps" },
-      { label: "Hypotheses", icon: "🔬", href: "/hypotheses" },
-      { label: "Cross-synthesis", icon: "🔗", href: "/synthesis" },
-      { label: "Contradictions", icon: "⚖", href: "/contradictions" },
-      { label: "Research trends", icon: "📈", href: "/trends" },
-    ],
-  },
-  {
-    title: "Verification & Benchmarks",
-    items: [
-      { label: "Quality audit", icon: "🛡", href: "/quality-audit" },
-      { label: "Scientific benchmarks", icon: "📊", href: "/benchmarks" },
-      { label: "Agent laboratory", icon: "◎", href: "/agents" },
-    ],
-  },
-  {
-    title: "Automation & Monitoring",
+    title: "System & Automation",
     items: [
       { label: "Automation", icon: "⚡", href: "/automation" },
-    ],
-  },
-  {
-    title: "Collaboration & System",
-    items: [
-      { label: "Workspaces", icon: "👥", href: "/workspaces" },
-      { label: "Peer reviews", icon: "📋", href: "/reviews" },
-      { label: "Notifications", icon: "🔔", href: "/notifications" },
       { label: "Settings", icon: "⚙", href: "/settings" },
     ],
   },

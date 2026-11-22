@@ -1,6 +1,10 @@
-# NEOMON TODO
+## Product Simplification & n8n Automation completed
 
-## Completed
+- [x] Streamline sidebar navigation into 6 primary operational items (Dashboard, New Investigation, Research History, Evidence & Reports, Automation, Settings).
+- [x] Consolidate specialized deep-dives (Knowledge Graph, Contradiction Intelligence, Research Gaps, Study Independence, Peer Review) into the core Investigation Workspace (`/investigations/[id]`).
+- [x] Implement robust n8n Automation Bridge with status telemetry, research monitor CRUD, manual trigger execution, and service-to-service HMAC token validation.
+- [x] Deliver 3 production workflow blueprints in `automation/n8n/` for scheduled research monitoring, investigation completion notifications, and report approval delivery.
+- [x] Enforce zero data loss: preserve all 69 database models, Alembic migrations, and backend API contracts.
 
 - [x] Audit local workspace and GitHub repository state.
 - [x] Document the actual greenfield baseline.

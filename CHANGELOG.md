@@ -2,7 +2,21 @@
 
 ## Unreleased
 
-### Added
+### Added & Simplified
+
+- Streamlined user navigation into 6 primary operational sections:
+  1. Dashboard (`/`)
+  2. New Investigation (`/investigations/new`)
+  3. Research History (`/history`)
+  4. Evidence & Reports (`/evidence`)
+  5. Automation (`/automation`)
+  6. Settings (`/settings`)
+- Consolidated standalone views (Knowledge Graph, Contradictions, Research Gaps, Study Independence Clusters, Peer Review) directly into the contextual Investigation Workspace (`/investigations/[id]`).
+- Implemented complete n8n automation bridge:
+  - Backend endpoints: `/api/v1/integrations/n8n/status`, `/api/v1/integrations/n8n/test`, `/api/v1/integrations/n8n/events`, `/api/v1/monitoring`.
+  - Workflow blueprints: `research_monitoring.json`, `investigation_completion.json`, and `report_approval_delivery.json`.
+  - Translucent Dot Lens background and responsive cyberpunk automation dashboard (`/automation`).
+- Preserved full backward compatibility across all 69 database models, Alembic migrations, and REST endpoints.
 
 - Audited the empty local workspace and empty GitHub repository.
 - Added the initial Next.js App Router and TypeScript project configuration.

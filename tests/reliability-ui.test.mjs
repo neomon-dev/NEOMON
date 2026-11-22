@@ -24,13 +24,6 @@ test("Milestone 12 Benchmark route and ScientificReliabilityWorkspace components
   assert.match(compContent, /Reviewer Challenge/);
 });
 
-test("AppShell navigation includes Scientific Benchmarks link", () => {
-  const shellPath = path.join(rootDir, "components", "app-shell.tsx");
-  const shellContent = fs.readFileSync(shellPath, "utf8");
-  assert.match(shellContent, /Scientific benchmarks/);
-  assert.match(shellContent, /\/benchmarks/);
-});
-
 test("Investigation Detail UI includes ScientificReliabilityWorkspace mount", () => {
   const invPagePath = path.join(rootDir, "app", "investigations", "[id]", "page.tsx");
   const invContent = fs.readFileSync(invPagePath, "utf8");

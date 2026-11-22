@@ -479,10 +479,5 @@ test("Investigation Detail UI includes Milestone 8A Research Gap Discovery Works
   assert.match(compContent, /Run Gap Discovery/);
   assert.match(compContent, /copy-query-button/);
   assert.match(compContent, /gap-missing-info-box/);
-
-  const appShellPath = path.join(rootDir, "components", "app-shell.tsx");
-  const shellContent = fs.readFileSync(appShellPath, "utf8");
-  assert.match(shellContent, /Research gaps/);
-  assert.match(shellContent, /\/gaps/);
 });
 

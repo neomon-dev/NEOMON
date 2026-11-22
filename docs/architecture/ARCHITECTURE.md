@@ -4,15 +4,26 @@
 
 NEOMON contains a Next.js App Router application using React and TypeScript plus a standalone FastAPI backend in `backend/`. The dashboard keeps its original dark research-laboratory shell and now reads backend health and agent readiness. The backend provides versioned API contracts, provider adapters, SQLAlchemy models, migrations, and an in-process development event broker.
 
-## Planned boundaries
+## Streamlined Navigation and Consolidation Architecture
 
-```text
-app/                 Route composition and UI entry points
-components/          Reusable presentation and interactive panels
-lib/                 Shared types, validation, and client-safe utilities
-backend/app/         FastAPI routes, settings, providers, agents, events, and models
-backend/migrations/  Alembic migrations; never reset production data
-tests/                Focused unit, integration, and end-to-end coverage
+In accordance with product simplification principles, NEOMON standardizes its interface on 6 primary routes, while consolidating specialist analytics inside the core Investigation Workspace:
+
+```
+  Primary Navigation:
+  /                     Dashboard
+  /investigations/new   New Investigation & Claim Formulation
+  /history              Research History & Audit Trail
+  /evidence             Evidence & Reports (Consolidated Explorer)
+  /automation           n8n Automation & Monitoring Bridge
+  /settings             Provider & Hardware Configuration
+
+  Consolidated Workspaces (Mounted within /investigations/[id]):
+  - Knowledge Graph (React Flow Entity Topology)
+  - Dialectical Debate (Advocate / Skeptic / Methodologist)
+  - Contradiction Intelligence & Tension Graph
+  - Research Gaps & Autonomous Horizon
+  - Scientific Reliability & Study Independence Clusters
+  - 18-Section Research Synthesis & Multi-Format Exports
 ```
 
 The first backend integration should be server-only and expose stable, typed contracts to the UI. A Python/FastAPI service remains the preferred home for long-running research orchestration once the project has real workflow requirements; the Next.js app is the initial product shell, not a reason to duplicate orchestration logic in the browser.
