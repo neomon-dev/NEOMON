@@ -362,30 +362,46 @@ async def _run_investigation_impl(
                 await persist_document(source, abstract)
     clusters = detect_source_independence_clusters(all_included_sources) if all_included_sources else []
     cluster_count = len(clusters)
+    peer_reviewed_count = sum(
+        1 for s in all_included_sources if getattr(s, "source_type", "") in {"peer_reviewed", "academic"} or bool(getattr(s, "doi", ""))
+    )
+    primary_source_count = sum(
+        1 for s in all_included_sources if getattr(s, "source_type", "") in {"peer_reviewed", "preprint", "government_institutional", "research_organization"}
+    )
     investigation.relevant_source_count = relevant_source_count
     investigation.full_text_count = full_text_count
-    investigation.quality_status = (
-        "strong"
-        if relevant_source_count >= 5 and evidence_count >= 5 and full_text_count >= 2 and cluster_count >= 3
-        else "moderate"
-        if relevant_source_count >= 3 and evidence_count >= 3 and full_text_count >= 1 and cluster_count >= 2
-        else "limited"
-        if relevant_source_count and evidence_count
-        else "insufficient_evidence"
-    )
+
+    # Scientific calibration gate: 'strong' requires verified peer-review/primary literature, full-text, and independent clusters
+    if relevant_source_count == 0 or evidence_count == 0:
+        investigation.quality_status = "insufficient_evidence"
+    elif (
+        relevant_source_count >= 4
+        and evidence_count >= 4
+        and full_text_count >= 1
+        and cluster_count >= 2
+        and (peer_reviewed_count >= 1 or primary_source_count >= 2)
+    ):
+        investigation.quality_status = "strong"
+    elif relevant_source_count >= 2 and evidence_count >= 2 and cluster_count >= 1:
+        investigation.quality_status = "moderate"
+    else:
+        investigation.quality_status = "limited"
+
     gaps: list[str] = []
     if not relevant_source_count:
         gaps.append("No sources met the transparent relevance threshold.")
     if not evidence_count:
         gaps.append("No traceable relevant passages were extracted.")
+    if peer_reviewed_count == 0 and relevant_source_count > 0:
+        gaps.append("Corpus lacks verified peer-reviewed publications; findings rest on preprints or secondary sources.")
     if cluster_count < 2 and relevant_source_count > 1:
         gaps.append("Multiple sources originate from the same cluster or syndicated publisher, limiting independence.")
     if errors:
         gaps.append(f"{len(errors)} provider or retrieval operation(s) failed.")
     investigation.evidence_gap = " ".join(gaps) or None
     investigation.quality_summary = (
-        f"{relevant_source_count} relevant source(s) across {cluster_count} independent cluster(s), "
-        f"{full_text_count} full-text document(s), and {evidence_count} traceable evidence passage(s)."
+        f"{relevant_source_count} relevant source(s) ({peer_reviewed_count} peer-reviewed/DOI-verified, "
+        f"{cluster_count} independent cluster(s)), {full_text_count} full-text document(s), and {evidence_count} traceable passage(s)."
     )
     investigation.status = "completed" if results else "failed"
     await session.commit()

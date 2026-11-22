@@ -62,6 +62,7 @@ export function EvidenceExplorer() {
   const [minRelevance, setMinRelevance] = useState("all");
   const [sort, setSort] = useState("relevance_desc");
   const [offset, setOffset] = useState(0);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -222,10 +223,11 @@ export function EvidenceExplorer() {
         </div>
 
         <section className="panel" style={{ marginTop: 18 }}>
-          <div className="workspace-toolbar">
+          <div className="workspace-toolbar" style={{ flexWrap: "wrap", gap: "8px" }}>
             <input
               aria-label="Search evidence passages"
               className="filter-input"
+              style={{ flex: "1 1 240px", minWidth: "200px" }}
               placeholder="Search passage text, context, section, source title, or claim..."
               value={search}
               onChange={(event) => {
@@ -236,6 +238,7 @@ export function EvidenceExplorer() {
             <select
               aria-label="Filter by investigation"
               className="filter-select"
+              style={{ maxWidth: "220px" }}
               value={investigationId}
               onChange={(event) => {
                 setInvestigationId(event.target.value);
@@ -255,6 +258,7 @@ export function EvidenceExplorer() {
             <select
               aria-label="Filter by evidence classification"
               className="filter-select"
+              style={{ maxWidth: "180px" }}
               value={evidenceType}
               onChange={(event) => {
                 setEvidenceType(event.target.value);
@@ -270,50 +274,9 @@ export function EvidenceExplorer() {
               <option value="insufficient">Insufficient</option>
             </select>
             <select
-              aria-label="Filter by minimum relevance"
-              className="filter-select"
-              value={minRelevance}
-              onChange={(event) => {
-                setMinRelevance(event.target.value);
-                setOffset(0);
-              }}
-            >
-              <option value="all">Any relevance</option>
-              <option value="0.2">Relevance &gt;= 0.20</option>
-              <option value="0.4">Relevance &gt;= 0.40</option>
-              <option value="0.6">Relevance &gt;= 0.60</option>
-              <option value="0.8">Relevance &gt;= 0.80</option>
-            </select>
-            <select
-              aria-label="Filter by source inclusion status"
-              className="filter-select"
-              value={inclusionStatus}
-              onChange={(event) => {
-                setInclusionStatus(event.target.value);
-                setOffset(0);
-              }}
-            >
-              <option value="all">All inclusion states</option>
-              <option value="included">Included sources</option>
-              <option value="low_relevance">Low relevance</option>
-              <option value="rejected">Rejected sources</option>
-            </select>
-            <select
-              aria-label="Filter by traceability"
-              className="filter-select"
-              value={traceableFilter}
-              onChange={(event) => {
-                setTraceableFilter(event.target.value);
-                setOffset(0);
-              }}
-            >
-              <option value="all">All traceability</option>
-              <option value="true">Traceable only</option>
-              <option value="false">Untraceable only</option>
-            </select>
-            <select
               aria-label="Sort evidence"
               className="filter-select"
+              style={{ maxWidth: "160px" }}
               value={sort}
               onChange={(event) => {
                 setSort(event.target.value);
@@ -324,10 +287,83 @@ export function EvidenceExplorer() {
               <option value="relevance_asc">Lowest relevance</option>
               <option value="recent_desc">Most recent</option>
             </select>
+            <button
+              className="outline-button compact-button"
+              type="button"
+              style={{
+                borderColor: showAdvancedFilters || minRelevance !== "all" || inclusionStatus !== "all" || traceableFilter !== "all" ? "#25D9F2" : undefined,
+                color: showAdvancedFilters || minRelevance !== "all" || inclusionStatus !== "all" || traceableFilter !== "all" ? "#25D9F2" : undefined,
+              }}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              {showAdvancedFilters ? "Hide Filters ▲" : "More Filters ▾"}
+            </button>
             <button className="outline-button compact-button" type="button" onClick={clearFilters}>
-              Reset filters
+              Reset
             </button>
           </div>
+
+          {showAdvancedFilters && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                padding: "10px 14px",
+                background: "rgba(12, 25, 43, 0.6)",
+                border: "1px solid rgba(37, 217, 242, 0.15)",
+                borderRadius: "6px",
+                marginTop: "8px",
+                marginBottom: "4px",
+              }}
+            >
+              <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center" }}>
+                Filter By:
+              </span>
+              <select
+                aria-label="Filter by minimum relevance"
+                className="filter-select"
+                value={minRelevance}
+                onChange={(event) => {
+                  setMinRelevance(event.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="all">Any relevance</option>
+                <option value="0.2">Relevance &gt;= 0.20</option>
+                <option value="0.4">Relevance &gt;= 0.40</option>
+                <option value="0.6">Relevance &gt;= 0.60</option>
+                <option value="0.8">Relevance &gt;= 0.80</option>
+              </select>
+              <select
+                aria-label="Filter by source inclusion status"
+                className="filter-select"
+                value={inclusionStatus}
+                onChange={(event) => {
+                  setInclusionStatus(event.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="all">All inclusion states</option>
+                <option value="included">Included sources</option>
+                <option value="low_relevance">Low relevance</option>
+                <option value="rejected">Rejected sources</option>
+              </select>
+              <select
+                aria-label="Filter by traceability"
+                className="filter-select"
+                value={traceableFilter}
+                onChange={(event) => {
+                  setTraceableFilter(event.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="all">All traceability</option>
+                <option value="true">Traceable only</option>
+                <option value="false">Untraceable only</option>
+              </select>
+            </div>
+          )}
 
           {(sourceId || claimId) && (
             <div className="workspace-quick-links">

@@ -7,10 +7,10 @@
   --color-ice-white: #F5FAFC;
 
   /* Cyberpunk Scientific Interface Tokens */
-  --bg-deep: #050914;
-  --bg-secondary: #091426;
-  --panel: #0C192B;
-  --surface-elevated: #122238;
+  --bg-deep: #06111F;
+  --bg-secondary: rgba(9, 20, 38, 0.45);
+  --panel: rgba(8, 25, 45, 0.42);
+  --surface-elevated: rgba(12, 34, 58, 0.52);
   --cyan: #25D9F2;
   --electric-blue: #2787FF;
   --violet: #8564FF;
@@ -28,12 +28,12 @@
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-smooth: cubic-bezier(0.25, 1, 0.5, 1);
 
-  --background: #050914;
-  --background-alt: #091426;
-  --surface: #0C192B;
-  --surface-raised: #122238;
-  --surface-overlay: rgba(12, 25, 43, 0.92);
-  --surface-hover: #162842;
+  --background: #06111F;
+  --background-alt: rgba(9, 20, 38, 0.45);
+  --surface: rgba(8, 25, 45, 0.42);
+  --surface-raised: rgba(12, 34, 58, 0.52);
+  --surface-overlay: rgba(8, 25, 45, 0.75);
+  --surface-hover: rgba(16, 44, 76, 0.58);
   --border: rgba(37, 217, 242, 0.12);
   --border-subtle: rgba(255, 255, 255, 0.05);
   --border-hover: rgba(37, 217, 242, 0.4);
@@ -74,8 +74,7 @@ html {
 
 body {
   margin: 0;
-  background: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.07), transparent 70%), var(--background);
-  background-attachment: fixed;
+  background: #06111F;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -112,7 +111,8 @@ a {
 .shell {
   display: flex;
   min-height: 100vh;
-  background: var(--background);
+  background: transparent;
+  position: relative;
 }
 
 .sidebar {
@@ -121,7 +121,9 @@ a {
   padding: 24px 14px 20px;
   display: flex;
   flex-direction: column;
-  background: #070b14;
+  background: rgba(7, 11, 20, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   flex-shrink: 0;
   position: sticky;
   top: 0;
@@ -338,22 +340,25 @@ nav {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 10;
 }
 
 /* Collaborative Top Header */
 .global-header {
   height: 56px;
-  background: rgba(8, 13, 26, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
+  background: rgba(5, 9, 20, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(37, 217, 242, 0.16);
+  box-shadow: 0 4px 24px -2px rgba(0, 0, 0, 0.75), 0 1px 0 0 rgba(37, 217, 242, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: 50;
 }
 
 .workspace-switcher-btn {
@@ -527,12 +532,9 @@ nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(8, 13, 26, 0.8);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  position: sticky;
-  top: 0;
-  z-index: 20;
+  background: rgba(8, 13, 26, 0.6);
+  position: relative;
+  z-index: 10;
 }
 
 .eyebrow {
@@ -719,6 +721,8 @@ h1 {
   box-shadow: var(--shadow-sm);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .metric-card:hover, .panel:hover {
@@ -748,12 +752,18 @@ h1 {
 
 .metric-card strong {
   margin: 8px 0 4px;
-  font-size: 32px;
+  font-size: clamp(22px, 2.2vw, 28px);
   font-weight: 800;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
   color: #ffffff;
   line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
 }
 
 .metric-detail {
@@ -926,6 +936,11 @@ h1 {
   color: #cbd5e1;
   font-size: 12px;
   font-weight: 500;
+}
+
+.settings-form > button {
+  justify-self: start;
+  min-width: 220px;
 }
 
 .settings-form button:disabled {
@@ -1394,9 +1409,22 @@ blockquote p {
 /* Knowledge Graph Styles */
 .kg-chip-bar {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  padding: 12px 0 6px;
+  padding: 8px 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kg-chip-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.kg-chip-bar::-webkit-scrollbar-thumb {
+  background: rgba(37, 217, 242, 0.2);
+  border-radius: 4px;
 }
 
 .kg-filter-chip {
@@ -1437,8 +1465,8 @@ blockquote p {
 }
 
 .kg-canvas-wrap {
-  height: 660px;
-  min-height: 540px;
+  height: calc(100vh - 270px);
+  min-height: 580px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -2923,56 +2951,62 @@ blockquote p {
 /* Cybernetic HUD Frame & Cards */
 .hud-card {
   position: relative;
-  background: linear-gradient(180deg, rgba(16, 24, 42, 0.85) 0%, rgba(8, 13, 26, 0.95) 100%);
-  border: 1px solid rgba(56, 189, 248, 0.16);
+  background: rgba(8, 25, 45, 0.35);
+  border: 1px solid rgba(54, 197, 222, 0.16);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   overflow: hidden;
 }
 
 .hud-card:hover {
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 12px 40px -4px rgba(0, 0, 0, 0.7), 0 0 20px -2px rgba(56, 189, 248, 0.18);
+  background: rgba(12, 34, 58, 0.48);
+  border-color: rgba(54, 197, 222, 0.38);
+  box-shadow: 0 12px 40px -4px rgba(0, 0, 0, 0.6), 0 0 20px -2px rgba(54, 197, 222, 0.15);
   transform: translateY(-2px);
 }
 
 /* Technical Corner Accents */
 .hud-corner-tl, .hud-corner-tr, .hud-corner-bl, .hud-corner-br {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   pointer-events: none;
+  transition: all 0.2s ease;
 }
 
 .hud-corner-tl {
   top: -1px;
   left: -1px;
-  border-top: 2px solid #38bdf8;
-  border-left: 2px solid #38bdf8;
+  border-top: 2px solid rgba(37, 217, 242, 0.7);
+  border-left: 2px solid rgba(37, 217, 242, 0.7);
+  border-top-left-radius: 6px;
 }
 
 .hud-corner-tr {
   top: -1px;
   right: -1px;
-  border-top: 2px solid #38bdf8;
-  border-right: 2px solid #38bdf8;
+  border-top: 2px solid rgba(37, 217, 242, 0.7);
+  border-right: 2px solid rgba(37, 217, 242, 0.7);
+  border-top-right-radius: 6px;
 }
 
 .hud-corner-bl {
   bottom: -1px;
   left: -1px;
-  border-bottom: 2px solid #38bdf8;
-  border-left: 2px solid #38bdf8;
+  border-bottom: 2px solid rgba(37, 217, 242, 0.7);
+  border-left: 2px solid rgba(37, 217, 242, 0.7);
+  border-bottom-left-radius: 6px;
 }
 
 .hud-corner-br {
   bottom: -1px;
   right: -1px;
-  border-bottom: 2px solid #38bdf8;
-  border-right: 2px solid #38bdf8;
+  border-bottom: 2px solid rgba(37, 217, 242, 0.7);
+  border-right: 2px solid rgba(37, 217, 242, 0.7);
+  border-bottom-right-radius: 6px;
 }
 
 /* Live Telemetry Beacon */
@@ -3019,17 +3053,19 @@ blockquote p {
 /* Cyber Hero Section */
 .hero-cyber-card {
   position: relative;
-  min-height: 290px;
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  min-height: 240px;
+  border: 1px solid rgba(54, 197, 222, 0.22);
   border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, rgba(8, 15, 30, 0.95) 0%, rgba(4, 8, 18, 0.98) 100%);
-  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.8), 0 0 32px -4px rgba(56, 189, 248, 0.15);
-  padding: 40px 48px;
+  background: rgba(8, 25, 45, 0.35);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 16px 48px -8px rgba(0, 0, 0, 0.5), 0 0 24px -4px rgba(54, 197, 222, 0.12);
+  padding: 32px 40px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   overflow: hidden;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .hero-cyber-content {

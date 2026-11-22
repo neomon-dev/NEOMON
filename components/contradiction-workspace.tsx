@@ -214,18 +214,18 @@ export function ContradictionWorkspace() {
         style={{
           padding: "12px 18px",
           borderRadius: "8px",
-          background: "rgba(239, 68, 68, 0.08)",
-          border: "1px solid rgba(239, 68, 68, 0.25)",
+          background: "linear-gradient(90deg, rgba(37, 217, 242, 0.08) 0%, rgba(100, 123, 255, 0.08) 100%)",
+          border: "1px solid rgba(37, 217, 242, 0.2)",
           fontSize: "12px",
-          color: "#fca5a5",
+          color: "#c8e2f8",
           display: "flex",
           alignItems: "center",
-          gap: "10px",
+          gap: "12px",
         }}
       >
-        <span style={{ fontSize: "16px" }}>⚖️</span>
-        <span>
-          <strong>Scientific Principle:</strong> Authentic empirical divergence is a discovery opportunity. Never force artificial consensus. Genuine contradictions must be investigated through boundary conditions, population differences, or temporal shifts.
+        <span style={{ fontSize: "18px", color: "#36C5DE" }}>⚖️</span>
+        <span style={{ lineHeight: "1.5" }}>
+          <strong style={{ color: "#36C5DE" }}>Scientific Principle:</strong> Authentic empirical divergence is a discovery opportunity. Never force artificial consensus. Genuine contradictions must be investigated through boundary conditions, population differences, or temporal shifts.
         </span>
       </div>
 
@@ -236,7 +236,7 @@ export function ContradictionWorkspace() {
       )}
 
       {/* Filters Bar */}
-      <div className="panel" style={{ padding: "14px 20px", display: "flex", gap: "14px", flexWrap: "wrap", alignItems: "center" }}>
+      <div className="panel" style={{ padding: "14px 20px", display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "14px", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <label style={{ fontSize: "12px", fontWeight: 600, color: "var(--muted)" }}>Investigation:</label>
           <select

@@ -304,63 +304,119 @@ function GraphCanvasInner() {
 
       <div className="content">
         <RevealSection delay={0.08}>
-          <div className="metric-grid">
-            <SpotlightCard spotlightColor="rgba(37, 217, 242, 0.15)">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
-                <span className="metric-label">Visible nodes</span>
-                <span style={{ fontSize: "15px", color: "#25D9F2" }}>⌘</span>
-              </div>
-              <div style={{ padding: "0 18px 16px" }}>
-                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: "12px",
+              marginBottom: "14px",
+            }}
+          >
+            <div
+              className="hud-card"
+              style={{
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "rgba(12, 25, 43, 0.75)",
+                border: "1px solid rgba(37, 217, 242, 0.2)",
+                borderRadius: "8px",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block" }}>
+                  Visible Nodes
+                </span>
+                <strong style={{ fontSize: "20px", color: "#ECF5FF", fontVariantNumeric: "tabular-nums" }}>
                   <AnimatedCounter value={flowNodes.length} />
                 </strong>
-                <span className="metric-detail">
-                  Total persisted claims: {graphData?.total_counts.claims ?? 0} · evidence: {graphData?.total_counts.evidence ?? 0}
+              </div>
+              <span style={{ fontSize: "11px", color: "#25D9F2", fontFamily: "monospace", textAlign: "right" }}>
+                {graphData?.total_counts.claims ?? 0} claims<br />
+                {graphData?.total_counts.evidence ?? 0} evidence
+              </span>
+            </div>
+
+            <div
+              className="hud-card"
+              style={{
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "rgba(12, 25, 43, 0.75)",
+                border: "1px solid rgba(39, 135, 255, 0.2)",
+                borderRadius: "8px",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block" }}>
+                  Persisted Edges
                 </span>
-              </div>
-            </SpotlightCard>
-            <SpotlightCard spotlightColor="rgba(39, 135, 255, 0.15)">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
-                <span className="metric-label">Persisted edges</span>
-                <span style={{ fontSize: "15px", color: "#2787FF" }}>🔗</span>
-              </div>
-              <div style={{ padding: "0 18px 16px" }}>
-                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+                <strong style={{ fontSize: "20px", color: "#ECF5FF", fontVariantNumeric: "tabular-nums" }}>
                   <AnimatedCounter value={flowEdges.length} />
                 </strong>
-                <span className="metric-detail">Directional evidence flows and citations</span>
               </div>
-            </SpotlightCard>
-            <SpotlightCard spotlightColor="rgba(133, 100, 255, 0.15)">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
-                <span className="metric-label">Search highlights</span>
-                <span style={{ fontSize: "15px", color: "#8564FF" }}>🔍</span>
-              </div>
-              <div style={{ padding: "0 18px 16px" }}>
-                <strong style={{ fontSize: "28px", color: "#ECF5FF", display: "block", margin: "4px 0" }}>
+              <span style={{ fontSize: "11px", color: "#2787FF", fontFamily: "monospace", textAlign: "right" }}>
+                Active Flows &<br />Citations
+              </span>
+            </div>
+
+            <div
+              className="hud-card"
+              style={{
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "rgba(12, 25, 43, 0.75)",
+                border: "1px solid rgba(133, 100, 255, 0.2)",
+                borderRadius: "8px",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block" }}>
+                  Search Highlights
+                </span>
+                <strong style={{ fontSize: "20px", color: "#ECF5FF", fontVariantNumeric: "tabular-nums" }}>
                   <AnimatedCounter value={matchedNodeIds.length} />
                 </strong>
-                <span className="metric-detail">Matches across visible graph labels & claims</span>
               </div>
-            </SpotlightCard>
-            <SpotlightCard spotlightColor="rgba(53, 224, 177, 0.15)">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 18px 0" }}>
-                <span className="metric-label">Graph coverage</span>
-                <span style={{ fontSize: "15px", color: "#35E0B1" }}>🌐</span>
-              </div>
-              <div style={{ padding: "0 18px 16px" }}>
-                <strong style={{ fontSize: "24px", color: "#ECF5FF", display: "block", margin: "6px 0" }}>
-                  {graphData?.truncated ? "Bounded slice" : "Complete"}
-                </strong>
-                <span className="metric-detail">
-                  {graphData?.total_counts.sources ?? 0} sources · {graphData?.total_counts.documents ?? 0} documents
+              <span style={{ fontSize: "11px", color: "#8564FF", fontFamily: "monospace", textAlign: "right" }}>
+                Matched Labels &<br />Claims
+              </span>
+            </div>
+
+            <div
+              className="hud-card"
+              style={{
+                padding: "10px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                background: "rgba(12, 25, 43, 0.75)",
+                border: "1px solid rgba(53, 224, 177, 0.2)",
+                borderRadius: "8px",
+              }}
+            >
+              <div>
+                <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "block" }}>
+                  Graph Coverage
                 </span>
+                <strong style={{ fontSize: "16px", color: "#ECF5FF" }}>
+                  {graphData?.truncated ? "Bounded Slice" : "Complete"}
+                </strong>
               </div>
-            </SpotlightCard>
+              <span style={{ fontSize: "11px", color: "#35E0B1", fontFamily: "monospace", textAlign: "right" }}>
+                {graphData?.total_counts.sources ?? 0} sources<br />
+                {graphData?.total_counts.documents ?? 0} docs
+              </span>
+            </div>
           </div>
         </RevealSection>
 
-        <section className="panel" style={{ marginTop: 18 }}>
+        <section className="panel" style={{ marginTop: 0 }}>
           <div className="workspace-toolbar">
             <select
               aria-label="Select investigation for knowledge graph"

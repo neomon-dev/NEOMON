@@ -110,7 +110,7 @@ export default function Home() {
     },
     {
       label: "Scientific Quality Tiers",
-      value: loading ? "…" : `${verifiedCount}/${investigations.length || 1}`,
+      value: loading ? "…" : `${verifiedCount} / ${investigations.length}`,
       detail: verifiedCount === investigations.length && investigations.length > 0 ? "100% verified & calibrated" : "Calibrated across quality criteria",
       icon: "🛡️",
       accent: "#10b981",
@@ -155,8 +155,8 @@ export default function Home() {
         {/* Cyber Hero Stage with Real Canvas Neural Network Background */}
         <section className="hero-cyber-card">
           {/* Animated Background Canvas & Aurora */}
-          <NeuralParticleCanvas density="high" interactive={true} />
-          <AtmosphericAurora showGrid={true} showScanlines={true} />
+          <NeuralParticleCanvas density="medium" interactive={true} />
+          <AtmosphericAurora showGrid={false} showScanlines={true} />
 
           {/* Technical Corner Accents */}
           <div className="hud-corner-tl" />

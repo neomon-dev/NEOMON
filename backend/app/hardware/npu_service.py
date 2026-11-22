@@ -13,7 +13,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    np = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +107,7 @@ class NPUAuxiliaryService:
 
         self._initialization_attempted = True
         core = self._get_core()
-        if core is None:
+        if core is None or np is None:
             self.active_device = "CPU_MOCK"
             return False
 

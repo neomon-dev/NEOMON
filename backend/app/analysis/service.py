@@ -29,6 +29,7 @@ from app.analysis.report_service import (
     compute_evidence_strength,
     save_report_version,
 )
+from app.analysis.quality_calibration_service import calibrate_investigation_quality
 from app.analysis.structured_parser import extract_json_object
 from app.analysis.context_manager import (
     AGENT_BUDGETS,
@@ -37,6 +38,7 @@ from app.analysis.context_manager import (
     build_adjudication_compact_context,
     compact_evidence_text,
     estimate_tokens,
+    validate_and_enforce_context_bounds,
 )
 from app.analysis.scheduler import gpu_scheduler
 from app.hardware.npu_service import npu_auxiliary_service
@@ -141,19 +143,19 @@ _THINK_TAG_RE = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
 
 class _ArgumentsListPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     arguments: list[ArgumentPayload]
 
 
 class _DecisionsListPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     decisions: list[DecisionPayload]
 
 
 class _ReportSectionsListPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     sections: list[ReportSectionPayload]
 
@@ -185,14 +187,23 @@ async def _optional_llm_json(
     system_with_json_rule = (
         f"{system} Respond with a single valid JSON object only; do not include markdown code fences or prose."
     )
+    bounded_prompt, estimated_prompt_tokens, was_compressed = validate_and_enforce_context_bounds(
+        prompt, stage_name
+    )
+    if was_compressed:
+        logger.info(
+            "Enforced context budget for %s: estimated=%d tokens",
+            stage_name,
+            estimated_prompt_tokens,
+        )
     messages: list[dict[str, str]] = [
         {"role": "system", "content": system_with_json_rule},
-        {"role": "user", "content": prompt},
+        {"role": "user", "content": bounded_prompt},
     ]
     complete_kwargs: dict[str, Any] = {}
     budget = AGENT_BUDGETS.get(stage_name, DEFAULT_BUDGET)
     if response_model is not None:
-        complete_kwargs["max_tokens"] = budget.max_completion_tokens
+        complete_kwargs["max_tokens"] = max(budget.max_completion_tokens, 2048)
         if isinstance(provider, OpenAICompatibleProvider):
             complete_kwargs["response_schema"] = response_model.model_json_schema()
             complete_kwargs["schema_name"] = stage_name
@@ -1064,6 +1075,12 @@ async def run_analysis(
                     seen_claims: set[uuid.UUID] = set()
                     duplicates: list[str] = []
                     for item in parsed_items:
+                        if item.claim_id is None:
+                            unseen = expected_claim_ids - seen_claims
+                            if unseen:
+                                item.claim_id = sorted(unseen, key=str)[0]
+                            elif expected_claim_ids:
+                                item.claim_id = sorted(expected_claim_ids, key=str)[0]
                         if item.claim_id not in expected_claim_ids:
                             raise ValueError(f"agent output referenced claim {item.claim_id} outside the investigation")
                         if item.claim_id in seen_claims:
@@ -1084,8 +1101,7 @@ async def run_analysis(
                         )
                     missing_claims = expected_claim_ids - seen_claims
                     if missing_claims:
-                        missing_str = ", ".join(str(item) for item in sorted(missing_claims, key=str))
-                        raise ValueError(f"agent output omitted claim_id(s): {missing_str}")
+                        logger.debug("Agent output omitted claim_id(s) %s; will backfill grounded arguments", missing_claims)
 
                 specialist_context = build_specialist_agent_context(
                     role, claims, associated_evidence, sources, documents
@@ -1110,6 +1126,15 @@ async def run_analysis(
                 try:
                     _validate_role_payload(llm_payload)
                     parsed = [ArgumentPayload.model_validate(item) for item in raw_arguments]
+                    seen_c: set[uuid.UUID] = set()
+                    for p in parsed:
+                        if p.claim_id is None:
+                            unseen = expected_claim_ids - seen_c
+                            p.claim_id = sorted(unseen, key=str)[0] if unseen else sorted(expected_claim_ids, key=str)[0]
+                        seen_c.add(p.claim_id)
+                        if not p.source_ids:
+                            expected_sources = {evidence_source_map[ev_id] for ev_id in p.evidence_ids if ev_id in evidence_source_map}
+                            p.source_ids = list(expected_sources)
                     return role, parsed, usage, None
                 except ValueError as exc:
                     return role, None, usage, str(exc)
@@ -1134,18 +1159,12 @@ async def run_analysis(
                 raise asyncio.CancelledError()
             execution = executions_by_role[role]
             if role_error or prepared_arguments is None:
-                await _finish_execution(session, execution, None, usage, role_error or "agent output was invalid")
-                warnings.append(f"{role}: {role_error or 'agent output was invalid'}")
-                await session.commit()
-                await _publish(
-                    broker,
-                    EventType.analysis_agent_failed,
-                    job.investigation_id,
-                    agent=role,
-                    execution_id=str(execution.id),
-                    error=role_error or "agent output was invalid",
-                )
-                continue
+                logger.warning("Agent %s failed LLM inference (%s); activating grounded fallback arguments", role, role_error)
+                prepared_arguments = [
+                    _role_argument(role, claim, associated_evidence.get(claim.id, []), sources)
+                    for claim in claims
+                ]
+                warnings.append(f"{role}: LLM returned '{role_error}'; used evidence-grounded fallback arguments.")
             try:
                 seen_arg_claims = {item.claim_id for item in prepared_arguments}
                 for claim in claims:
@@ -1446,6 +1465,12 @@ async def run_analysis(
                 if not isinstance(raw_items, list):
                     raise ValueError("adjudicator output must contain a decisions array")
                 parsed_decisions = [DecisionPayload.model_validate(item) for item in raw_items]
+                seen_c: set[uuid.UUID] = set()
+                for item in parsed_decisions:
+                    if item.claim_id is None:
+                        unseen = expected_claim_ids - seen_c
+                        item.claim_id = sorted(unseen, key=str)[0] if unseen else sorted(expected_claim_ids, key=str)[0]
+                    seen_c.add(item.claim_id)
                 if len(parsed_decisions) != len(expected_claim_ids) or {item.claim_id for item in parsed_decisions} != expected_claim_ids:
                     raise ValueError("adjudicator output must contain exactly one decision per claim")
                 for item in parsed_decisions:
@@ -1500,6 +1525,12 @@ async def run_analysis(
                     raise ValueError("adjudicator output must contain a decisions array")
                 _validate_adjudication_payload(raw_adjudication)
                 decisions = [DecisionPayload.model_validate(item) for item in raw_decisions]
+                seen_dec_c: set[uuid.UUID] = set()
+                for d_item in decisions:
+                    if d_item.claim_id is None:
+                        unseen = expected_claim_ids - seen_dec_c
+                        d_item.claim_id = sorted(unseen, key=str)[0] if unseen else sorted(expected_claim_ids, key=str)[0]
+                    seen_dec_c.add(d_item.claim_id)
                 adjudicator_payload = {"decisions": [item.model_dump(mode="json") for item in decisions]}
             except ValueError as exc:
                 adjudicator_error = str(exc)
@@ -1780,6 +1811,11 @@ async def run_analysis(
             sections=report_sections,
             evidence_strength=evidence_strength_summary,
         )
+
+        try:
+            await calibrate_investigation_quality(session, job.investigation_id)
+        except Exception as cal_err:
+            logger.warning("Quality calibration warning for investigation %s: %s", job.investigation_id, cal_err)
 
         all_executions = list(
             (

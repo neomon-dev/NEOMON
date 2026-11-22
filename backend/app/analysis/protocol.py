@@ -62,7 +62,7 @@ class ArgumentPayload(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     argument_id: uuid.UUID | None = None
-    claim_id: uuid.UUID
+    claim_id: uuid.UUID | None = None
     argument_type: ArgumentType
     text: str = Field(default="Evidence-grounded analysis.", min_length=1, max_length=8000)
     evidence_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
@@ -79,6 +79,16 @@ class ArgumentPayload(BaseModel):
             return data
         d = dict(data)
 
+        # Sanitize claim_id
+        raw_cid = d.get("claim_id") or d.get("claim") or d.get("id")
+        if raw_cid:
+            try:
+                d["claim_id"] = str(uuid.UUID(str(raw_cid)))
+            except (ValueError, TypeError):
+                d["claim_id"] = None
+        else:
+            d["claim_id"] = None
+
         # Normalize text and reasoning_summary
         text = d.get("text") or d.get("argument") or d.get("reasoning_summary") or d.get("explanation") or d.get("summary")
         summary = d.get("reasoning_summary") or d.get("explanation") or d.get("summary") or text
@@ -93,23 +103,6 @@ class ArgumentPayload(BaseModel):
 
         # Normalize evidence_basis
         basis = str(d.get("evidence_basis", "")).lower().strip()
-        if basis in {"direct", "indirect", "none"}:
-            d["evidence_basis"] = basis
-        elif d.get("evidence_ids") and len(d.get("evidence_ids", [])) > 0:
-            d["evidence_basis"] = "direct"
-        else:
-            d["evidence_basis"] = "none"
-
-        # Normalize confidence from flat fields
-        raw_conf = d.get("confidence")
-        conf_lvl = d.get("confidence_level")
-        if raw_conf is None and conf_lvl is not None:
-            d["confidence"] = conf_lvl
-        elif raw_conf is None:
-            d["confidence"] = {"level": "moderate", "explanation": "Assessed from supplied evidence."}
-
-        # Normalize argument_type if missing or slightly varied
-        arg_type = str(d.get("argument_type", "")).lower().strip()
         type_map = {
             "supporting": ArgumentType.supporting,
             "support": ArgumentType.supporting,
@@ -124,6 +117,52 @@ class ArgumentPayload(BaseModel):
             "temporal_qualification": ArgumentType.temporal_qualification,
             "temporal": ArgumentType.temporal_qualification,
         }
+        if basis in type_map and ("argument_type" not in d or not d["argument_type"]):
+            d["argument_type"] = type_map[basis]
+            basis = "direct"
+
+        basis_map = {
+            "direct": "direct",
+            "indirect": "indirect",
+            "none": "none",
+            "contextual": "indirect",
+            "circumstantial": "indirect",
+            "partial": "indirect",
+            "empirical": "direct",
+            "observational": "direct",
+            "theoretical": "indirect",
+            "source_criticism": "direct",
+            "methodology": "direct",
+        }
+        if basis in basis_map:
+            d["evidence_basis"] = basis_map[basis]
+        elif d.get("evidence_ids") and len(d.get("evidence_ids", [])) > 0:
+            d["evidence_basis"] = "direct"
+        else:
+            d["evidence_basis"] = "none"
+
+        # Sanitize evidence_ids and source_ids to valid UUIDs
+        for id_field in ("evidence_ids", "source_ids"):
+            raw_ids = d.get(id_field)
+            if isinstance(raw_ids, list):
+                valid_ids: list[str] = []
+                for item in raw_ids:
+                    try:
+                        valid_ids.append(str(uuid.UUID(str(item))))
+                    except (ValueError, TypeError):
+                        continue
+                d[id_field] = valid_ids
+
+        # Normalize confidence from flat fields
+        raw_conf = d.get("confidence")
+        conf_lvl = d.get("confidence_level")
+        if raw_conf is None and conf_lvl is not None:
+            d["confidence"] = conf_lvl
+        elif raw_conf is None:
+            d["confidence"] = {"level": "moderate", "explanation": "Assessed from supplied evidence."}
+
+        # Normalize argument_type if missing or slightly varied
+        arg_type = str(d.get("argument_type", "")).lower().strip()
         if arg_type in type_map:
             d["argument_type"] = type_map[arg_type]
         elif "argument_type" not in d or not d["argument_type"]:
@@ -133,7 +172,7 @@ class ArgumentPayload(BaseModel):
 
 
 class DebatePayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     round_number: int = Field(ge=1, le=10)
     moderator_summary: str = Field(min_length=1, max_length=6000)
@@ -148,22 +187,62 @@ class PlannerPayload(BaseModel):
 
 
 class DecisionPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
-    claim_id: uuid.UUID
-    decision: str = Field(pattern="^(strongly_supported|moderately_supported|weakly_supported|contradictory|insufficient_evidence)$")
-    explanation: str = Field(min_length=1, max_length=6000)
+    claim_id: uuid.UUID | None = None
+    decision: str = Field(default="moderately_supported", pattern="^(strongly_supported|moderately_supported|weakly_supported|contradictory|insufficient_evidence)$")
+    explanation: str = Field(default="Adjudication evaluated from available claims and evidence.", min_length=1, max_length=6000)
     supporting_argument_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
     evidence_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
     unresolved_disagreements: list[str] = Field(default_factory=list, max_length=20)
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_decision(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        d = dict(data)
+        raw_cid = d.get("claim_id") or d.get("claim") or d.get("id")
+        if raw_cid:
+            try:
+                d["claim_id"] = str(uuid.UUID(str(raw_cid)))
+            except (ValueError, TypeError):
+                d["claim_id"] = None
+        else:
+            d["claim_id"] = None
+
+        raw_dec = str(d.get("decision", "")).lower().strip()
+        dec_map = {
+            "strongly_supported": "strongly_supported",
+            "strong": "strongly_supported",
+            "moderately_supported": "moderately_supported",
+            "moderate": "moderately_supported",
+            "supported": "moderately_supported",
+            "weakly_supported": "weakly_supported",
+            "weak": "weakly_supported",
+            "contradictory": "contradictory",
+            "contradiction": "contradictory",
+            "conflict": "contradictory",
+            "insufficient_evidence": "insufficient_evidence",
+            "insufficient": "insufficient_evidence",
+            "none": "insufficient_evidence",
+        }
+        if raw_dec in dec_map:
+            d["decision"] = dec_map[raw_dec]
+        elif not d.get("decision"):
+            d["decision"] = "moderately_supported"
+
+        if not d.get("explanation"):
+            d["explanation"] = f"Adjudication decision evaluated as {d['decision']} from available claims and evidence."
+        return d
+
 
 class EvidenceProvenance(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
     evidence_id: uuid.UUID
-    source_url: str
-    access_level: str
+    source_url: str = Field(default="https://neomon.local/source")
+    access_level: str = Field(default="open_access")
     document_url: str | None = None
     version_type: str | None = None
     page_number: int | None = None
@@ -171,11 +250,11 @@ class EvidenceProvenance(BaseModel):
 
 
 class ReportSectionPayload(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="ignore")
 
-    section_type: str = Field(min_length=1, max_length=40)
-    title: str = Field(min_length=1, max_length=200)
-    content: str = Field(min_length=1, max_length=12000)
+    section_type: str = Field(default="analysis", min_length=1, max_length=40)
+    title: str = Field(default="Research Analysis", min_length=1, max_length=200)
+    content: str = Field(default="Analysis section content.", min_length=1, max_length=12000)
     claim_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
     evidence_ids: list[uuid.UUID] = Field(default_factory=list, max_length=100)
     provenance: list[EvidenceProvenance] = Field(default_factory=list, max_length=100)

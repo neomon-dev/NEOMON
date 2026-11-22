@@ -100,11 +100,14 @@ class AdaptiveGPUScheduler:
                         yield lease_meta
                     finally:
                         self._active_generations = max(0, self._active_generations - 1)
-        except TimeoutError:
+        except (TimeoutError, asyncio.CancelledError) as exc:
             self._queue_depth = max(0, self._queue_depth - 1)
             if req_id in self._queue:
                 self._queue.remove(req_id)
-            logger.error("GPU lease timed out waiting in queue: stage=%s timeout=%.1fs", stage_name, timeout_seconds)
+            if isinstance(exc, TimeoutError):
+                logger.error("GPU lease timed out waiting in queue: stage=%s timeout=%.1fs", stage_name, timeout_seconds)
+            else:
+                logger.info("GPU lease cancelled while waiting in queue: stage=%s", stage_name)
             raise
 
     def get_telemetry(self) -> SchedulerTelemetry:

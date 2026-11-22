@@ -59,7 +59,9 @@ export function SpotlightCard({
       className={`spotlight-card ${className}`}
       style={{
         position: "relative",
-        background: "var(--panel, #0C192B)",
+        background: "var(--panel, rgba(8, 25, 45, 0.40))",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
         borderTop: propBorderTop || propBorder || `1px solid ${activeBorderColor}`,
         borderRight: propBorderRight || propBorder || `1px solid ${activeBorderColor}`,
         borderBottom: propBorderBottom || propBorder || `1px solid ${activeBorderColor}`,

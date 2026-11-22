@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { BackendStatus } from "@/components/backend-status";
+import { DotLens } from "@/components/dot-lens";
 import { ProviderSessionProvider } from "@/components/provider-context";
 import { useAuth } from "@/lib/auth-context";
 
@@ -24,43 +25,23 @@ const navSections: NavSection[] = [
     items: [
       { label: "Dashboard", icon: "⌂", href: "/" },
       { label: "New investigation", icon: "+", href: "/investigations/new" },
-      { label: "Autonomous research", icon: "⚡", href: "/autonomous" },
       { label: "Research history", icon: "↺", href: "/history" },
     ],
   },
   {
-    title: "Evidence & Knowledge",
+    title: "Evidence & Adjudication",
     items: [
-      { label: "Intelligence hub", icon: "❖", href: "/intelligence" },
       { label: "Evidence library", icon: "◇", href: "/evidence" },
       { label: "Source intelligence", icon: "◈", href: "/sources" },
       { label: "Knowledge graph", icon: "⌘", href: "/graph" },
-    ],
-  },
-  {
-    title: "Analysis & Synthesis",
-    items: [
-      { label: "Research gaps", icon: "🎯", href: "/gaps" },
-      { label: "Hypotheses", icon: "🔬", href: "/hypotheses" },
-      { label: "Cross-synthesis", icon: "🔗", href: "/synthesis" },
       { label: "Contradictions", icon: "⚖", href: "/contradictions" },
-      { label: "Research trends", icon: "📈", href: "/trends" },
     ],
   },
   {
-    title: "Verification & Benchmarks",
+    title: "System & Workspaces",
     items: [
-      { label: "Quality audit", icon: "🛡", href: "/quality-audit" },
-      { label: "Scientific benchmarks", icon: "📊", href: "/benchmarks" },
-      { label: "Agent laboratory", icon: "◎", href: "/agents" },
-    ],
-  },
-  {
-    title: "Collaboration & System",
-    items: [
+      { label: "Agent observatory", icon: "◎", href: "/agents" },
       { label: "Workspaces", icon: "👥", href: "/workspaces" },
-      { label: "Peer reviews", icon: "📋", href: "/reviews" },
-      { label: "Notifications", icon: "🔔", href: "/notifications" },
       { label: "Settings", icon: "⚙", href: "/settings" },
     ],
   },
@@ -77,6 +58,18 @@ export function AppShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <ProviderSessionProvider>
       <div className="shell">
+        <DotLens
+          background="#06111F"
+          baseColor="#082F49"
+          midColor="#647BFF"
+          accentColor="#36C5DE"
+          density={34}
+          dotSize={78}
+          reach={20}
+          minSize={10}
+          hover={100}
+          speed={32}
+        />
         <aside className="sidebar">
           <Link className="brand" href="/" title="NEOMON — RESEARCH BEYOND THE SURFACE.">
             <div className="brand-symbol-container">

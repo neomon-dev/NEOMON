@@ -24,87 +24,150 @@ class AgentContextBudget:
     preserve_full_text: bool
 
 
-# Empirical token budgets calibrated for Intel Arc GPU Unified Shared Memory (USM)
+# Context token targets calibrated for OpenVINO Qwen 8B on Intel Arc GPU Unified Shared Memory (USM)
 AGENT_BUDGETS: dict[str, AgentContextBudget] = {
     "intelligence_planner": AgentContextBudget(
         role="intelligence_planner",
-        target_prompt_tokens=400,
+        target_prompt_tokens=2048,
         max_completion_tokens=1024,
         max_evidence_per_claim=0,
         preserve_full_text=False,
     ),
     "advocate": AgentContextBudget(
         role="advocate",
-        target_prompt_tokens=1400,
+        target_prompt_tokens=3072,
         max_completion_tokens=1536,
-        max_evidence_per_claim=4,
+        max_evidence_per_claim=5,
         preserve_full_text=False,
     ),
     "skeptic": AgentContextBudget(
         role="skeptic",
-        target_prompt_tokens=1400,
+        target_prompt_tokens=3072,
         max_completion_tokens=1536,
-        max_evidence_per_claim=4,
+        max_evidence_per_claim=5,
         preserve_full_text=False,
     ),
     "methodology_auditor": AgentContextBudget(
         role="methodology_auditor",
-        target_prompt_tokens=1400,
+        target_prompt_tokens=3072,
         max_completion_tokens=1536,
-        max_evidence_per_claim=4,
+        max_evidence_per_claim=5,
         preserve_full_text=False,
     ),
     "source_intelligence": AgentContextBudget(
         role="source_intelligence",
-        target_prompt_tokens=1300,
-        max_completion_tokens=1536,
-        max_evidence_per_claim=3,
+        target_prompt_tokens=2048,
+        max_completion_tokens=1024,
+        max_evidence_per_claim=4,
         preserve_full_text=False,
     ),
     "citation_genealogy": AgentContextBudget(
         role="citation_genealogy",
-        target_prompt_tokens=1300,
-        max_completion_tokens=1536,
-        max_evidence_per_claim=3,
+        target_prompt_tokens=2048,
+        max_completion_tokens=1024,
+        max_evidence_per_claim=4,
         preserve_full_text=False,
     ),
     "temporal_intelligence": AgentContextBudget(
         role="temporal_intelligence",
-        target_prompt_tokens=1300,
-        max_completion_tokens=1536,
-        max_evidence_per_claim=3,
+        target_prompt_tokens=2048,
+        max_completion_tokens=1024,
+        max_evidence_per_claim=4,
         preserve_full_text=False,
     ),
     "debate_moderator": AgentContextBudget(
         role="debate_moderator",
-        target_prompt_tokens=1200,
+        target_prompt_tokens=2048,
         max_completion_tokens=1024,
         max_evidence_per_claim=0,
         preserve_full_text=False,
     ),
     "conflict_adjudicator": AgentContextBudget(
         role="conflict_adjudicator",
-        target_prompt_tokens=1800,
+        target_prompt_tokens=2560,
         max_completion_tokens=1536,
-        max_evidence_per_claim=4,
+        max_evidence_per_claim=5,
         preserve_full_text=False,
     ),
     "report_intelligence": AgentContextBudget(
         role="report_intelligence",
-        target_prompt_tokens=2200,
+        target_prompt_tokens=4096,
         max_completion_tokens=2048,
-        max_evidence_per_claim=5,
+        max_evidence_per_claim=6,
         preserve_full_text=False,
     ),
 }
 
 DEFAULT_BUDGET = AgentContextBudget(
     role="default",
-    target_prompt_tokens=1400,
+    target_prompt_tokens=2560,
     max_completion_tokens=1536,
     max_evidence_per_claim=4,
     preserve_full_text=False,
 )
+
+# Deterministic passage relevance & metadata cache (safe across calls)
+_RELEVANCE_CACHE: dict[str, float] = {}
+
+
+def get_cached_relevance(claim_id_or_text: str, evidence_id_or_text: str) -> float | None:
+    """Retrieve pre-computed relevance score if present in cache."""
+    key = f"{claim_id_or_text}::{evidence_id_or_text}"
+    return _RELEVANCE_CACHE.get(key)
+
+
+def set_cached_relevance(claim_id_or_text: str, evidence_id_or_text: str, score: float) -> None:
+    """Cache deterministic relevance score."""
+    key = f"{claim_id_or_text}::{evidence_id_or_text}"
+    if len(_RELEVANCE_CACHE) > 5000:
+        _RELEVANCE_CACHE.clear()
+    _RELEVANCE_CACHE[key] = score
+
+
+def validate_and_enforce_context_bounds(
+    prompt: str,
+    role: str,
+    max_context_limit: int = 16384,
+    safety_margin: float = 0.15,
+) -> tuple[str, int, bool]:
+    """Validate prompt against task budget and model limits, applying compression if needed.
+
+    Returns: (final_prompt, estimated_tokens, was_compressed)
+    """
+    budget = AGENT_BUDGETS.get(role, DEFAULT_BUDGET)
+    est = estimate_tokens(prompt)
+    effective_ceiling = min(
+        budget.target_prompt_tokens,
+        int(max_context_limit * (1.0 - safety_margin)) - budget.max_completion_tokens,
+    )
+
+    if est <= effective_ceiling:
+        return prompt, est, False
+
+    # Compress prompt if oversized while strictly preserving exact quote text and IDs
+    lines = prompt.splitlines()
+    compressed_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        compressed_lines.append(stripped)
+
+    compressed_prompt = " ".join(compressed_lines)
+    compressed_est = estimate_tokens(compressed_prompt)
+
+    # If still exceeding effective ceiling, truncate safely without breaking JSON structure
+    if compressed_est > effective_ceiling:
+        char_cap = int(effective_ceiling * 3.8)
+        # Find last clean boundary before char_cap
+        safe_cut = compressed_prompt[:char_cap].rfind("}")
+        if safe_cut > char_cap // 2:
+            compressed_prompt = compressed_prompt[: safe_cut + 1]
+        else:
+            compressed_prompt = compressed_prompt[:char_cap]
+        compressed_est = estimate_tokens(compressed_prompt)
+
+    return compressed_prompt, compressed_est, True
 
 
 def estimate_tokens(text: str) -> int:

@@ -44,6 +44,7 @@ export function SourceIntelligence() {
   const [sort, setSort] = useState("relevance_desc");
   const [offset, setOffset] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [refreshingSourceId, setRefreshingSourceId] = useState<string | null>(null);
@@ -190,10 +191,11 @@ export function SourceIntelligence() {
         </div>
 
         <section className="panel" style={{ marginTop: 18 }}>
-          <div className="workspace-toolbar">
+          <div className="workspace-toolbar" style={{ flexWrap: "wrap", gap: "8px" }}>
             <input
               aria-label="Search sources"
               className="filter-input"
+              style={{ flex: "1 1 240px", minWidth: "200px" }}
               placeholder="Search title, publisher, DOI, or URL..."
               value={search}
               onChange={(event) => {
@@ -204,6 +206,7 @@ export function SourceIntelligence() {
             <select
               aria-label="Filter by investigation"
               className="filter-select"
+              style={{ maxWidth: "220px" }}
               value={investigationId}
               onChange={(event) => {
                 setInvestigationId(event.target.value);
@@ -219,22 +222,9 @@ export function SourceIntelligence() {
               ))}
             </select>
             <select
-              aria-label="Filter by inclusion status"
-              className="filter-select"
-              value={inclusionStatus}
-              onChange={(event) => {
-                setInclusionStatus(event.target.value);
-                setOffset(0);
-              }}
-            >
-              <option value="all">All inclusion states</option>
-              <option value="included">Included</option>
-              <option value="low_relevance">Low relevance</option>
-              <option value="rejected">Rejected</option>
-            </select>
-            <select
               aria-label="Filter by source type"
               className="filter-select"
+              style={{ maxWidth: "180px" }}
               value={sourceType}
               onChange={(event) => {
                 setSourceType(event.target.value);
@@ -258,39 +248,9 @@ export function SourceIntelligence() {
               <option value="other">Other</option>
             </select>
             <select
-              aria-label="Filter by access level"
-              className="filter-select"
-              value={accessLevel}
-              onChange={(event) => {
-                setAccessLevel(event.target.value);
-                setOffset(0);
-              }}
-            >
-              <option value="all">All access levels</option>
-              <option value="full_text">Full text</option>
-              <option value="abstract_only">Abstract only</option>
-              <option value="metadata_only">Metadata only</option>
-              <option value="none">No document retrieved</option>
-            </select>
-            <select
-              aria-label="Filter by open access status"
-              className="filter-select"
-              value={openAccessStatus}
-              onChange={(event) => {
-                setOpenAccessStatus(event.target.value);
-                setOffset(0);
-              }}
-            >
-              <option value="all">All OA statuses</option>
-              <option value="resolved">OA resolved</option>
-              <option value="metadata_only">Metadata only</option>
-              <option value="unavailable">Unavailable</option>
-              <option value="not_checked">Not checked</option>
-              <option value="failed">Failed</option>
-            </select>
-            <select
               aria-label="Sort sources"
               className="filter-select"
+              style={{ maxWidth: "160px" }}
               value={sort}
               onChange={(event) => {
                 setSort(event.target.value);
@@ -302,10 +262,86 @@ export function SourceIntelligence() {
               <option value="relevance_asc">Lowest relevance</option>
               <option value="recent_desc">Most recent</option>
             </select>
+            <button
+              className="outline-button compact-button"
+              type="button"
+              style={{
+                borderColor: showAdvancedFilters || inclusionStatus !== "all" || accessLevel !== "all" || openAccessStatus !== "all" ? "#25D9F2" : undefined,
+                color: showAdvancedFilters || inclusionStatus !== "all" || accessLevel !== "all" || openAccessStatus !== "all" ? "#25D9F2" : undefined,
+              }}
+              onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            >
+              {showAdvancedFilters ? "Hide Filters ▲" : "More Filters ▾"}
+            </button>
             <button className="outline-button compact-button" type="button" onClick={clearFilters}>
-              Reset filters
+              Reset
             </button>
           </div>
+
+          {showAdvancedFilters && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "10px",
+                padding: "10px 14px",
+                background: "rgba(12, 25, 43, 0.6)",
+                border: "1px solid rgba(37, 217, 242, 0.15)",
+                borderRadius: "6px",
+                marginTop: "8px",
+                marginBottom: "4px",
+              }}
+            >
+              <span style={{ fontSize: "11px", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center" }}>
+                Filter By:
+              </span>
+              <select
+                aria-label="Filter by inclusion status"
+                className="filter-select"
+                value={inclusionStatus}
+                onChange={(event) => {
+                  setInclusionStatus(event.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="all">All inclusion states</option>
+                <option value="included">Included</option>
+                <option value="low_relevance">Low relevance</option>
+                <option value="rejected">Rejected</option>
+              </select>
+              <select
+                aria-label="Filter by access level"
+                className="filter-select"
+                value={accessLevel}
+                onChange={(event) => {
+                  setAccessLevel(event.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="all">All access levels</option>
+                <option value="full_text">Full text</option>
+                <option value="abstract_only">Abstract only</option>
+                <option value="metadata_only">Metadata only</option>
+                <option value="none">No document retrieved</option>
+              </select>
+              <select
+                aria-label="Filter by open access status"
+                className="filter-select"
+                value={openAccessStatus}
+                onChange={(event) => {
+                  setOpenAccessStatus(event.target.value);
+                  setOffset(0);
+                }}
+              >
+                <option value="all">All OA statuses</option>
+                <option value="resolved">OA resolved</option>
+                <option value="metadata_only">Metadata only</option>
+                <option value="unavailable">Unavailable</option>
+                <option value="not_checked">Not checked</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+          )}
 
           {actionMessage && <p className="connection-result success dashboard-error">{actionMessage}</p>}
           {error && <p className="connection-result error dashboard-error">{error}</p>}
