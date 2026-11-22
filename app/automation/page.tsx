@@ -108,11 +108,12 @@ export default function AutomationDashboardPage() {
   async function handleTriggerRun(config: MonitoringConfig) {
     try {
       setActionMessage(`Triggering research monitoring run for "${config.name}"...`);
+      const runKey = "ui_" + String(config.id) + "_" + String(config.consecutive_failures);
       const res = await requestJson<{ sources_discovered: number; status: string }>(
         `/monitoring/${config.id}/trigger`,
         {
           method: "POST",
-          body: JSON.stringify({ idempotency_key: `ui_${Date.now()}` }),
+          body: JSON.stringify({ idempotency_key: runKey }),
         }
       );
       setActionMessage(
