@@ -225,7 +225,13 @@ async def _optional_llm_json(
                 await _tracked_state("generating", {})
             async with gpu_scheduler.lease(stage_name, estimated_prompt_tokens=estimate_tokens(prompt)):
                 async with inference_state_listener(_tracked_state):
-                    result = await provider.complete(messages, model=model, **complete_kwargs)
+                    try:
+                        result = await provider.complete(messages, model=model, **complete_kwargs)
+                    except TypeError as type_err:
+                        if "unexpected keyword argument" in str(type_err):
+                            result = await provider.complete(messages, model=model)
+                        else:
+                            raise
         except (ProviderRequestError, ProviderQueueTimeoutError, ProviderQueueFullError, TimeoutError) as exc:
             if generating_started_monotonic is not None:
                 total_inference_seconds += time.monotonic() - generating_started_monotonic

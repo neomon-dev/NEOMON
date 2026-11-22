@@ -178,7 +178,7 @@ class _MockAnalysisProvider:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, object]]] = []
 
-    async def complete(self, messages, model=None):
+    async def complete(self, messages, model=None, **kwargs):
         system = messages[0]["content"]
         request = json.loads(messages[1]["content"])
         self.calls.append((system, request))

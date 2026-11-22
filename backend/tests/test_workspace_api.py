@@ -472,7 +472,7 @@ async def test_duplicate_claim_argument_triggers_retry_and_adjudicator_enforces_
     seen_adjudicator_attempts = 0
 
     class _CorrectableProvider:
-        async def complete(self, messages, model=None):
+        async def complete(self, messages, model=None, **kwargs):
             nonlocal seen_advocate_attempts, seen_adjudicator_attempts
             system = messages[0]["content"]
             request = json.loads(messages[1]["content"])
@@ -655,7 +655,7 @@ async def test_failed_analysis_marks_waiting_or_running_executions_failed(isolat
     await isolated_session.flush()
 
     class _FailingModeratorProvider:
-        async def complete(self, messages, model=None):
+        async def complete(self, messages, model=None, **kwargs):
             system = messages[0]["content"]
             if "claims array" in system:
                 return {
