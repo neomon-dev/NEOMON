@@ -44,7 +44,7 @@ export function SourceIntelligence() {
   const [sort, setSort] = useState("relevance_desc");
   const [offset, setOffset] = useState(0);
   const [refreshNonce, setRefreshNonce] = useState(0);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(true);
 
   const [loading, setLoading] = useState(true);
   const [refreshingSourceId, setRefreshingSourceId] = useState<string | null>(null);
