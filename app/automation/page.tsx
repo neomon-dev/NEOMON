@@ -69,13 +69,39 @@ export default function AutomationDashboardPage() {
       const [statusRes, configsRes, invsRes] = await Promise.all([
         requestJson<N8nStatus>("/integrations/n8n/status"),
         requestJson<MonitoringConfig[]>(`/monitoring?workspace_id=${workspaceId}`),
-        requestJson<{ items?: InvestigationOption[]; investigations?: InvestigationOption[] }>(
-          `/research/investigations?workspace_id=${workspaceId}&limit=20`
-        ).catch(() => ({ items: [] as InvestigationOption[], investigations: [] as InvestigationOption[] })),
+        requestJson<InvestigationOption[] | { items?: InvestigationOption[]; investigations?: InvestigationOption[] }>(
+          `/research/investigations?workspace_id=${workspaceId}`
+        ).catch(async () => {
+          // Fallback without workspace filter if workspace-specific query returns empty or errors
+          return requestJson<InvestigationOption[]>("/research/investigations").catch(() => []);
+        }),
       ]);
       setN8nStatus(statusRes);
       setConfigs(configsRes);
-      const invList = ("items" in invsRes && invsRes.items) || ("investigations" in invsRes && invsRes.investigations) || [];
+
+      let invList: InvestigationOption[] = [];
+      if (Array.isArray(invsRes)) {
+        invList = invsRes;
+      } else if (invsRes && typeof invsRes === "object") {
+        if ("items" in invsRes && Array.isArray(invsRes.items)) {
+          invList = invsRes.items;
+        } else if ("investigations" in invsRes && Array.isArray(invsRes.investigations)) {
+          invList = invsRes.investigations;
+        }
+      }
+
+      // If workspace query returned 0 investigations, try global fetch so users always have options to monitor
+      if (invList.length === 0) {
+        try {
+          const fallbackRes = await requestJson<InvestigationOption[]>("/research/investigations");
+          if (Array.isArray(fallbackRes)) {
+            invList = fallbackRes;
+          }
+        } catch {
+          // ignore fallback error
+        }
+      }
+
       setInvestigations(invList);
       if (invList.length > 0 && !formInvestigationId) {
         setFormInvestigationId(invList[0].id);
@@ -480,15 +506,21 @@ export default function AutomationDashboardPage() {
                 <select
                   required
                   className="filter-select"
-                  style={{ width: "100%" }}
+                  style={{ width: "100%", background: "#0c1527", color: "#f8fafc" }}
                   value={formInvestigationId}
                   onChange={(e) => setFormInvestigationId(e.target.value)}
                 >
-                  {investigations.map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.question.slice(0, 60)}...
+                  {investigations.length === 0 ? (
+                    <option value="" disabled style={{ background: "#0c1527", color: "#94a3b8" }}>
+                      No investigations found — launch an investigation first
                     </option>
-                  ))}
+                  ) : (
+                    investigations.map((inv) => (
+                      <option key={inv.id} value={inv.id} style={{ background: "#0c1527", color: "#f8fafc" }}>
+                        {inv.question.length > 70 ? `${inv.question.slice(0, 70)}...` : inv.question}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 
